@@ -7,6 +7,7 @@ from typing import Any, Callable, Iterable, Protocol, cast, runtime_checkable
 
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
+from pinelib.core.types import TickUpdate
 from pinelib.errors import PineGoldenMismatchError, PineRuntimeError
 from pinelib.strategy.context import Fill, StrategyContext, Trade
 
@@ -20,10 +21,11 @@ class GeneratedStrategy(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class StrategySchedule:
-    """Controls the historical bar-by-bar strategy execution schedule."""
+    """Controls deterministic strategy execution scheduling."""
 
     process_orders: bool = True
     calc_on_order_fills: bool = True
+    calc_on_every_tick: bool = True
     max_recalculations_per_bar: int | None = None
 
 
@@ -92,6 +94,7 @@ def run_generated_strategy(
     bars: Iterable[Bar],
     *,
     schedule: StrategySchedule | None = None,
+    realtime_ticks: Iterable[Iterable[TickUpdate]] | None = None,
 ) -> BacktestResult:
     """Run generated-like code bar-by-bar using PineRuntime + StrategyContext.
 
@@ -108,28 +111,70 @@ def run_generated_strategy(
     callback = _resolve_strategy_callback(strategy_instance)
     max_recalcs = schedule.max_recalculations_per_bar or runtime.config.max_recalculations_per_bar
 
+    ticks_by_bar = iter(realtime_ticks) if realtime_ticks is not None else None
     for bar in bars:
-        runtime.begin_bar(bar)
-        active_bar = runtime.current_bar
-        if active_bar is None:  # defensive; begin_bar guarantees this
-            raise PineRuntimeError("runtime did not set current_bar")
-        callback(runtime, strategy)
-        if schedule.process_orders:
-            strategy.process_orders_for_bar(runtime=runtime, bar=active_bar)
-            recalc_count = 0
-            while schedule.calc_on_order_fills and strategy.calc_on_order_fills and strategy.has_fill_recalc_pending():
-                recalc_count += 1
-                if recalc_count > max_recalcs:
-                    raise PineRuntimeError("Maximum strategy recalculations per bar exceeded")
-                runtime.guard_recalc_count(recalc_count)
-                strategy.update_position_equity_trades_after_fill()
-                callback(runtime, strategy)
-                strategy.process_orders_for_bar(runtime=runtime, bar=active_bar, recalc_phase=True)
+        bar_ticks = list(next(ticks_by_bar)) if ticks_by_bar is not None else []
+        if bar_ticks:
+            if not strategy.calc_on_every_tick or not schedule.calc_on_every_tick:
+                runtime.begin_bar(bar)
+                active_bar = runtime.current_bar
+                if active_bar is None:
+                    raise PineRuntimeError("runtime did not set current_bar")
+                _run_strategy_pass(callback, runtime, strategy, active_bar, schedule, max_recalcs)
+            else:
+                runtime.begin_realtime_bar(bar)
+                for idx, tick in enumerate(bar_ticks):
+                    if idx == len(bar_ticks) - 1 and not tick.is_final:
+                        tick = TickUpdate(tick.price, tick.volume, tick.time, True)
+                    active_bar = runtime.update_realtime_tick(tick)
+                    callback(runtime, strategy)
+                    if schedule.process_orders:
+                        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar, recalc_phase=idx > 0)
+                        _run_fill_recalcs(callback, runtime, strategy, active_bar, schedule, max_recalcs)
+        else:
+            runtime.begin_bar(bar)
+            active_bar = runtime.current_bar
+            if active_bar is None:  # defensive; begin_bar guarantees this
+                raise PineRuntimeError("runtime did not set current_bar")
+            _run_strategy_pass(callback, runtime, strategy, active_bar, schedule, max_recalcs)
         runtime.end_bar()
         snapshots.append(snapshot_from_state(runtime, strategy))
 
     report = build_backtest_report(runtime, strategy, strategy_instance, snapshots)
     return BacktestResult(runtime, strategy, strategy_instance, snapshots, report)
+
+
+def _run_strategy_pass(
+    callback: Callable[[PineRuntime, StrategyContext], None],
+    runtime: PineRuntime,
+    strategy: StrategyContext,
+    active_bar: Bar,
+    schedule: StrategySchedule,
+    max_recalcs: int,
+) -> None:
+    callback(runtime, strategy)
+    if schedule.process_orders:
+        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar)
+        _run_fill_recalcs(callback, runtime, strategy, active_bar, schedule, max_recalcs)
+
+
+def _run_fill_recalcs(
+    callback: Callable[[PineRuntime, StrategyContext], None],
+    runtime: PineRuntime,
+    strategy: StrategyContext,
+    active_bar: Bar,
+    schedule: StrategySchedule,
+    max_recalcs: int,
+) -> None:
+    recalc_count = 0
+    while schedule.calc_on_order_fills and strategy.calc_on_order_fills and strategy.has_fill_recalc_pending():
+        recalc_count += 1
+        if recalc_count > max_recalcs:
+            raise PineRuntimeError("Maximum strategy recalculations per bar exceeded")
+        runtime.guard_recalc_count(recalc_count)
+        strategy.update_position_equity_trades_after_fill()
+        callback(runtime, strategy)
+        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar, recalc_phase=True)
 
 
 def snapshot_from_state(runtime: PineRuntime, strategy: StrategyContext) -> BacktestSnapshot:

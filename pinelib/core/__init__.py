@@ -14,7 +14,7 @@ from pinelib.core.precision import (
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions, is_timestamp_in_session, parse_session
-from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
+from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TickUpdate, TimeframeInfo, TypeInfo
 
 __all__ = [
     "Bar",
@@ -26,6 +26,7 @@ __all__ = [
     "Series",
     "SymbolInfo",
     "TimeFunctions",
+    "TickUpdate",
     "TimeframeInfo",
     "TypeInfo",
     "fixnan",

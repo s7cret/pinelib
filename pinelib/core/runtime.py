@@ -8,7 +8,7 @@ from pinelib.core.inputs import InputRegistry
 from pinelib.core.na import na
 from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions
-from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
+from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TickUpdate, TimeframeInfo, TypeInfo
 from pinelib.errors import PineRuntimeError
 from pinelib.request.providers import DataProvider, IntrabarDataProvider, LowerTfQueryMetadata
 from pinelib.version import RUNTIME_CONTRACT_VERSION
@@ -76,14 +76,62 @@ class PineRuntime:
             isnew=True,
             isconfirmed=False,
         )
-        self.open.set_current(effective_bar.open)
-        self.high.set_current(effective_bar.high)
-        self.low.set_current(effective_bar.low)
-        self.close.set_current(effective_bar.close)
-        self.volume.set_current(effective_bar.volume)
-        self.time.set_current(effective_bar.time)
-        self.time_close.set_current(effective_bar.time_close)
-        self.bar_index_series.set_current(current_index)
+        self._set_builtin_current(effective_bar, current_index)
+
+    def begin_realtime_bar(self, bar: Bar) -> None:
+        """Open a deterministic realtime bar without committing it.
+
+        Callers may then feed explicit :class:`TickUpdate` values through
+        :meth:`update_realtime_tick`. This is intentionally provider-driven;
+        missing ticks are not approximated from OHLC.
+        """
+
+        effective_bar = self._normalize_bar(bar)
+        self.current_bar = effective_bar
+        self.chart_bars.append(effective_bar)
+        current_index = self.bar_index + 1
+        self.barstate = BarStateInfo(
+            isfirst=current_index == 0,
+            islast=True,
+            ishistory=False,
+            isrealtime=True,
+            isnew=True,
+            isconfirmed=False,
+        )
+        self._set_builtin_current(effective_bar, current_index)
+
+    def update_realtime_tick(self, tick: TickUpdate) -> Bar:
+        if self.current_bar is None:
+            raise PineRuntimeError("update_realtime_tick() called without an active realtime bar")
+        if not self.barstate.isrealtime:
+            raise PineRuntimeError("update_realtime_tick() requires begin_realtime_bar()")
+        if tick.time is not None:
+            if tick.time < self.current_bar.time:
+                raise PineRuntimeError("Realtime tick time cannot precede the active bar")
+            if self.current_bar.time_close is not None and tick.time > self.current_bar.time_close:
+                raise PineRuntimeError("Realtime tick time cannot exceed active bar time_close")
+        updated = Bar(
+            time=self.current_bar.time,
+            open=self.current_bar.open,
+            high=max(self.current_bar.high, tick.price),
+            low=min(self.current_bar.low, tick.price),
+            close=tick.price,
+            volume=self.current_bar.volume + tick.volume,
+            time_close=self.current_bar.time_close,
+        )
+        self.current_bar = updated
+        self.chart_bars[-1] = updated
+        current_index = self.bar_index + 1
+        self.barstate = BarStateInfo(
+            isfirst=current_index == 0,
+            islast=True,
+            ishistory=False,
+            isrealtime=True,
+            isnew=False,
+            isconfirmed=bool(tick.is_final),
+        )
+        self._set_builtin_current(updated, current_index)
+        return updated
 
     def end_bar(self) -> None:
         if self.current_bar is None:
@@ -91,14 +139,25 @@ class PineRuntime:
         for name in self.commit_order:
             self.series_registry[name].commit_current()
         self.bar_index += 1
+        was_realtime = self.barstate.isrealtime
         self.barstate = BarStateInfo(
             isfirst=self.bar_index == 0,
             islast=True,
-            ishistory=True,
-            isrealtime=False,
+            ishistory=not was_realtime,
+            isrealtime=was_realtime,
             isnew=False,
             isconfirmed=True,
         )
+
+    def _set_builtin_current(self, bar: Bar, current_index: int) -> None:
+        self.open.set_current(bar.open)
+        self.high.set_current(bar.high)
+        self.low.set_current(bar.low)
+        self.close.set_current(bar.close)
+        self.volume.set_current(bar.volume)
+        self.time.set_current(bar.time)
+        self.time_close.set_current(bar.time_close)
+        self.bar_index_series.set_current(current_index)
 
     def series(
         self,

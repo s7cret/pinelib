@@ -40,6 +40,7 @@ class StrategyDeclaration:
     close_entries_rule: str = "FIFO"
     margin_long: float = 100.0
     margin_short: float = 100.0
+    fill_orders_on_standard_ohlc: bool | None = None
     risk_free_rate: float = 0.0
     max_bars_back: int | None = None
     max_lines_count: int | None = None
@@ -137,6 +138,7 @@ class StrategyContext:
         self.close_entries_rule = self.declaration.close_entries_rule
         self.margin_long = self.declaration.margin_long
         self.margin_short = self.declaration.margin_short
+        self.fill_orders_on_standard_ohlc = self.declaration.fill_orders_on_standard_ohlc
         self.max_bars_back = self.declaration.max_bars_back
         self.equity = self.initial_capital
         self.netprofit = 0.0
@@ -170,7 +172,24 @@ class StrategyContext:
         runtime.visual.max_counts["label"] = self.declaration.max_labels_count
         runtime.visual.max_counts["line"] = self.declaration.max_lines_count
         runtime.visual.max_counts["box"] = self.declaration.max_boxes_count
+        self._sync_runtime_strategy_flags(runtime)
         self._validate_settings(runtime)
+
+    def _sync_runtime_strategy_flags(self, runtime: PineRuntime) -> None:
+        expected = {
+            "process_orders_on_close": self.process_orders_on_close,
+            "calc_on_order_fills": self.calc_on_order_fills,
+            "calc_on_every_tick": self.calc_on_every_tick,
+        }
+        for name, value in expected.items():
+            configured = getattr(runtime.config, name)
+            if configured is None:
+                setattr(runtime.config, name, value)
+            elif bool(configured) != bool(value):
+                raise PineStrategyError(
+                    f"RuntimeConfig.{name} conflicts with StrategyContext.{name}",
+                    code=PL_UNSUPPORTED_STRATEGY_SETTING,
+                )
 
     def _validate_settings(self, runtime: PineRuntime) -> None:
         unsupported: list[str] = []
@@ -180,6 +199,8 @@ class StrategyContext:
             unsupported.append("backtest_fill_limits_assumption")
         if self.close_entries_rule not in ("FIFO", "ANY"):
             unsupported.append("close_entries_rule")
+        if self.fill_orders_on_standard_ohlc is not None:
+            unsupported.append("fill_orders_on_standard_ohlc")
         if unsupported:
             msg = "Unsupported strategy settings: " + ", ".join(unsupported)
             if self.declaration.strict_tv_parity or runtime.config.strict_tv_parity:

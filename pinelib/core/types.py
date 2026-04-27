@@ -74,6 +74,22 @@ class BarStateInfo:
     isconfirmed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class TickUpdate:
+    """Deterministic realtime/tick update for one open chart bar.
+
+    PineLib does not fetch or synthesize TradingView realtime feeds. Callers that
+    want ``calc_on_every_tick`` semantics must provide an explicit sequence of
+    ticks. The runtime mutates the active bar monotonically using these ticks and
+    marks only the final update as confirmed.
+    """
+
+    price: float
+    volume: float = 0.0
+    time: int | None = None
+    is_final: bool = False
+
+
 @dataclass(slots=True)
 class RuntimeConfig:
     supports_nested_security: bool = False
@@ -84,6 +100,9 @@ class RuntimeConfig:
     diagnostics_as_errors: bool = False
     diagnostics: list[dict[str, object]] = field(default_factory=list)
     extra: dict[str, object] = field(default_factory=dict)
+    process_orders_on_close: bool | None = None
+    calc_on_order_fills: bool | None = None
+    calc_on_every_tick: bool | None = None
 
     def emit_diagnostic(self, code: str, message: str, **extra: object) -> None:
         payload: dict[str, object] = {"code": code, "message": message}
