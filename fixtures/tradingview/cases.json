@@ -2,12 +2,95 @@
   "schema_version": "1.0",
   "contract_version": "1.4",
   "cases": [
-    {"id": "session_time_time_close_timeframe_guard", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_time.csv"]},
-    {"id": "request_security_gaps_lookahead", "status": "pending_external_oracle", "required_files": ["bars.csv", "requested_bars.csv", "expected_security.csv"]},
-    {"id": "request_security_lower_tf_intrabar_validation", "status": "pending_external_oracle", "required_files": ["bars.csv", "lower_tf_bars.csv", "expected_lower_tf.json"]},
-    {"id": "strategy_market_limit_stop_stop_limit", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_trades.csv"]},
-    {"id": "strategy_exit_oca_reservation", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_trades.csv"]},
-    {"id": "calc_on_every_tick_supplied_ticks", "status": "pending_external_oracle", "required_files": ["bars.csv", "ticks.csv", "expected_report.json"]},
-    {"id": "ta_stateful_indicators", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_indicators.csv"]}
+    {
+      "id": "session_time_time_close_timeframe_guard",
+      "status": "oracle_verified",
+      "required_files": [
+        "bars.csv",
+        "expected_time.csv"
+      ],
+      "evidence_files": [
+        "evidence.json",
+        "oracle_script.pine"
+      ],
+      "oracle_source": "TradingView Chromium CDP capture 2026-04-27"
+    },
+    {
+      "id": "request_security_gaps_lookahead",
+      "status": "oracle_verified",
+      "required_files": [
+        "bars.csv",
+        "requested_bars.csv",
+        "expected_security.csv"
+      ],
+      "evidence_files": [
+        "evidence.json",
+        "oracle_script.pine"
+      ],
+      "oracle_source": "TradingView Chromium CDP capture 2026-04-27"
+    },
+    {
+      "id": "request_security_lower_tf_intrabar_validation",
+      "status": "pending_external_oracle",
+      "required_files": [
+        "bars.csv",
+        "lower_tf_bars.csv",
+        "expected_lower_tf.json"
+      ],
+      "pending_reason": "Full lower_tf_bars.csv intrabar rows were not extractable from TradingView in this run; only aggregate Pine plot evidence captured.",
+      "evidence_files": [
+        "evidence.json"
+      ]
+    },
+    {
+      "id": "strategy_market_limit_stop_stop_limit",
+      "status": "pending_external_oracle",
+      "required_files": [
+        "bars.csv",
+        "expected_trades.csv"
+      ],
+      "pending_reason": "Strategy Tester/order fill export not captured as machine-readable TradingView oracle in this run.",
+      "evidence_files": [
+        "evidence.json"
+      ]
+    },
+    {
+      "id": "strategy_exit_oca_reservation",
+      "status": "pending_external_oracle",
+      "required_files": [
+        "bars.csv",
+        "expected_trades.csv"
+      ],
+      "pending_reason": "Strategy Tester OCA reservation/fill export not captured as machine-readable TradingView oracle in this run.",
+      "evidence_files": [
+        "evidence.json"
+      ]
+    },
+    {
+      "id": "calc_on_every_tick_supplied_ticks",
+      "status": "pending_external_oracle",
+      "required_files": [
+        "bars.csv",
+        "ticks.csv",
+        "expected_report.json"
+      ],
+      "pending_reason": "TradingView UI/CDP run did not provide supplied tick stream oracle data.",
+      "evidence_files": [
+        "evidence.json"
+      ]
+    },
+    {
+      "id": "ta_stateful_indicators",
+      "status": "oracle_verified",
+      "required_files": [
+        "bars.csv",
+        "expected_indicators.csv"
+      ],
+      "evidence_files": [
+        "evidence.json",
+        "oracle_script.pine"
+      ],
+      "oracle_source": "TradingView Chromium CDP capture 2026-04-27"
+    }
   ]
 }
