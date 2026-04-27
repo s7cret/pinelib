@@ -41,7 +41,7 @@ def test_merge_gaps_and_lookahead_modes() -> None:
     gaps_on = merge_requested_series_to_chart_bars(values, requested_bars=requested, chart_bars=chart, gaps="barmerge.gaps_on")
     assert is_na(gaps_on[0])
     assert gaps_on[1] == 10.0
-    assert gaps_on[2] == 10.0
+    assert is_na(gaps_on[2])
     assert gaps_on[3] == 20.0
 
     lookahead = merge_requested_series_to_chart_bars(

@@ -36,13 +36,18 @@ def merge_requested_series_to_chart_bars(
     last_value: Any = na
     for chart_bar in chart_bars:
         value: Any = na
+        chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
         for requested_bar, requested_value in zip(requested_bars, requested_values, strict=True):
             requested_close = requested_bar.time_close if requested_bar.time_close is not None else requested_bar.time
-            chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
             if lookahead == "barmerge.lookahead_on":
-                matches = requested_bar.time <= chart_bar.time <= requested_close
+                if gaps == "barmerge.gaps_on":
+                    matches = chart_bar.time <= requested_bar.time <= chart_close
+                else:
+                    matches = requested_bar.time <= chart_bar.time
+            elif gaps == "barmerge.gaps_on":
+                matches = chart_bar.time <= requested_close <= chart_close
             else:
-                matches = requested_bar.time <= chart_close and requested_close <= chart_close
+                matches = requested_close <= chart_close
             if matches:
                 value = requested_value
         if value is na and gaps == "barmerge.gaps_off":
