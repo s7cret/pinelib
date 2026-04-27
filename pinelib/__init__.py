@@ -51,6 +51,7 @@ from pinelib.errors import (
     PineUnsupportedFeatureError,
 )
 from pinelib.math import pine_abs, pine_max, pine_min, pine_round, pine_sum
+from pinelib.reference import PineArray, PineMap, PineMatrix, reference_history
 from pinelib.request import (
     DataProvider,
     InMemoryDataProvider,
@@ -60,6 +61,7 @@ from pinelib.request import (
     security,
 )
 from pinelib.strategy import Fill, Order, StrategyContext, StrategyDeclaration, Trade
+from pinelib.visual import PineObjectId, VisualEvent, VisualRecorder
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
 __all__ = [
@@ -82,6 +84,13 @@ __all__ = [
     "PL_WARNING_BAR_MAGNIFIER_FALLBACK",
     "PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK",
     "PL_WARNING_EXIT_QTY_REDUCED",
+    "PineArray",
+    "PineMap",
+    "PineMatrix",
+    "reference_history",
+    "PineObjectId",
+    "VisualEvent",
+    "VisualRecorder",
     "PineDataFormatError",
     "PineGoldenMismatchError",
     "PineHistoryError",

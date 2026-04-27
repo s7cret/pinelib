@@ -1,38 +1,28 @@
-# PineLib Runtime v0.4.0
+# PineLib Runtime v0.5.0
 
 PineLib is a Python runtime foundation for AST2Python-generated Pine-compatible code.
-v0.4.0 advances the v1.4 runtime contract with the first real strategy context and broker-emulator MVP.
+v0.5.0 continues the v1.4 runtime contract / TZ_01 track with Bar Magnifier execution provenance plus visual/reference foundations.
 
-Implemented through v0.4.0:
+Implemented through v0.5.0:
 
 - contract/version metadata for `pinelib` and runtime contract `1.4`
 - validated `Bar` model with UTC millisecond timestamps
 - `Series[T]` with Pine-compatible current vs committed history semantics
-- `PineRuntime` core loop with built-in bar series registration, commit ownership, and recalculation guard scaffold
-- runtime metadata models: `syminfo`, enriched `timeframe`, and `barstate`
-- `RuntimeConfig.diagnostics` collection for explicit runtime diagnostics
-- `input.int/float/bool/string/timeframe/symbol/session/source` metadata and validation
-- `na`, `nz`, `fixnan`, inclusive `pine_range`, and Pine numeric/operator helpers
-- `DataProvider` protocols and in-memory provider with normalization metadata log
-- timezone/session-aware `time()` and `time_close()` using IANA `zoneinfo`, including DST/overnight coverage
+- `PineRuntime` core loop with built-in bar series registration, commit ownership, recalculation guard scaffold, inputs, metadata, and diagnostics
+- `DataProvider` / `IntrabarDataProvider` protocols and in-memory provider
+- timezone/session-aware `time()` and `time_close()` helpers
 - `request.security` foundation with explicit nested-request diagnostics
-- stateful and batch P0 TA helpers: SMA/EMA/RMA/TR/ATR/RSI/MACD/highest/lowest/change/cross helpers
-- `StrategyContext` with declaration settings storage for contract P0/P1 fields
-- broker emulator MVP:
-  - `strategy.entry/order/exit/close/close_all/cancel/cancel_all`
-  - market, limit, stop, and stop-limit order models
-  - historical next-bar market fills and `process_orders_on_close`
-  - TradingView-style synthetic OHLC path (`open→high→low→close` or `open→low→high→close`)
-  - gap-at-open price-order fills
-  - default sizing: fixed, cash, percent_of_equity
-  - commission: percent, cash_per_order, cash_per_contract
-  - slippage price adjustment
-  - position size/average price/equity/openprofit/netprofit and trade logs
-  - entry reversal and pyramiding basics
-  - `strategy.exit` bracket OCA cancellation plus reduce/reservation diagnostics (`PL_WARNING_EXIT_QTY_REDUCED`)
-  - `calc_on_order_fills` pending-recalc flag and max recalculation guard scaffold
-
-Unsupported parity-affecting strategy settings are diagnosed explicitly; strict TV parity mode raises instead of silently emulating.
+- P0 TA helpers and Pine numeric/operator helpers
+- `StrategyContext` broker emulator MVP from v0.4.0
+- Bar Magnifier foundation:
+  - provider-backed intrabar path when `use_bar_magnifier=True`
+  - strict missing-data error `PL_MISSING_INTRABAR_DATA`
+  - non-strict warning fallback `PL_WARNING_BAR_MAGNIFIER_FALLBACK`
+  - `fill_source` provenance (`intrabar` / `ohlc_path`) on fills and closed trades
+  - TP/SL bracket arbitration by earliest crossing in the active path
+- `calc_on_every_tick` historical fallback diagnostic `PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK`
+- visual recorder foundation with stable `PineObjectId` for label/line/box/table lifecycle, set/delete events, and count limits
+- reference container foundation: `PineArray`, `PineMap`, `PineMatrix`, and explicit `PL_REFERENCE_HISTORY_UNSUPPORTED`
 
 ## Install
 
@@ -62,10 +52,12 @@ for i, bar in enumerate(bars):
 
 assert strategy.position_size == 1
 assert strategy.position_avg_price == 12
+assert strategy.fills[-1].fill_source == "ohlc_path"
 ```
 
-## Coverage map for v0.4
+## Coverage map for v0.5
 
-- Core runtime, inputs, request/security, sessions/time helpers, and P0 TA base: implemented foundation
-- Strategy broker emulator: MVP implemented for required v0.4 scope
-- Deferred: full Bar Magnifier execution, trailing exits, advanced margin/leverage, all TradingView edge cases, visuals, full TA namespace, and golden TradingView parity suite
+- Core runtime, inputs, request/security, sessions/time helpers, P0 TA base: implemented foundation
+- Strategy broker emulator: MVP plus Bar Magnifier provider path and fill provenance
+- Visual/reference types: deterministic recorder and minimal identity/copy foundations
+- Deferred: full TradingView Bar Magnifier parity matrix, realtime tick execution, full visual API/rendering, full reference history semantics, trailing exits, advanced margin/leverage, and complete golden TradingView parity suite

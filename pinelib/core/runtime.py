@@ -12,6 +12,7 @@ from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, Timefram
 from pinelib.errors import PineRuntimeError
 from pinelib.request.providers import DataProvider, IntrabarDataProvider
 from pinelib.version import RUNTIME_CONTRACT_VERSION
+from pinelib.visual import VisualRecorder
 
 
 @dataclass(slots=True)
@@ -35,6 +36,7 @@ class PineRuntime:
     commit_order: list[str] = field(init=False, default_factory=list)
     inputs: InputRegistry = field(init=False)
     barstate: BarStateInfo = field(init=False, default_factory=BarStateInfo)
+    visual: VisualRecorder = field(init=False)
 
     open: Series[float] = field(init=False)
     high: Series[float] = field(init=False)
@@ -50,6 +52,7 @@ class PineRuntime:
         if isinstance(self.timeframe, str):
             self.timeframe = TimeframeInfo.from_string(self.timeframe)
         self.inputs = InputRegistry(self.config)
+        self.visual = VisualRecorder(self.config)
         self.open = self.series("open", "float")
         self.high = self.series("high", "float")
         self.low = self.series("low", "float")
