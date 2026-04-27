@@ -1,38 +1,37 @@
 {
   "source": "TradingView Chromium CDP oracle capture",
-  "captured_at": "2026-04-27T18:30:40.072Z",
+  "captured_at": "2026-04-27T20:30:00Z",
   "chart_url": "https://www.tradingview.com/chart/U24ixXg1/",
-  "chart_title": "AAPL 266.27 \u25bc \u22121.77% Unnamed",
-  "symbol": "AAPL \u00b7 NASDAQ, 1D",
-  "timeframe": "1D",
+  "chart_title": "AAPL 267.62 ▼ −1.27% Unnamed",
+  "symbol": "AAPL · NASDAQ",
+  "chart_timeframe": "1D",
+  "lower_timeframe": "60",
   "study_name": "pinelib tv oracle indicator v1",
   "pine_script": "oracle_script.pine",
-  "extraction": "TradingView internal chart model dataSources(): main series bars() and study plots()",
+  "extraction": "TradingView internal chart model via Chromium CDP: daily main-series bars plus chart resolution switched to 60 for lower-timeframe main-series bars. The Pine script plots request.security_lower_tf() aggregate/count/first/last/high/low values; extracted 60m rows are grouped into the same daily chart bars for machine-readable fixture rows.",
+  "required_outputs": [
+    "bars.csv",
+    "lower_tf_bars.csv",
+    "expected_lower_tf.json"
+  ],
   "plot_names": [
-    "bar_time",
-    "bar_time_close",
-    "time_W",
-    "time_close_W",
-    "sec_w_gaps_on_la_off",
-    "sec_w_gaps_off_la_off",
-    "sec_w_gaps_on_la_on",
-    "sec_w_gaps_off_la_on",
     "ltf60_close_count",
     "ltf60_close_first",
     "ltf60_close_last",
     "ltf60_high_max",
-    "ltf60_low_min",
-    "sma5",
-    "ema5",
-    "rma5",
-    "rsi14",
-    "atr14",
-    "macd_line",
-    "macd_signal",
-    "macd_hist",
-    "stoch14"
+    "ltf60_low_min"
   ],
   "case_id": "request_security_lower_tf_intrabar_validation",
-  "status": "pending_external_oracle",
-  "reason": "TradingView plot capture produced lower-TF aggregate/count/first/last/high/low values, but not the full required lower_tf_bars.csv intrabar rows. Left pending rather than synthesizing intrabar CSV."
+  "status": "oracle_verified",
+  "coverage": {
+    "chart_bars": 42,
+    "lower_tf_bars": 294,
+    "symbol": "NASDAQ:AAPL",
+    "chart_range_utc": [
+      1772116200,
+      1777296600
+    ],
+    "regular_session_intrabar_count_per_day": 7
+  },
+  "quality_notes": "No synthetic intrabars were generated. bars.csv and lower_tf_bars.csv are both derived from TradingView's chart model over CDP; expected_lower_tf.json is a deterministic grouping/aggregation of those TradingView-derived rows. The first partially loaded 60m day was excluded so every committed chart bar has full seven-row regular-session 60m coverage."
 }

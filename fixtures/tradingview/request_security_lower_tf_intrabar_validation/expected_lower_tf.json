@@ -1,0 +1,1228 @@
+{
+  "schema_version": "1.0",
+  "source": "TradingView Chromium CDP chart model capture",
+  "symbol": "NASDAQ:AAPL",
+  "chart_timeframe": "1D",
+  "lower_timeframe": "60",
+  "captured_at": "2026-04-27T20:30:00Z",
+  "bars": [
+    {
+      "bar_index": 0,
+      "time": 1772116200,
+      "time_close": 1772139600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        271.98,
+        272.57,
+        271.75,
+        271.39,
+        272.81,
+        272.64,
+        272.96
+      ],
+      "first_close": 271.98,
+      "last_close": 272.96,
+      "high_max": 276.14,
+      "low_min": 270.8,
+      "lower_tf_row_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "bar_index": 1,
+      "time": 1772202600,
+      "time_close": 1772226000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        268.51,
+        269.05,
+        267.88,
+        265.98,
+        265.74,
+        266.65,
+        264.2
+      ],
+      "first_close": 268.51,
+      "last_close": 264.2,
+      "high_max": 272.9,
+      "low_min": 262.89,
+      "lower_tf_row_indices": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ]
+    },
+    {
+      "bar_index": 2,
+      "time": 1772461800,
+      "time_close": 1772485200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        263.8,
+        264.35,
+        265.985,
+        265.5,
+        266.06,
+        264.27,
+        264.53
+      ],
+      "first_close": 263.8,
+      "last_close": 264.53,
+      "high_max": 266.52,
+      "low_min": 260.19,
+      "lower_tf_row_indices": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "bar_index": 3,
+      "time": 1772548200,
+      "time_close": 1772571600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        262.26,
+        262.54,
+        261.83,
+        261.47,
+        263.66,
+        263.27,
+        263.71
+      ],
+      "first_close": 262.26,
+      "last_close": 263.71,
+      "high_max": 265.56,
+      "low_min": 260.14,
+      "lower_tf_row_indices": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "bar_index": 4,
+      "time": 1772634600,
+      "time_close": 1772658000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        264.11,
+        264.55,
+        264.91,
+        263.79,
+        263.35,
+        262.72,
+        262.49
+      ],
+      "first_close": 264.11,
+      "last_close": 262.49,
+      "high_max": 266.13,
+      "low_min": 261.4,
+      "lower_tf_row_indices": [
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34
+      ]
+    },
+    {
+      "bar_index": 5,
+      "time": 1772721000,
+      "time_close": 1772744400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        258.885,
+        260.76,
+        259.06,
+        258.92,
+        257.87,
+        258.7,
+        260.3
+      ],
+      "first_close": 258.885,
+      "last_close": 260.3,
+      "high_max": 261.55,
+      "low_min": 257.25,
+      "lower_tf_row_indices": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41
+      ]
+    },
+    {
+      "bar_index": 6,
+      "time": 1772807400,
+      "time_close": 1772830800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        256.7,
+        257.24,
+        256.8,
+        256.49,
+        257.15,
+        256.91,
+        257.535
+      ],
+      "first_close": 256.7,
+      "last_close": 257.535,
+      "high_max": 258.78,
+      "low_min": 254.4,
+      "lower_tf_row_indices": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48
+      ]
+    },
+    {
+      "bar_index": 7,
+      "time": 1773063000,
+      "time_close": 1773086400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        255.67,
+        257.71,
+        257.56,
+        256.63,
+        257.15,
+        259.485,
+        259.98
+      ],
+      "first_close": 255.67,
+      "last_close": 259.98,
+      "high_max": 261.15,
+      "low_min": 253.7,
+      "lower_tf_row_indices": [
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55
+      ]
+    },
+    {
+      "bar_index": 8,
+      "time": 1773149400,
+      "time_close": 1773172800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        259.96,
+        261.3,
+        261.87,
+        262.19,
+        261.65,
+        260.5,
+        260.76
+      ],
+      "first_close": 259.96,
+      "last_close": 260.76,
+      "high_max": 262.48,
+      "low_min": 256.97,
+      "lower_tf_row_indices": [
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62
+      ]
+    },
+    {
+      "bar_index": 9,
+      "time": 1773235800,
+      "time_close": 1773259200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        259.99,
+        260.11,
+        260.64,
+        261.02,
+        260.11,
+        260.13,
+        260.835
+      ],
+      "first_close": 259.99,
+      "last_close": 260.835,
+      "high_max": 262.13,
+      "low_min": 259.55,
+      "lower_tf_row_indices": [
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69
+      ]
+    },
+    {
+      "bar_index": 10,
+      "time": 1773322200,
+      "time_close": 1773345600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        254.66,
+        255.35,
+        255.65,
+        255.05,
+        255.39,
+        256.09,
+        255.7
+      ],
+      "first_close": 254.66,
+      "last_close": 255.7,
+      "high_max": 258.81,
+      "low_min": 254.2,
+      "lower_tf_row_indices": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76
+      ]
+    },
+    {
+      "bar_index": 11,
+      "time": 1773408600,
+      "time_close": 1773432000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        255.4,
+        253.31,
+        252.64,
+        251.16,
+        251.27,
+        250.295,
+        250.115
+      ],
+      "first_close": 255.4,
+      "last_close": 250.115,
+      "high_max": 256.32,
+      "low_min": 249.67,
+      "lower_tf_row_indices": [
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83
+      ]
+    },
+    {
+      "bar_index": 12,
+      "time": 1773667800,
+      "time_close": 1773691200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        253.23,
+        253.02,
+        252.34,
+        252.93,
+        252.91,
+        252.87,
+        252.81
+      ],
+      "first_close": 253.23,
+      "last_close": 252.81,
+      "high_max": 253.88,
+      "low_min": 249.89,
+      "lower_tf_row_indices": [
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90
+      ]
+    },
+    {
+      "bar_index": 13,
+      "time": 1773754200,
+      "time_close": 1773777600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        254.44,
+        254.16,
+        254.86,
+        253.91,
+        254.12,
+        253.77,
+        254.19
+      ],
+      "first_close": 254.44,
+      "last_close": 254.19,
+      "high_max": 255.13,
+      "low_min": 252.19,
+      "lower_tf_row_indices": [
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97
+      ]
+    },
+    {
+      "bar_index": 14,
+      "time": 1773840600,
+      "time_close": 1773864000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        252.35,
+        252.32,
+        251.58,
+        250.8,
+        250.96,
+        249.67,
+        249.92
+      ],
+      "first_close": 252.35,
+      "last_close": 249.92,
+      "high_max": 254.91,
+      "low_min": 249,
+      "lower_tf_row_indices": [
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104
+      ]
+    },
+    {
+      "bar_index": 15,
+      "time": 1773927000,
+      "time_close": 1773950400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        249.83,
+        249.4,
+        249.27,
+        248.29,
+        248.05,
+        248.46,
+        248.86
+      ],
+      "first_close": 249.83,
+      "last_close": 248.86,
+      "high_max": 251.82,
+      "low_min": 247.3,
+      "lower_tf_row_indices": [
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111
+      ]
+    },
+    {
+      "bar_index": 16,
+      "time": 1774013400,
+      "time_close": 1774036800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        247.78,
+        247.985,
+        248.62,
+        248.28,
+        248.08,
+        248.1,
+        248.16
+      ],
+      "first_close": 247.78,
+      "last_close": 248.16,
+      "high_max": 249.2,
+      "low_min": 246,
+      "lower_tf_row_indices": [
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118
+      ]
+    },
+    {
+      "bar_index": 17,
+      "time": 1774272600,
+      "time_close": 1774296000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        252.43,
+        252.56,
+        250.79,
+        250.93,
+        251.35,
+        251.77,
+        251.49
+      ],
+      "first_close": 252.43,
+      "last_close": 251.49,
+      "high_max": 254.54,
+      "low_min": 250.28,
+      "lower_tf_row_indices": [
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125
+      ]
+    },
+    {
+      "bar_index": 18,
+      "time": 1774359000,
+      "time_close": 1774382400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        252.53,
+        253.98,
+        254.6,
+        253.06,
+        252.57,
+        252.09,
+        251.76
+      ],
+      "first_close": 252.53,
+      "last_close": 251.76,
+      "high_max": 254.82,
+      "low_min": 249.57,
+      "lower_tf_row_indices": [
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132
+      ]
+    },
+    {
+      "bar_index": 19,
+      "time": 1774445400,
+      "time_close": 1774468800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        252.85,
+        254.24,
+        253.96,
+        254.14,
+        253.96,
+        252.63,
+        252.65
+      ],
+      "first_close": 252.85,
+      "last_close": 252.65,
+      "high_max": 255,
+      "low_min": 251.6,
+      "lower_tf_row_indices": [
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139
+      ]
+    },
+    {
+      "bar_index": 20,
+      "time": 1774531800,
+      "time_close": 1774555200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        255.9,
+        255.71,
+        256.09,
+        254.99,
+        253.83,
+        253.69,
+        252.86
+      ],
+      "first_close": 255.9,
+      "last_close": 252.86,
+      "high_max": 257,
+      "low_min": 250.79,
+      "lower_tf_row_indices": [
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146
+      ]
+    },
+    {
+      "bar_index": 21,
+      "time": 1774618200,
+      "time_close": 1774641600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        254.475,
+        252.6,
+        251.78,
+        250.43,
+        249.38,
+        248.39,
+        248.63
+      ],
+      "first_close": 254.475,
+      "last_close": 248.63,
+      "high_max": 255.46,
+      "low_min": 248.08,
+      "lower_tf_row_indices": [
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153
+      ]
+    },
+    {
+      "bar_index": 22,
+      "time": 1774877400,
+      "time_close": 1774900800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        247.86,
+        246.54,
+        246.02,
+        246.24,
+        246.5,
+        245.88,
+        246.54
+      ],
+      "first_close": 247.86,
+      "last_close": 246.54,
+      "high_max": 250.85,
+      "low_min": 245.51,
+      "lower_tf_row_indices": [
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160
+      ]
+    },
+    {
+      "bar_index": 23,
+      "time": 1774963800,
+      "time_close": 1774987200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        249,
+        248.43,
+        250.34,
+        253.21,
+        253.17,
+        253.68,
+        253.76
+      ],
+      "first_close": 249,
+      "last_close": 253.76,
+      "high_max": 255.48,
+      "low_min": 247.11,
+      "lower_tf_row_indices": [
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167
+      ]
+    },
+    {
+      "bar_index": 24,
+      "time": 1775050200,
+      "time_close": 1775073600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        254.14,
+        254.15,
+        254.44,
+        255.13,
+        254.32,
+        255.65,
+        255.72
+      ],
+      "first_close": 254.14,
+      "last_close": 255.72,
+      "high_max": 256.21,
+      "low_min": 253.33,
+      "lower_tf_row_indices": [
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174
+      ]
+    },
+    {
+      "bar_index": 25,
+      "time": 1775136600,
+      "time_close": 1775160000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        252.08,
+        255.13,
+        254.11,
+        255.31,
+        255.145,
+        255.12,
+        255.92
+      ],
+      "first_close": 252.08,
+      "last_close": 255.92,
+      "high_max": 256.13,
+      "low_min": 250.65,
+      "lower_tf_row_indices": [
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181
+      ]
+    },
+    {
+      "bar_index": 26,
+      "time": 1775482200,
+      "time_close": 1775505600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        261.76,
+        259.25,
+        259.06,
+        258.77,
+        259.3,
+        258.24,
+        258.96
+      ],
+      "first_close": 261.76,
+      "last_close": 258.96,
+      "high_max": 262.16,
+      "low_min": 256.46,
+      "lower_tf_row_indices": [
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188
+      ]
+    },
+    {
+      "bar_index": 27,
+      "time": 1775568600,
+      "time_close": 1775592000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        247.66,
+        247.8,
+        250.16,
+        251.6,
+        251.33,
+        251.96,
+        253.49
+      ],
+      "first_close": 247.66,
+      "last_close": 253.49,
+      "high_max": 256.42,
+      "low_min": 245.69,
+      "lower_tf_row_indices": [
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195
+      ]
+    },
+    {
+      "bar_index": 28,
+      "time": 1775655000,
+      "time_close": 1775678400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        258.14,
+        257.52,
+        257.39,
+        257.51,
+        257.22,
+        257.2,
+        258.93
+      ],
+      "first_close": 258.14,
+      "last_close": 258.93,
+      "high_max": 259.74,
+      "low_min": 256.52,
+      "lower_tf_row_indices": [
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202
+      ]
+    },
+    {
+      "bar_index": 29,
+      "time": 1775741400,
+      "time_close": 1775764800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        257.84,
+        257.53,
+        259.14,
+        260.05,
+        259.63,
+        260.06,
+        260.425
+      ],
+      "first_close": 257.84,
+      "last_close": 260.425,
+      "high_max": 261.11,
+      "low_min": 256.09,
+      "lower_tf_row_indices": [
+        203,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209
+      ]
+    },
+    {
+      "bar_index": 30,
+      "time": 1775827800,
+      "time_close": 1775851200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        261.55,
+        261.32,
+        260.52,
+        259.25,
+        260.12,
+        259.72,
+        260.42
+      ],
+      "first_close": 261.55,
+      "last_close": 260.42,
+      "high_max": 262.18,
+      "low_min": 259.03,
+      "lower_tf_row_indices": [
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216
+      ]
+    },
+    {
+      "bar_index": 31,
+      "time": 1776087000,
+      "time_close": 1776110400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        257.32,
+        257.72,
+        257.78,
+        257.87,
+        257.88,
+        257.85,
+        259.21
+      ],
+      "first_close": 257.32,
+      "last_close": 259.21,
+      "high_max": 260.18,
+      "low_min": 256.66,
+      "lower_tf_row_indices": [
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223
+      ]
+    },
+    {
+      "bar_index": 32,
+      "time": 1776173400,
+      "time_close": 1776196800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        259.33,
+        258.05,
+        257.7,
+        258.65,
+        258.78,
+        258.34,
+        258.86
+      ],
+      "first_close": 259.33,
+      "last_close": 258.86,
+      "high_max": 261.93,
+      "low_min": 257.19,
+      "lower_tf_row_indices": [
+        224,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230
+      ]
+    },
+    {
+      "bar_index": 33,
+      "time": 1776259800,
+      "time_close": 1776283200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        260.7,
+        263.19,
+        264.56,
+        264.96,
+        265.185,
+        265.33,
+        266.37
+      ],
+      "first_close": 260.7,
+      "last_close": 266.37,
+      "high_max": 266.55,
+      "low_min": 257.81,
+      "lower_tf_row_indices": [
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        237
+      ]
+    },
+    {
+      "bar_index": 34,
+      "time": 1776346200,
+      "time_close": 1776369600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        262.05,
+        262.24,
+        264.08,
+        263.51,
+        263.59,
+        263.63,
+        263.41
+      ],
+      "first_close": 262.05,
+      "last_close": 263.41,
+      "high_max": 267.21,
+      "low_min": 261.28,
+      "lower_tf_row_indices": [
+        238,
+        239,
+        240,
+        241,
+        242,
+        243,
+        244
+      ]
+    },
+    {
+      "bar_index": 35,
+      "time": 1776432600,
+      "time_close": 1776456000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        268.58,
+        271.94,
+        271.55,
+        270.57,
+        270.18,
+        269.7,
+        270.22
+      ],
+      "first_close": 268.58,
+      "last_close": 270.22,
+      "high_max": 272.3,
+      "low_min": 266.73,
+      "lower_tf_row_indices": [
+        245,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251
+      ]
+    },
+    {
+      "bar_index": 36,
+      "time": 1776691800,
+      "time_close": 1776715200,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        273.39,
+        272.88,
+        272.57,
+        272.2,
+        273.47,
+        272.69,
+        272.99
+      ],
+      "first_close": 273.39,
+      "last_close": 272.99,
+      "high_max": 274.285,
+      "low_min": 270.33,
+      "lower_tf_row_indices": [
+        252,
+        253,
+        254,
+        255,
+        256,
+        257,
+        258
+      ]
+    },
+    {
+      "bar_index": 37,
+      "time": 1776778200,
+      "time_close": 1776801600,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        269.59,
+        267.91,
+        265.88,
+        266.16,
+        266.36,
+        267.98,
+        266.22
+      ],
+      "first_close": 269.59,
+      "last_close": 266.22,
+      "high_max": 272.8,
+      "low_min": 265.4,
+      "lower_tf_row_indices": [
+        259,
+        260,
+        261,
+        262,
+        263,
+        264,
+        265
+      ]
+    },
+    {
+      "bar_index": 38,
+      "time": 1776864600,
+      "time_close": 1776888000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        271.94,
+        272.41,
+        272.7,
+        273.21,
+        272.71,
+        272.71,
+        273.12
+      ],
+      "first_close": 271.94,
+      "last_close": 273.12,
+      "high_max": 273.73,
+      "low_min": 266.87,
+      "lower_tf_row_indices": [
+        266,
+        267,
+        268,
+        269,
+        270,
+        271,
+        272
+      ]
+    },
+    {
+      "bar_index": 39,
+      "time": 1776951000,
+      "time_close": 1776974400,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        273.96,
+        273.68,
+        273.615,
+        272.24,
+        273.66,
+        274.17,
+        273.45
+      ],
+      "first_close": 273.96,
+      "last_close": 273.45,
+      "high_max": 275.77,
+      "low_min": 271.62,
+      "lower_tf_row_indices": [
+        273,
+        274,
+        275,
+        276,
+        277,
+        278,
+        279
+      ]
+    },
+    {
+      "bar_index": 40,
+      "time": 1777037400,
+      "time_close": 1777060800,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        272.1,
+        270.67,
+        271,
+        270.06,
+        269.95,
+        270.09,
+        270.97
+      ],
+      "first_close": 272.1,
+      "last_close": 270.97,
+      "high_max": 273.05,
+      "low_min": 269.65,
+      "lower_tf_row_indices": [
+        280,
+        281,
+        282,
+        283,
+        284,
+        285,
+        286
+      ]
+    },
+    {
+      "bar_index": 41,
+      "time": 1777296600,
+      "time_close": 1777320000,
+      "lower_timeframe": "60",
+      "count": 7,
+      "close_values": [
+        267.36,
+        267.12,
+        266.3,
+        266.84,
+        266.34,
+        267.14,
+        267.675
+      ],
+      "first_close": 267.36,
+      "last_close": 267.675,
+      "high_max": 268.36,
+      "low_min": 265.06,
+      "lower_tf_row_indices": [
+        287,
+        288,
+        289,
+        290,
+        291,
+        292,
+        293
+      ]
+    }
+  ]
+}

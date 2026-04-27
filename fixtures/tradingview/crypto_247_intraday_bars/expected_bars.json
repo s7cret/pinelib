@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "source": "TradingView Chromium CDP chart model capture",
+  "symbol": "BINANCE:BTCUSDT",
+  "timeframe": "60",
+  "captured_at": "2026-04-27T20:45:00Z",
+  "bar_count": 300,
+  "first_time": 1776243600,
+  "last_time": 1777320000,
+  "expected_step_seconds": 3600,
+  "first_close": 74011.69,
+  "last_close": 76942.4,
+  "total_volume": 181973.52995999999
+}

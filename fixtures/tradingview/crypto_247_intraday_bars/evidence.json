@@ -1,0 +1,20 @@
+{
+  "source": "TradingView Chromium CDP oracle capture",
+  "captured_at": "2026-04-27T20:45:00Z",
+  "chart_url": "https://www.tradingview.com/chart/U24ixXg1/",
+  "chart_title": "BTCUSDT 76,942.41 \u25bc \u22122.18%",
+  "symbol": "BTCUSDT \u00b7 Binance",
+  "timeframe": "60",
+  "extraction": "TradingView internal chart model main-series bars() after setSymbol(BINANCE:BTCUSDT) and setResolution(60).",
+  "case_id": "crypto_247_intraday_bars",
+  "status": "oracle_verified",
+  "coverage": {
+    "bars": 300,
+    "range_utc": [
+      1776243600,
+      1777320000
+    ],
+    "expected_step_seconds": 3600
+  },
+  "quality_notes": "TradingView-derived 24/7 crypto intraday fixture; no synthetic bars."
+}

@@ -17,7 +17,8 @@ from pinelib.core.na import is_na, na
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.types import SymbolInfo, TimeframeInfo
 from pinelib.errors import PineUnsupportedFeatureError
-from pinelib.request.security import merge_requested_series_to_chart_bars
+from pinelib.request.providers import InMemoryDataProvider
+from pinelib.request.security import merge_requested_series_to_chart_bars, security_lower_tf
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "fixtures" / "tradingview"
@@ -222,6 +223,89 @@ def test_request_security_gaps_and_lookahead_matches_tradingview_expected_csv() 
         expected_by_index.values(),
         ["sec_w_gaps_on_la_off", "sec_w_gaps_off_la_off", "sec_w_gaps_on_la_on", "sec_w_gaps_off_la_on"],
     )
+
+
+def test_request_security_lower_tf_matches_tradingview_intrabar_fixture() -> None:
+    case_dir = FIXTURES / "request_security_lower_tf_intrabar_validation"
+    chart_rows = _load_csv(case_dir / "bars.csv")
+    lower_rows = _load_csv(case_dir / "lower_tf_bars.csv")
+    expected = json.loads((case_dir / "expected_lower_tf.json").read_text(encoding="utf-8"))["bars"]
+    expected_by_index = {int(row["bar_index"]): row for row in expected}
+    lower_bars = [
+        Bar(
+            time=int(row["time"]) * 1000,
+            open=float(row["open"]),
+            high=float(row["high"]),
+            low=float(row["low"]),
+            close=float(row["close"]),
+            volume=float(row["volume"]),
+        )
+        for row in lower_rows
+    ]
+    runtime = PineRuntime(
+        symbol_info=SymbolInfo(tickerid="NASDAQ:AAPL", timezone="America/New_York", session="0930-1600:23456"),
+        timeframe=TimeframeInfo.from_string("1D"),
+        data_provider=InMemoryDataProvider({("NASDAQ:AAPL", "60"): lower_bars}),
+    )
+
+    checked = 0
+    for row in chart_rows:
+        bar_index = int(row["bar_index"])
+        runtime.begin_bar(_bar_from_row(row, time_close=int(row["time_close"]) * 1000))
+        close_values = list(
+            security_lower_tf("NASDAQ:AAPL", "60", lambda child: child.close[0], runtime=runtime, state_id="ltf_close")
+        )
+        high_values = list(
+            security_lower_tf("NASDAQ:AAPL", "60", lambda child: child.high[0], runtime=runtime, state_id="ltf_high")
+        )
+        low_values = list(
+            security_lower_tf("NASDAQ:AAPL", "60", lambda child: child.low[0], runtime=runtime, state_id="ltf_low")
+        )
+        exp = expected_by_index[bar_index]
+        assert len(close_values) == exp["count"]
+        assert len(high_values) == exp["count"]
+        assert len(low_values) == exp["count"]
+        for actual, expected_close in zip(close_values, exp["close_values"], strict=True):
+            assert math.isclose(float(actual), float(expected_close), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+        assert math.isclose(float(close_values[0]), float(exp["first_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+        assert math.isclose(float(close_values[-1]), float(exp["last_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+        assert math.isclose(max(float(value) for value in high_values), float(exp["high_max"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+        assert math.isclose(min(float(value) for value in low_values), float(exp["low_min"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+        runtime.end_bar()
+        checked += 1
+
+    assert checked == len(expected)
+    assert {entry.selected_bars for entry in runtime.lower_tf_metadata_log} == {7}
+
+
+def test_crypto_247_intraday_fixture_preserves_tradingview_hourly_bars() -> None:
+    case_dir = FIXTURES / "crypto_247_intraday_bars"
+    rows = _load_csv(case_dir / "bars.csv")
+    expected = json.loads((case_dir / "expected_bars.json").read_text(encoding="utf-8"))
+    assert len(rows) == expected["bar_count"] == 300
+    assert int(rows[0]["time"]) == expected["first_time"]
+    assert int(rows[-1]["time"]) == expected["last_time"]
+    assert math.isclose(float(rows[0]["close"]), float(expected["first_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+    assert math.isclose(float(rows[-1]["close"]), float(expected["last_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+    for previous, current in zip(rows, rows[1:]):
+        assert int(current["time"]) - int(previous["time"]) == expected["expected_step_seconds"]
+    assert math.isclose(
+        sum(float(row["volume"]) for row in rows),
+        float(expected["total_volume"]),
+        rel_tol=VALUE_TOLERANCE,
+        abs_tol=1e-6,
+    )
+
+    runtime = PineRuntime(
+        symbol_info=SymbolInfo(tickerid="BINANCE:BTCUSDT", timezone="Etc/UTC", session="24x7"),
+        timeframe=TimeframeInfo.from_string("60"),
+    )
+    for row in rows:
+        runtime.begin_bar(_bar_from_row(row, time_close=int(row["time_close"]) * 1000))
+        assert runtime.time[0] == int(row["time"]) * 1000
+        assert runtime.time_close[0] == int(row["time_close"]) * 1000
+        runtime.end_bar()
+    assert runtime.bar_index == expected["bar_count"] - 1
 
 
 def test_ta_stateful_indicators_match_tradingview_after_visible_warmup() -> None:
