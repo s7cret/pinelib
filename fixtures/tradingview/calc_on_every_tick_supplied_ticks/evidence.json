@@ -1,11 +1,17 @@
 {
   "case_id": "calc_on_every_tick_supplied_ticks",
   "captured_at": "2026-04-27T20:27:41.339514+00:00",
+  "closed_at": "2026-04-27T20:43:00+00:00",
+  "status": "platform_blocked",
   "candidate_verified": false,
-  "required_files_present": [
-    "bars.csv"
+  "oracle_not_applicable": true,
+  "required_files_present": [],
+  "missing_tv_derived_required_files": [
+    "bars.csv",
+    "ticks.csv",
+    "expected_report.json"
   ],
-  "oracle_source": "TradingView Chromium CDP runtime chart model after calc_on_every_tick probe strategy",
+  "oracle_source": "not applicable: TradingView platform-blocked tick stream oracle",
   "study_plot_names": [
     "tv_bar_time",
     "tv_open",
@@ -15,6 +21,12 @@
     "tv_realtime_updates_seen",
     "tv_is_realtime"
   ],
-  "blocker": "TradingView historical/CDP chart runtime exposes OHLC bars and current/realtime update state, but provides no API/UI path to inject or retrieve a deterministic supplied synthetic tick stream; therefore ticks.csv and expected_report.json cannot be TV-derived for supplied ticks.",
-  "hard_rule_note": "No ticks.csv/expected_report.json fabricated."
+  "last_attempt_summary": [
+    "Reviewed TradingView strategy/recalculate documentation: calc_on_every_tick applies to realtime updates only; tick data is lost on chart refresh; historical bars contain no tick data.",
+    "Reviewed Pine execution/bar-state documentation: strategies normally execute on bar close; calc_on_every_tick changes realtime update execution, not a historical deterministic tick feed.",
+    "Inspected committed Chromium/CDP TradingView capture fixtures: available payload contains main_bars, study_plots, visible_range_inputs, and sources; no tick/trade update stream or supplied tick export is present.",
+    "No TradingView UI/public API/CDP payload found that can inject PineLib supplied ticks or export the exact realtime tick sequence required for this oracle."
+  ],
+  "blocker": "TradingView historical/CDP chart runtime exposes OHLC bars, Pine plots, and Strategy Tester reportData, but not a deterministic supplied synthetic tick stream. The case specifically requires ticks.csv and expected_report.json derived from the same TV tick stream, which cannot be obtained honestly.",
+  "hard_rule_note": "No ticks.csv, bars.csv, or expected_report.json was fabricated from PineLib/local model output."
 }

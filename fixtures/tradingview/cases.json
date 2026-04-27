@@ -77,17 +77,20 @@
     },
     {
       "id": "calc_on_every_tick_supplied_ticks",
-      "status": "pending_external_oracle",
+      "status": "platform_blocked",
       "required_files": [
         "bars.csv",
         "ticks.csv",
         "expected_report.json"
       ],
-      "pending_reason": "TradingView historical/CDP exposes chart OHLC and Pine runtime plots but no deterministic supplied tick-stream export/API for ticks.csv and expected_report.json.",
       "evidence_files": [
         "evidence.json",
-        "oracle_script.pine"
-      ]
+        "oracle_script.pine",
+        "platform_blocked_evidence.md"
+      ],
+      "blocked_reason": "TradingView documents calc_on_every_tick as realtime-only, loses tick data on refresh, and states historical bars contain no tick data; Chromium/CDP captures expose chart bars, plots, and Strategy Tester reportData but no deterministic supplied tick-stream export/API.",
+      "blocked_by": "TradingView platform: no public/UI/CDP oracle path to inject or export the exact realtime tick stream needed for supplied-tick parity.",
+      "oracle_source": "not applicable: platform-blocked tick stream oracle, no fabricated ticks"
     },
     {
       "id": "ta_stateful_indicators",

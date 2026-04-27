@@ -88,11 +88,12 @@ def _manifest() -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(MANIFEST_PATH.read_text(encoding="utf-8")))
 
 
-def test_tradingview_oracle_manifest_counts_verified_and_pending_cases() -> None:
+def test_tradingview_oracle_manifest_counts_verified_and_blocked_cases_without_pending() -> None:
     manifest = _manifest()
     cases = manifest["cases"]
     statuses = {case["status"] for case in cases}
-    assert statuses <= {"oracle_verified", "golden_synthetic", "pending_external_oracle"}
+    assert statuses <= {"oracle_verified", "golden_synthetic", "platform_blocked"}
+    assert "pending_external_oracle" not in statuses
 
     for case in cases:
         case_dir = MANIFEST_PATH.parent / case["id"]
@@ -102,8 +103,9 @@ def test_tradingview_oracle_manifest_counts_verified_and_pending_cases() -> None
             assert case.get("oracle_source", "").startswith("TradingView")
             for required_file in case["required_files"]:
                 assert (case_dir / required_file).is_file()
-        elif case["status"] == "pending_external_oracle":
-            assert case.get("pending_reason", "").strip()
+        elif case["status"] == "platform_blocked":
+            assert case.get("blocked_reason", "").strip()
+            assert case.get("blocked_by", "").strip()
             assert all(not (case_dir / required_file).exists() for required_file in case["required_files"])
 
     result = subprocess.run(
@@ -115,7 +117,24 @@ def test_tradingview_oracle_manifest_counts_verified_and_pending_cases() -> None
     )
     summary = json.loads(result.stdout)
     assert summary["oracle_verified"] == sum(case["status"] == "oracle_verified" for case in cases)
-    assert summary["pending_external_oracle"] == sum(case["status"] == "pending_external_oracle" for case in cases)
+    assert summary["platform_blocked"] == sum(case["status"] == "platform_blocked" for case in cases)
+    assert summary["pending_external_oracle"] == 0
+
+
+def test_calc_on_every_tick_supplied_ticks_is_platform_blocked_not_pending() -> None:
+    case_dir = FIXTURES / "calc_on_every_tick_supplied_ticks"
+    case = next(case for case in _manifest()["cases"] if case["id"] == "calc_on_every_tick_supplied_ticks")
+    evidence = json.loads((case_dir / "evidence.json").read_text(encoding="utf-8"))
+    blocked_evidence = (case_dir / "platform_blocked_evidence.md").read_text(encoding="utf-8")
+
+    assert case["status"] == "platform_blocked"
+    assert evidence["status"] == "platform_blocked"
+    assert evidence["candidate_verified"] is False
+    assert evidence["oracle_not_applicable"] is True
+    assert "No ticks.csv" in evidence["hard_rule_note"]
+    assert "historical bars contain no tick data" in blocked_evidence
+    assert "no deterministic tick stream" in blocked_evidence
+    assert all(not (case_dir / required_file).exists() for required_file in case["required_files"])
 
 
 def test_session_time_time_close_timeframe_guard_matches_tradingview_daily_time_values() -> None:
