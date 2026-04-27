@@ -29,6 +29,7 @@ def _tracked_python_files() -> list[Path]:
     files.extend(sorted((ROOT / "tests").rglob("*.py")))
     files.extend(sorted((ROOT / "scripts").glob("*.py")))
     files.extend(sorted((ROOT / "docs").rglob("*.md")))
+    files.extend(sorted((ROOT / "docs").rglob("*.json")))
     return files
 
 

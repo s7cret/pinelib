@@ -1,9 +1,9 @@
-# PineLib Runtime v0.7.0
+# PineLib Runtime v0.8.0
 
 PineLib is a Python runtime foundation for AST2Python-generated Pine-compatible code.
-v0.7.0 continues the v1.4 runtime contract / TZ_01 track with integration/backtest engine polish and file IO helpers.
+v0.8.0 continues the v1.4 runtime contract / TZ_01 track with TradingView parity fixture harnesses and target strategy integration scaffolding.
 
-Implemented through v0.7.0:
+Implemented through v0.8.0:
 
 - contract/version metadata for `pinelib` and runtime contract `1.4`
 - validated `Bar` model with UTC millisecond timestamps
@@ -14,8 +14,10 @@ Implemented through v0.7.0:
 - `request.security` foundation with explicit nested-request diagnostics
 - StrategyContext broker emulator MVP plus Bar Magnifier provenance from v0.5.0
 - v0.7 bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext`
-- result snapshots, JSON-safe backtest report schema, golden-compare tolerance utility, and optimizer-friendly params metadata capture
+- result snapshots, JSON-safe backtest report schema, golden-compare tolerance utility, strategy/equity compare reports, and optimizer-friendly params metadata capture
 - CSV OHLCV loader plus optional Parquet loader with graceful dependency errors
+- TradingView-exported indicator/trade CSV fixture loaders and indicator column compare reports in `pinelib.parity`
+- AVAX/SOL/XLM sample integration scaffolding with placeholder data contracts in `docs/sample_contracts_v0_8_0.json`
 - improved strategy schedule helper with guarded `calc_on_order_fills` recalc loop and runtime `process_orders_on_close` coverage
 - visual recorder foundation and reference containers (`PineArray`, `PineMap`, `PineMatrix`)
 - TA helpers: `sma`, `ema`, `rma`, `rsi`, `macd`, `tr`, `atr`, `highest`, `lowest`, `change`, crosses, plus v0.6 additions: `bb`, `bbw`, fast `stoch`, `dmi`/`adx`, `supertrend`, `wma`, `vwma`, `hma`, `swma`, `alma`, `sar`, `pivot_high`/`pivot_low`, `valuewhen`, `barssince`, `linreg`, `variance`, `stdev`, `dev`, percentile/percentrank basics, `vwap`, `mfi`, `cci`, `obv`, `mom`, `roc`, `correlation`, `rising`, and `falling`
@@ -53,6 +55,16 @@ assert strategy.position_avg_price == 12
 assert result.report.params_metadata["qty"]["default"] == 1
 ```
 
+## Parity fixture harness
+
+```python
+from pinelib import compare_strategy_reports, load_tradingview_indicator_csv
+
+fixture = load_tradingview_indicator_csv("tradingview_indicators.csv")
+report = compare_strategy_reports(actual_report, expected_report, fields=["final_equity", "netprofit"], abs_tol=1e-4)
+assert report.matches
+```
+
 ## Bar file IO
 
 ```python
@@ -62,11 +74,11 @@ bars = load_bars_csv("bars.csv")      # required: time, open, high, low, close
 bars2 = load_bars("bars.parquet")     # optional pandas + pyarrow/fastparquet
 ```
 
-## Coverage map for v0.7
+## Coverage map for v0.8
 
 - Batch and runtime modes are preserved for existing stateful indicators; runtime stateful helpers require explicit `state_id`.
-- Backtest reports are JSON-safe integration artifacts, not a complete TradingView strategy tester clone.
+- Backtest and parity compare reports are JSON-safe integration artifacts, not a complete TradingView strategy tester clone.
 - Several TA helpers remain batch-first; incomplete overloads raise explicit `PineRuntimeError` instead of silently approximating.
-- Deferred: full TradingView TA overload matrix, complete visual API/rendering, full reference history semantics, realtime tick execution, advanced strategy parity, and golden TradingView parity suite.
+- Deferred: full TradingView TA overload matrix, complete visual API/rendering, full reference history semantics, realtime tick execution, trailing-exit ratchets, margin calls, and advanced strategy parity.
 
-See `docs/current_limitations.md` for current limitations.
+See `docs/current_limitations.md` and `docs/coverage_map_v0_8_0.md` for current limitations and namespace coverage.

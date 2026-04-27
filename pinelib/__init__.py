@@ -44,6 +44,7 @@ from pinelib.backtest import (
 from pinelib.errors import (
     PL_DATA_FORMAT_ERROR,
     PL_INPUT_VALIDATION_ERROR,
+    PL_MARGIN_FIELDS_DIAGNOSTIC,
     PL_MISSING_INTRABAR_DATA,
     PL_REFERENCE_HISTORY_UNSUPPORTED,
     PL_SESSION_PARSE_ERROR,
@@ -65,6 +66,18 @@ from pinelib.errors import (
 )
 from pinelib.io import load_bars, load_bars_csv, load_bars_parquet
 from pinelib.math import pine_abs, pine_max, pine_min, pine_round, pine_sum
+from pinelib.parity import (
+    StrategyCompareReport,
+    TradingViewIndicatorFixture,
+    TradingViewSampleContract,
+    assert_strategy_report_close,
+    compare_indicator_fixture,
+    compare_strategy_reports,
+    default_sample_contracts,
+    load_tradingview_indicator_csv,
+    load_tradingview_trades_csv,
+    write_sample_contracts,
+)
 from pinelib.reference import PineArray, PineMap, PineMatrix, reference_history
 from pinelib.request import (
     DataProvider,
@@ -93,6 +106,7 @@ __all__ = [
     "PACKAGE_VERSION",
     "PL_DATA_FORMAT_ERROR",
     "PL_INPUT_VALIDATION_ERROR",
+    "PL_MARGIN_FIELDS_DIAGNOSTIC",
     "PL_MISSING_INTRABAR_DATA",
     "PL_REFERENCE_HISTORY_UNSUPPORTED",
     "PL_SESSION_PARSE_ERROR",
@@ -126,19 +140,28 @@ __all__ = [
     "Order",
     "StrategyContext",
     "StrategySchedule",
+    "StrategyCompareReport",
     "StrategyDeclaration",
     "Trade",
+    "TradingViewIndicatorFixture",
+    "TradingViewSampleContract",
     "SymbolInfo",
     "TimeframeInfo",
     "TypeInfo",
+    "assert_strategy_report_close",
     "build_backtest_report",
     "compare_golden",
+    "compare_indicator_fixture",
+    "compare_strategy_reports",
     "extract_params_metadata",
+    "default_sample_contracts",
     "extract_strategy_params",
     "fixnan",
     "load_bars",
     "load_bars_csv",
     "load_bars_parquet",
+    "load_tradingview_indicator_csv",
+    "load_tradingview_trades_csv",
     "merge_requested_series_to_chart_bars",
     "is_na",
     "na",
@@ -168,6 +191,7 @@ __all__ = [
     "string",
     "ta",
     "write_result_snapshot",
+    "write_sample_contracts",
 ]
 
 __version__ = PACKAGE_VERSION

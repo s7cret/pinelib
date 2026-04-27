@@ -5,7 +5,15 @@ from typing import Any, Literal
 
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
-from pinelib.errors import PL_MISSING_INTRABAR_DATA, PL_UNSUPPORTED_STRATEGY_SETTING, PL_WARNING_BAR_MAGNIFIER_FALLBACK, PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK, PL_WARNING_EXIT_QTY_REDUCED, PineStrategyError
+from pinelib.errors import (
+    PL_MARGIN_FIELDS_DIAGNOSTIC,
+    PL_MISSING_INTRABAR_DATA,
+    PL_UNSUPPORTED_STRATEGY_SETTING,
+    PL_WARNING_BAR_MAGNIFIER_FALLBACK,
+    PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
+    PL_WARNING_EXIT_QTY_REDUCED,
+    PineStrategyError,
+)
 
 Direction = Literal["long", "short"]
 OrderType = Literal["market", "limit", "stop", "stop_limit"]
@@ -169,6 +177,14 @@ class StrategyContext:
             if self.declaration.strict_tv_parity or runtime.config.strict_tv_parity:
                 raise PineStrategyError(msg, code=PL_UNSUPPORTED_STRATEGY_SETTING)
             self._emit(runtime, PL_UNSUPPORTED_STRATEGY_SETTING, msg, settings=unsupported)
+        if self.margin_long != 100.0 or self.margin_short != 100.0:
+            self._emit(
+                runtime,
+                PL_MARGIN_FIELDS_DIAGNOSTIC,
+                "margin_long/margin_short are captured for diagnostics; margin calls are not emulated",
+                margin_long=self.margin_long,
+                margin_short=self.margin_short,
+            )
 
     def entry(self, id: str, direction: Direction, qty: float | None = None, limit: float | None = None, stop: float | None = None, *, source_map: object | None = None) -> None:
         self._add_order(id, direction, qty, limit, stop, "entry", source_map=source_map)
@@ -380,11 +396,9 @@ class StrategyContext:
             self.equity -= commission
         else:
             remaining = qty
-            for lot in list(self._lots):
+            for lot in self._lots_for_close(order):
                 if remaining <= 0:
                     break
-                if order.from_entry and lot.entry_id != order.from_entry:
-                    continue
                 close_qty = min(lot.qty, remaining)
                 profit = (price - lot.entry_price) * close_qty if lot.direction == "long" else (lot.entry_price - price) * close_qty
                 prorated_entry_commission = lot.commission * (close_qty / lot.qty) if lot.qty else 0.0
@@ -410,6 +424,14 @@ class StrategyContext:
             if remaining > 1e-12 and order.kind in {"entry", "order"}:
                 self._lots.append(_OpenLot(order.id, "long" if signed > 0 else "short", remaining, price, bar.time, runtime.bar_index + 1, commission * (remaining / qty)))
         self._recompute_position(price)
+
+    def _lots_for_close(self, order: Order) -> list[_OpenLot]:
+        lots = list(self._lots)
+        if self.close_entries_rule == "ANY" and order.from_entry:
+            matching = [lot for lot in lots if lot.entry_id == order.from_entry]
+            others = [lot for lot in lots if lot.entry_id != order.from_entry]
+            return [*matching, *others]
+        return lots
 
     def _recompute_position(self, mark_price: float) -> None:
         long_qty = sum(l.qty for l in self._lots if l.direction == "long")
@@ -459,7 +481,10 @@ class StrategyContext:
         return available
 
     def _available_exit_qty(self, from_entry: str | None) -> float:
-        lots = self._lots if from_entry is None else [l for l in self._lots if l.entry_id == from_entry]
+        if from_entry is not None and self.close_entries_rule == "ANY":
+            lots = [lot for lot in self._lots if lot.entry_id == from_entry]
+        else:
+            lots = self._lots
         sign = 1.0 if self.position_size >= 0 else -1.0
         return sign * sum(l.qty for l in lots)
 
