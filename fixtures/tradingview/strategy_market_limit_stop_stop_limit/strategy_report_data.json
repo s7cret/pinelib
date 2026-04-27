@@ -1,0 +1,352 @@
+{
+  "currency": "USD",
+  "settings": {
+    "dateRange": {
+      "backtest": {
+        "from": 345479400000,
+        "to": 1777296600000
+      },
+      "trade": {
+        "from": 1767191400000,
+        "to": 1777296600000
+      }
+    }
+  },
+  "buyHold": [
+    100000,
+    100000,
+    97782.04,
+    94883.32,
+    95033.38
+  ],
+  "buyHoldPercent": [
+    100,
+    100,
+    97.78204,
+    94.88332,
+    95.03338
+  ],
+  "filledOrders": [
+    {
+      "b": true,
+      "c": "MKT_L",
+      "e": true,
+      "id": "MKT_L",
+      "p": 273.06,
+      "q": 1,
+      "tm": 0,
+      "tp": "MARKET"
+    },
+    {
+      "b": false,
+      "c": "MKT_X",
+      "e": false,
+      "id": "Close entry(s) order strategy.close_0",
+      "p": 273.06,
+      "q": 1,
+      "tm": 0,
+      "tp": "MARKET"
+    },
+    {
+      "b": true,
+      "c": "LMT_L",
+      "e": true,
+      "id": "LMT_L",
+      "p": 267,
+      "q": 1,
+      "tm": 1,
+      "tp": "LIMIT"
+    },
+    {
+      "b": false,
+      "c": "LMT_X",
+      "e": false,
+      "id": "Close entry(s) order strategy.close_1",
+      "p": 267,
+      "q": 1,
+      "tm": 1,
+      "tp": "MARKET"
+    },
+    {
+      "b": true,
+      "c": "STP_L",
+      "e": true,
+      "id": "STP_L",
+      "p": 259.08,
+      "q": 1,
+      "tm": 2,
+      "tp": "STOP"
+    },
+    {
+      "b": false,
+      "c": "STP_X",
+      "e": false,
+      "id": "Close entry(s) order strategy.close_2",
+      "p": 259.08,
+      "q": 1,
+      "tm": 2,
+      "tp": "MARKET"
+    },
+    {
+      "b": true,
+      "c": "STPLMT_L",
+      "e": true,
+      "id": "STPLMT_L",
+      "p": 259.49,
+      "q": 1,
+      "tm": 3,
+      "tp": "STOP_LIMIT"
+    },
+    {
+      "b": false,
+      "c": "STPLMT_X",
+      "e": false,
+      "id": "Close entry(s) order strategy.close_3",
+      "p": 259.49,
+      "q": 1,
+      "tm": 3,
+      "tp": "MARKET"
+    }
+  ],
+  "performance": {
+    "all": {
+      "avgBarsInLossTrade": 0,
+      "avgBarsInTrade": 1,
+      "avgBarsInWinTrade": 0,
+      "avgLosTrade": null,
+      "avgLosTradePercent": null,
+      "avgTrade": 0,
+      "avgTradePercent": 0,
+      "avgWinTrade": null,
+      "avgWinTradePercent": null,
+      "commissionPaid": 0,
+      "grossLoss": 0,
+      "grossLossPercent": 0,
+      "grossLossWC": 0,
+      "grossProfit": 0,
+      "grossProfitPercent": 0,
+      "grossProfitWC": 0,
+      "largestLosTrade": null,
+      "largestLosTradePercent": null,
+      "largestWinTrade": null,
+      "largestWinTradePercent": null,
+      "marginCalls": 0,
+      "maxContractsHeld": 1,
+      "netProfit": 0,
+      "netProfitPercent": 0,
+      "numberOfLosingTrades": 0,
+      "numberOfWiningTrades": 0,
+      "percentProfitable": 0,
+      "profitFactor": null,
+      "ratioAvgWinAvgLoss": null,
+      "totalOpenTrades": 0,
+      "totalTrades": 4
+    },
+    "long": {
+      "avgBarsInLossTrade": 0,
+      "avgBarsInTrade": 1,
+      "avgBarsInWinTrade": 0,
+      "avgLosTrade": null,
+      "avgLosTradePercent": null,
+      "avgTrade": 0,
+      "avgTradePercent": 0,
+      "avgWinTrade": null,
+      "avgWinTradePercent": null,
+      "commissionPaid": 0,
+      "grossLoss": 0,
+      "grossLossPercent": 0,
+      "grossLossWC": 0,
+      "grossProfit": 0,
+      "grossProfitPercent": 0,
+      "grossProfitWC": 0,
+      "largestLosTrade": null,
+      "largestLosTradePercent": null,
+      "largestWinTrade": null,
+      "largestWinTradePercent": null,
+      "marginCalls": 0,
+      "maxContractsHeld": 1,
+      "netProfit": 0,
+      "netProfitPercent": 0,
+      "numberOfLosingTrades": 0,
+      "numberOfWiningTrades": 0,
+      "percentProfitable": 0,
+      "profitFactor": null,
+      "ratioAvgWinAvgLoss": null,
+      "totalOpenTrades": 0,
+      "totalTrades": 4
+    },
+    "maxStrategyDrawDown": 0,
+    "openPL": 0,
+    "buyHoldReturn": -1991.039999999999,
+    "sharpeRatio": null,
+    "sortinoRatio": null,
+    "maxStrategyDrawDownPercent": 0,
+    "maxStrategyRunUp": 0,
+    "maxStrategyRunUpPercent": 0,
+    "buyHoldReturnPercent": -0.01991039999999999,
+    "openPLPercent": 0,
+    "buyHoldGainPercent": -0.01992236138577601,
+    "maxMarginUsed": 273.06,
+    "avgMarginUsed": 0,
+    "short": {
+      "avgBarsInLossTrade": 0,
+      "avgBarsInTrade": 0,
+      "avgBarsInWinTrade": 0,
+      "avgLosTrade": null,
+      "avgLosTradePercent": null,
+      "avgTrade": null,
+      "avgTradePercent": null,
+      "avgWinTrade": null,
+      "avgWinTradePercent": null,
+      "commissionPaid": 0,
+      "grossLoss": 0,
+      "grossLossPercent": 0,
+      "grossLossWC": 0,
+      "grossProfit": 0,
+      "grossProfitPercent": 0,
+      "grossProfitWC": 0,
+      "largestLosTrade": null,
+      "largestLosTradePercent": null,
+      "largestWinTrade": null,
+      "largestWinTradePercent": null,
+      "marginCalls": 0,
+      "maxContractsHeld": 0,
+      "netProfit": 0,
+      "netProfitPercent": 0,
+      "numberOfLosingTrades": 0,
+      "numberOfWiningTrades": 0,
+      "percentProfitable": null,
+      "profitFactor": null,
+      "ratioAvgWinAvgLoss": null,
+      "totalOpenTrades": 0,
+      "totalTrades": 0
+    }
+  },
+  "trades": [
+    {
+      "e": {
+        "c": "MKT_L",
+        "p": 273.06,
+        "tm": 1767191400000,
+        "tp": "le"
+      },
+      "q": 1,
+      "x": {
+        "c": "MKT_X",
+        "p": 273.06,
+        "tm": 1767191400000,
+        "tp": "lx"
+      },
+      "tp": {
+        "v": 0,
+        "p": 0
+      },
+      "cp": {
+        "v": 0,
+        "p": 0
+      },
+      "rn": {
+        "v": 0,
+        "p": 0
+      },
+      "dd": {
+        "v": 0,
+        "p": 0
+      }
+    },
+    {
+      "e": {
+        "c": "LMT_L",
+        "p": 267,
+        "tm": 1767709800000,
+        "tp": "le"
+      },
+      "q": 1,
+      "x": {
+        "c": "LMT_X",
+        "p": 267,
+        "tm": 1767709800000,
+        "tp": "lx"
+      },
+      "tp": {
+        "v": 0,
+        "p": 0
+      },
+      "cp": {
+        "v": 0,
+        "p": 0
+      },
+      "rn": {
+        "v": 0,
+        "p": 0
+      },
+      "dd": {
+        "v": 0,
+        "p": 0
+      }
+    },
+    {
+      "e": {
+        "c": "STP_L",
+        "p": 259.08,
+        "tm": 1767969000000,
+        "tp": "le"
+      },
+      "q": 1,
+      "x": {
+        "c": "STP_X",
+        "p": 259.08,
+        "tm": 1767969000000,
+        "tp": "lx"
+      },
+      "tp": {
+        "v": 0,
+        "p": 0
+      },
+      "cp": {
+        "v": 0,
+        "p": 0
+      },
+      "rn": {
+        "v": 0,
+        "p": 0
+      },
+      "dd": {
+        "v": 0,
+        "p": 0
+      }
+    },
+    {
+      "e": {
+        "c": "STPLMT_L",
+        "p": 259.49,
+        "tm": 1768401000000,
+        "tp": "le"
+      },
+      "q": 1,
+      "x": {
+        "c": "STPLMT_X",
+        "p": 259.49,
+        "tm": 1768401000000,
+        "tp": "lx"
+      },
+      "tp": {
+        "v": 0,
+        "p": 0
+      },
+      "cp": {
+        "v": 0,
+        "p": 0
+      },
+      "rn": {
+        "v": 0,
+        "p": 0
+      },
+      "dd": {
+        "v": 0,
+        "p": 0
+      }
+    }
+  ],
+  "firstTradeIndex": 0
+}

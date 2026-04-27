@@ -45,27 +45,35 @@
     },
     {
       "id": "strategy_market_limit_stop_stop_limit",
-      "status": "pending_external_oracle",
+      "status": "oracle_verified",
       "required_files": [
         "bars.csv",
         "expected_trades.csv"
       ],
-      "pending_reason": "Strategy Tester/order fill export not captured as machine-readable TradingView oracle in this run.",
       "evidence_files": [
-        "evidence.json"
-      ]
+        "evidence.json",
+        "oracle_script.pine",
+        "filled_orders.csv",
+        "strategy_report_data.json",
+        "study_plots.csv"
+      ],
+      "oracle_source": "TradingView Chromium CDP Strategy Tester reportData capture 2026-04-27"
     },
     {
       "id": "strategy_exit_oca_reservation",
-      "status": "pending_external_oracle",
+      "status": "oracle_verified",
       "required_files": [
         "bars.csv",
         "expected_trades.csv"
       ],
-      "pending_reason": "Strategy Tester OCA reservation/fill export not captured as machine-readable TradingView oracle in this run.",
       "evidence_files": [
-        "evidence.json"
-      ]
+        "evidence.json",
+        "oracle_script.pine",
+        "filled_orders.csv",
+        "strategy_report_data.json",
+        "study_plots.csv"
+      ],
+      "oracle_source": "TradingView Chromium CDP Strategy Tester reportData capture 2026-04-27"
     },
     {
       "id": "calc_on_every_tick_supplied_ticks",
@@ -75,9 +83,10 @@
         "ticks.csv",
         "expected_report.json"
       ],
-      "pending_reason": "TradingView UI/CDP run did not provide supplied tick stream oracle data.",
+      "pending_reason": "TradingView historical/CDP exposes chart OHLC and Pine runtime plots but no deterministic supplied tick-stream export/API for ticks.csv and expected_report.json.",
       "evidence_files": [
-        "evidence.json"
+        "evidence.json",
+        "oracle_script.pine"
       ]
     },
     {

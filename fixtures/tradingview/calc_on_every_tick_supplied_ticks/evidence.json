@@ -1,38 +1,20 @@
 {
-  "source": "TradingView Chromium CDP oracle capture",
-  "captured_at": "2026-04-27T18:30:40.072Z",
-  "chart_url": "https://www.tradingview.com/chart/U24ixXg1/",
-  "chart_title": "AAPL 266.27 \u25bc \u22121.77% Unnamed",
-  "symbol": "AAPL \u00b7 NASDAQ, 1D",
-  "timeframe": "1D",
-  "study_name": "pinelib tv oracle indicator v1",
-  "pine_script": "oracle_script.pine",
-  "extraction": "TradingView internal chart model dataSources(): main series bars() and study plots()",
-  "plot_names": [
-    "bar_time",
-    "bar_time_close",
-    "time_W",
-    "time_close_W",
-    "sec_w_gaps_on_la_off",
-    "sec_w_gaps_off_la_off",
-    "sec_w_gaps_on_la_on",
-    "sec_w_gaps_off_la_on",
-    "ltf60_close_count",
-    "ltf60_close_first",
-    "ltf60_close_last",
-    "ltf60_high_max",
-    "ltf60_low_min",
-    "sma5",
-    "ema5",
-    "rma5",
-    "rsi14",
-    "atr14",
-    "macd_line",
-    "macd_signal",
-    "macd_hist",
-    "stoch14"
-  ],
   "case_id": "calc_on_every_tick_supplied_ticks",
-  "status": "pending_external_oracle",
-  "reason": "TradingView historical chart does not accept supplied synthetic ticks through Pine UI/CDP; no real TradingView tick oracle captured."
+  "captured_at": "2026-04-27T20:27:41.339514+00:00",
+  "candidate_verified": false,
+  "required_files_present": [
+    "bars.csv"
+  ],
+  "oracle_source": "TradingView Chromium CDP runtime chart model after calc_on_every_tick probe strategy",
+  "study_plot_names": [
+    "tv_bar_time",
+    "tv_open",
+    "tv_high",
+    "tv_low",
+    "tv_close",
+    "tv_realtime_updates_seen",
+    "tv_is_realtime"
+  ],
+  "blocker": "TradingView historical/CDP chart runtime exposes OHLC bars and current/realtime update state, but provides no API/UI path to inject or retrieve a deterministic supplied synthetic tick stream; therefore ticks.csv and expected_report.json cannot be TV-derived for supplied ticks.",
+  "hard_rule_note": "No ticks.csv/expected_report.json fabricated."
 }

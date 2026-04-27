@@ -308,6 +308,38 @@ def test_crypto_247_intraday_fixture_preserves_tradingview_hourly_bars() -> None
     assert runtime.bar_index == expected["bar_count"] - 1
 
 
+def test_strategy_tester_trade_exports_are_tradingview_reportdata_backed() -> None:
+    cases = {
+        "strategy_market_limit_stop_stop_limit": {"trades": 4, "filled_orders": 8},
+        "strategy_exit_oca_reservation": {"trades": 2, "filled_orders": 3},
+    }
+    for case_id, expected_counts in cases.items():
+        case_dir = FIXTURES / case_id
+        trades = _load_csv(case_dir / "expected_trades.csv")
+        filled_orders = _load_csv(case_dir / "filled_orders.csv")
+        evidence = json.loads((case_dir / "evidence.json").read_text(encoding="utf-8"))
+        report_data = json.loads((case_dir / "strategy_report_data.json").read_text(encoding="utf-8"))
+
+        assert len(trades) == expected_counts["trades"]
+        assert len(filled_orders) == expected_counts["filled_orders"]
+        assert evidence["candidate_verified"] is True
+        assert "TradingView" in evidence["oracle_source"]
+        assert "reportData" in evidence["oracle_source"]
+        assert len(report_data["trades"]) == expected_counts["trades"]
+        assert len(report_data["filledOrders"]) == expected_counts["filled_orders"]
+        for idx, row in enumerate(trades):
+            assert int(row["trade_no"]) == idx
+            assert row["entry_comment"]
+            assert row["exit_comment"]
+            assert float(row["quantity"]) > 0
+            assert int(row["entry_time_ms"]) > 0
+            assert int(row["exit_time_ms"]) >= int(row["entry_time_ms"])
+
+    oca_trades = _load_csv(FIXTURES / "strategy_exit_oca_reservation" / "expected_trades.csv")
+    assert [float(row["quantity"]) for row in oca_trades] == [1.0, 19.0]
+    assert {row["exit_comment"] for row in oca_trades} == {"STOP_REDUCED_20", "LIM_RESERVE_19"}
+
+
 def test_ta_stateful_indicators_match_tradingview_after_visible_warmup() -> None:
     case_dir = FIXTURES / "ta_stateful_indicators"
     bars_rows = _load_csv(case_dir / "bars.csv")

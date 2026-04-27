@@ -1,0 +1,5 @@
+trade_no,entry_comment,entry_price,entry_time_ms,entry_type,exit_comment,exit_price,exit_time_ms,exit_type,quantity,profit_value,profit_percent,cumulative_profit_value,cumulative_profit_percent,runup_value,runup_percent,drawdown_value,drawdown_percent
+0,MKT_L,273.06,1767191400000,le,MKT_X,273.06,1767191400000,lx,1,0,0,0,0,0,0,0,0
+1,LMT_L,267,1767709800000,le,LMT_X,267,1767709800000,lx,1,0,0,0,0,0,0,0,0
+2,STP_L,259.08,1767969000000,le,STP_X,259.08,1767969000000,lx,1,0,0,0,0,0,0,0,0
+3,STPLMT_L,259.49,1768401000000,le,STPLMT_X,259.49,1768401000000,lx,1,0,0,0,0,0,0,0,0

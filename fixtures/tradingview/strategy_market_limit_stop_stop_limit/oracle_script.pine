@@ -1,1 +1,49 @@
-// Pending: dedicated TradingView extraction not completed in this run.
+//@version=6
+strategy("pinelib_oracle_strategy_market_limit_stop_stoplimit_v1", overlay=false, pyramiding=10, initial_capital=100000, calc_on_order_fills=true, process_orders_on_close=false)
+int start = last_bar_index - 80
+if bar_index == start
+    strategy.entry("MKT_L", strategy.long, qty=1)
+if bar_index == start + 1
+    strategy.close("MKT_L", comment="MKT_X")
+if bar_index == start + 3
+    strategy.entry("LMT_L", strategy.long, qty=1, limit=close + 1000)
+if bar_index == start + 4
+    strategy.close("LMT_L", comment="LMT_X")
+if bar_index == start + 6
+    strategy.entry("STP_L", strategy.long, qty=1, stop=close - 1000)
+if bar_index == start + 7
+    strategy.close("STP_L", comment="STP_X")
+if bar_index == start + 9
+    strategy.entry("STPLMT_L", strategy.long, qty=1, stop=close - 1000, limit=close + 1000)
+if bar_index == start + 10
+    strategy.close("STPLMT_L", comment="STPLMT_X")
+float t_no = na
+float ent_bar = na
+float ex_bar = na
+float ent_px = na
+float ex_px = na
+float sz = na
+float prof = na
+if strategy.closedtrades > nz(strategy.closedtrades[1])
+    int n = strategy.closedtrades - 1
+    t_no := n
+    ent_bar := strategy.closedtrades.entry_bar_index(n)
+    ex_bar := strategy.closedtrades.exit_bar_index(n)
+    ent_px := strategy.closedtrades.entry_price(n)
+    ex_px := strategy.closedtrades.exit_price(n)
+    sz := strategy.closedtrades.size(n)
+    prof := strategy.closedtrades.profit(n)
+plot(time, "tv_bar_time")
+plot(open, "tv_open")
+plot(high, "tv_high")
+plot(low, "tv_low")
+plot(close, "tv_close")
+plot(strategy.closedtrades, "tv_closedtrades_count")
+plot(strategy.position_size, "tv_position_size")
+plot(t_no, "tv_trade_no")
+plot(ent_bar, "tv_entry_bar_index")
+plot(ex_bar, "tv_exit_bar_index")
+plot(ent_px, "tv_entry_price")
+plot(ex_px, "tv_exit_price")
+plot(sz, "tv_size")
+plot(prof, "tv_profit")

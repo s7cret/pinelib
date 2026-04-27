@@ -1,1 +1,14 @@
-// Pending: dedicated TradingView extraction not completed in this run.
+//@version=6
+strategy("pinelib_oracle_calc_on_every_tick_probe_v1", overlay=false, calc_on_every_tick=true)
+varip int realtime_updates = 0
+if barstate.isnew
+    realtime_updates := 0
+else
+    realtime_updates += 1
+plot(time, "tv_bar_time")
+plot(open, "tv_open")
+plot(high, "tv_high")
+plot(low, "tv_low")
+plot(close, "tv_close")
+plot(realtime_updates, "tv_realtime_updates_seen")
+plot(barstate.isrealtime ? 1 : 0, "tv_is_realtime")

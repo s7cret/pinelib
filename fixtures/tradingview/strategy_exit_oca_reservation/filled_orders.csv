@@ -1,0 +1,4 @@
+order_no,id,comment,is_entry,is_buy,price,quantity,order_type,trade_marker
+0,OCA_L,OCA_L,True,True,255.17,20,MARKET,0
+1,STOP_REDUCED_20,STOP_REDUCED_20,False,False,255.17,1,STOP,0
+2,LIM_RESERVE_19,LIM_RESERVE_19,False,False,255.17,19,LIMIT,0

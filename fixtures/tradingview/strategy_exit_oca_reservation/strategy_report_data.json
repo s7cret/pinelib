@@ -1,0 +1,236 @@
+{
+  "currency": "USD",
+  "settings": {
+    "dateRange": {
+      "backtest": {
+        "from": 345479400000,
+        "to": 1777296600000
+      },
+      "trade": {
+        "from": 1769783400000,
+        "to": 1777296600000
+      }
+    }
+  },
+  "buyHold": [
+    100000,
+    100000,
+    100000
+  ],
+  "buyHoldPercent": [
+    100,
+    100,
+    100
+  ],
+  "filledOrders": [
+    {
+      "b": true,
+      "c": "OCA_L",
+      "e": true,
+      "id": "OCA_L",
+      "p": 255.17,
+      "q": 20,
+      "tm": 0,
+      "tp": "MARKET"
+    },
+    {
+      "b": false,
+      "c": "STOP_REDUCED_20",
+      "e": false,
+      "id": "STOP_REDUCED_20",
+      "p": 255.17,
+      "q": 1,
+      "tm": 0,
+      "tp": "STOP"
+    },
+    {
+      "b": false,
+      "c": "LIM_RESERVE_19",
+      "e": false,
+      "id": "LIM_RESERVE_19",
+      "p": 255.17,
+      "q": 19,
+      "tm": 0,
+      "tp": "LIMIT"
+    }
+  ],
+  "performance": {
+    "all": {
+      "avgBarsInLossTrade": 0,
+      "avgBarsInTrade": 1,
+      "avgBarsInWinTrade": 0,
+      "avgLosTrade": null,
+      "avgLosTradePercent": null,
+      "avgTrade": 0,
+      "avgTradePercent": 0,
+      "avgWinTrade": null,
+      "avgWinTradePercent": null,
+      "commissionPaid": 0,
+      "grossLoss": 0,
+      "grossLossPercent": 0,
+      "grossLossWC": 0,
+      "grossProfit": 0,
+      "grossProfitPercent": 0,
+      "grossProfitWC": 0,
+      "largestLosTrade": null,
+      "largestLosTradePercent": null,
+      "largestWinTrade": null,
+      "largestWinTradePercent": null,
+      "marginCalls": 0,
+      "maxContractsHeld": 20,
+      "netProfit": 0,
+      "netProfitPercent": 0,
+      "numberOfLosingTrades": 0,
+      "numberOfWiningTrades": 0,
+      "percentProfitable": 0,
+      "profitFactor": null,
+      "ratioAvgWinAvgLoss": null,
+      "totalOpenTrades": 0,
+      "totalTrades": 2
+    },
+    "long": {
+      "avgBarsInLossTrade": 0,
+      "avgBarsInTrade": 1,
+      "avgBarsInWinTrade": 0,
+      "avgLosTrade": null,
+      "avgLosTradePercent": null,
+      "avgTrade": 0,
+      "avgTradePercent": 0,
+      "avgWinTrade": null,
+      "avgWinTradePercent": null,
+      "commissionPaid": 0,
+      "grossLoss": 0,
+      "grossLossPercent": 0,
+      "grossLossWC": 0,
+      "grossProfit": 0,
+      "grossProfitPercent": 0,
+      "grossProfitWC": 0,
+      "largestLosTrade": null,
+      "largestLosTradePercent": null,
+      "largestWinTrade": null,
+      "largestWinTradePercent": null,
+      "marginCalls": 0,
+      "maxContractsHeld": 20,
+      "netProfit": 0,
+      "netProfitPercent": 0,
+      "numberOfLosingTrades": 0,
+      "numberOfWiningTrades": 0,
+      "percentProfitable": 0,
+      "profitFactor": null,
+      "ratioAvgWinAvgLoss": null,
+      "totalOpenTrades": 0,
+      "totalTrades": 2
+    },
+    "maxStrategyDrawDown": 0,
+    "openPL": 0,
+    "buyHoldReturn": 4867.949999999995,
+    "sharpeRatio": null,
+    "sortinoRatio": null,
+    "maxStrategyDrawDownPercent": 0,
+    "maxStrategyRunUp": 0,
+    "maxStrategyRunUpPercent": 0,
+    "buyHoldReturnPercent": 0.04867949999999995,
+    "openPLPercent": 0,
+    "buyHoldGainPercent": 0.048791002077046626,
+    "maxMarginUsed": 5103.4,
+    "avgMarginUsed": 0,
+    "short": {
+      "avgBarsInLossTrade": 0,
+      "avgBarsInTrade": 0,
+      "avgBarsInWinTrade": 0,
+      "avgLosTrade": null,
+      "avgLosTradePercent": null,
+      "avgTrade": null,
+      "avgTradePercent": null,
+      "avgWinTrade": null,
+      "avgWinTradePercent": null,
+      "commissionPaid": 0,
+      "grossLoss": 0,
+      "grossLossPercent": 0,
+      "grossLossWC": 0,
+      "grossProfit": 0,
+      "grossProfitPercent": 0,
+      "grossProfitWC": 0,
+      "largestLosTrade": null,
+      "largestLosTradePercent": null,
+      "largestWinTrade": null,
+      "largestWinTradePercent": null,
+      "marginCalls": 0,
+      "maxContractsHeld": 0,
+      "netProfit": 0,
+      "netProfitPercent": 0,
+      "numberOfLosingTrades": 0,
+      "numberOfWiningTrades": 0,
+      "percentProfitable": null,
+      "profitFactor": null,
+      "ratioAvgWinAvgLoss": null,
+      "totalOpenTrades": 0,
+      "totalTrades": 0
+    }
+  },
+  "trades": [
+    {
+      "e": {
+        "c": "OCA_L",
+        "p": 255.17,
+        "tm": 1769783400000,
+        "tp": "le"
+      },
+      "q": 1,
+      "x": {
+        "c": "STOP_REDUCED_20",
+        "p": 255.17,
+        "tm": 1769783400000,
+        "tp": "lx"
+      },
+      "tp": {
+        "v": 0,
+        "p": 0
+      },
+      "cp": {
+        "v": 0,
+        "p": 0
+      },
+      "rn": {
+        "v": 0,
+        "p": 0
+      },
+      "dd": {
+        "v": 0,
+        "p": 0
+      }
+    },
+    {
+      "e": {
+        "c": "OCA_L",
+        "p": 255.17,
+        "tm": 1769783400000,
+        "tp": "le"
+      },
+      "q": 19,
+      "x": {
+        "c": "LIM_RESERVE_19",
+        "p": 255.17,
+        "tm": 1769783400000,
+        "tp": "lx"
+      },
+      "tp": {
+        "v": 0,
+        "p": 0
+      },
+      "cp": {
+        "v": 0,
+        "p": 0
+      },
+      "rn": {
+        "v": 0,
+        "p": 0
+      },
+      "dd": {
+        "v": 0,
+        "p": 0
+      }
+    }
+  ],
+  "firstTradeIndex": 0
+}
