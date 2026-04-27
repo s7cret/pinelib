@@ -28,6 +28,19 @@ from pinelib.core import (
     pine_range,
     pine_sub,
 )
+from pinelib.backtest import (
+    BacktestReport,
+    BacktestResult,
+    BacktestSnapshot,
+    StrategySchedule,
+    build_backtest_report,
+    compare_golden,
+    extract_params_metadata,
+    extract_strategy_params,
+    run_generated_strategy,
+    snapshot_from_state,
+    write_result_snapshot,
+)
 from pinelib.errors import (
     PL_DATA_FORMAT_ERROR,
     PL_INPUT_VALIDATION_ERROR,
@@ -50,6 +63,7 @@ from pinelib.errors import (
     PineTypeError,
     PineUnsupportedFeatureError,
 )
+from pinelib.io import load_bars, load_bars_csv, load_bars_parquet
 from pinelib.math import pine_abs, pine_max, pine_min, pine_round, pine_sum
 from pinelib.reference import PineArray, PineMap, PineMatrix, reference_history
 from pinelib.request import (
@@ -66,6 +80,9 @@ from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
 __all__ = [
     "Bar",
+    "BacktestReport",
+    "BacktestResult",
+    "BacktestSnapshot",
     "BarStateInfo",
     "DataProvider",
     "InMemoryDataProvider",
@@ -108,12 +125,20 @@ __all__ = [
     "Fill",
     "Order",
     "StrategyContext",
+    "StrategySchedule",
     "StrategyDeclaration",
     "Trade",
     "SymbolInfo",
     "TimeframeInfo",
     "TypeInfo",
+    "build_backtest_report",
+    "compare_golden",
+    "extract_params_metadata",
+    "extract_strategy_params",
     "fixnan",
+    "load_bars",
+    "load_bars_csv",
+    "load_bars_parquet",
     "merge_requested_series_to_chart_bars",
     "is_na",
     "na",
@@ -136,10 +161,13 @@ __all__ = [
     "pine_round",
     "pine_sub",
     "pine_sum",
+    "run_generated_strategy",
     "security",
+    "snapshot_from_state",
     "color",
     "string",
     "ta",
+    "write_result_snapshot",
 ]
 
 __version__ = PACKAGE_VERSION
