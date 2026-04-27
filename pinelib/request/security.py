@@ -5,7 +5,12 @@ from typing import Any, Literal
 
 from pinelib.core.bar import Bar
 from pinelib.core.na import na
-from pinelib.errors import PL_UNSUPPORTED_NESTED_SECURITY, PineRequestError, PineUnsupportedFeatureError
+from pinelib.errors import (
+    PL_UNSUPPORTED_LOWER_TF_SECURITY,
+    PL_UNSUPPORTED_NESTED_SECURITY,
+    PineRequestError,
+    PineUnsupportedFeatureError,
+)
 
 GapsMode = Literal["barmerge.gaps_on", "barmerge.gaps_off"]
 LookaheadMode = Literal["barmerge.lookahead_on", "barmerge.lookahead_off"]
@@ -114,3 +119,25 @@ def security(
     if index < 0 or index >= len(merged):
         return na
     return merged[index]
+
+
+def security_lower_tf(*args: Any, runtime: Any, state_id: str, **kwargs: Any) -> Any:
+    """Explicit contract boundary for request.security_lower_tf.
+
+    Pine's lower-timeframe request returns arrays per chart bar. PineLib does not yet
+    emulate that lifecycle, so generated code must receive a deterministic diagnostic
+    instead of a silent approximation.
+    """
+
+    del args, kwargs
+    if hasattr(runtime, "config"):
+        runtime.config.emit_diagnostic(
+            PL_UNSUPPORTED_LOWER_TF_SECURITY,
+            "request.security_lower_tf is not implemented by PineLib runtime v1.0.x",
+            state_id=state_id,
+            bar_index=getattr(runtime, "bar_index", None),
+        )
+    raise PineUnsupportedFeatureError(
+        "request.security_lower_tf is not implemented by PineLib runtime v1.0.x",
+        code=PL_UNSUPPORTED_LOWER_TF_SECURITY,
+    )

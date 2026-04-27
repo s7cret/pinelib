@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.errors import (
+    PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
     PL_MARGIN_FIELDS_DIAGNOSTIC,
     PL_MISSING_INTRABAR_DATA,
     PL_UNSUPPORTED_STRATEGY_SETTING,
@@ -69,6 +70,10 @@ class Order:
     fill_source: str | None = None
     source_map: object | None = None
     immediate: bool = False
+    trail_activation: float | None = None
+    trail_offset: float | None = None
+    trail_stop: float | None = None
+    trail_active: bool = False
 
 
 @dataclass(slots=True)
@@ -162,12 +167,15 @@ class StrategyContext:
         runtime.strategy = self
         self._runtime = runtime
         self._diagnostics_target = runtime.config
+        runtime.visual.max_counts["label"] = self.declaration.max_labels_count
+        runtime.visual.max_counts["line"] = self.declaration.max_lines_count
+        runtime.visual.max_counts["box"] = self.declaration.max_boxes_count
         self._validate_settings(runtime)
 
     def _validate_settings(self, runtime: PineRuntime) -> None:
         unsupported: list[str] = []
         if self.calc_on_every_tick:
-            self._emit(runtime, PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK, "calc_on_every_tick needs realtime/tick data; historical MVP uses close pass")
+            self._emit(runtime, PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK, "calc_on_every_tick needs realtime/tick data; historical runs expose an explicit diagnostic unless intrabar/realtime execution is supplied")
         if self.backtest_fill_limits_assumption not in (None, 0):
             unsupported.append("backtest_fill_limits_assumption")
         if self.close_entries_rule not in ("FIFO", "ANY"):
@@ -181,7 +189,7 @@ class StrategyContext:
             self._emit(
                 runtime,
                 PL_MARGIN_FIELDS_DIAGNOSTIC,
-                "margin_long/margin_short are captured for diagnostics; margin calls are not emulated",
+                "margin_long/margin_short are captured and margin-call risk is diagnosed; forced liquidation remains explicit/non-parity",
                 margin_long=self.margin_long,
                 margin_short=self.margin_short,
             )
@@ -196,8 +204,24 @@ class StrategyContext:
         self.pending_orders.append(order)
 
     def exit(self, id: str, from_entry: str | None = None, qty: float | None = None, qty_percent: float | None = None, limit: float | None = None, stop: float | None = None, profit: float | None = None, loss: float | None = None, trail_price: float | None = None, trail_points: float | None = None, trail_offset: float | None = None, *, source_map: object | None = None) -> None:
+        if trail_offset is not None and (trail_price is not None or trail_points is not None):
+            available = abs(self._available_exit_qty(from_entry))
+            requested = self._resolve_exit_qty(qty, qty_percent, available)
+            actual = max(0.0, min(requested, available))
+            if actual <= 0:
+                return
+            exit_direction: Direction = "short" if self.position_size > 0 else "long"
+            activation = trail_price
+            if activation is None and trail_points is not None and self.position_avg_price:
+                activation = self.position_avg_price + (trail_points if self.position_size > 0 else -trail_points)
+            if activation is None:
+                self._emit(None, PL_UNSUPPORTED_STRATEGY_SETTING, "strategy.exit trailing stop requires trail_price or trail_points", order_id=id)
+                return
+            created_bar_index, created_time = self._created_order_location()
+            self.pending_orders.append(Order(id, exit_direction, actual, "stop", "exit", from_entry=from_entry, parent_exit_id=id, oca_name=f"exit:{id}:{from_entry or '*'}", oca_type="reduce", created_bar_index=created_bar_index, created_time=created_time, source_map=source_map, trail_activation=float(activation), trail_offset=float(trail_offset)))
+            return
         if trail_price is not None or trail_points is not None or trail_offset is not None:
-            self._emit(None, PL_UNSUPPORTED_STRATEGY_SETTING, "Trailing exits are not implemented in v0.4.0", order_id=id)
+            self._emit(None, PL_UNSUPPORTED_STRATEGY_SETTING, "Incomplete trailing stop arguments; expected trail_offset plus trail_price or trail_points", order_id=id)
             return
         if limit is None and profit is not None and self.position_avg_price:
             limit = self.position_avg_price + (profit if self.position_size >= 0 else -profit)
@@ -268,7 +292,7 @@ class StrategyContext:
                     continue
                 if not self._eligible(order, runtime.bar_index + 1, recalc_phase):
                     continue
-                event = self._find_fill_event(order, path, bar)
+                event = self._find_fill_event(order, path, bar, runtime)
                 if event is None:
                     continue
                 step_index, fill_price = event
@@ -321,13 +345,15 @@ class StrategyContext:
         return order.created_bar_index < current_bar_index or self.process_orders_on_close
 
     def _find_fill_price(self, order: Order, path: list[float], bar: Bar) -> float | None:
-        event = self._find_fill_event(order, path, bar)
+        event = self._find_fill_event(order, path, bar, self._runtime)
         return None if event is None else event[1]
 
-    def _find_fill_event(self, order: Order, path: list[float], bar: Bar) -> tuple[int, float] | None:
+    def _find_fill_event(self, order: Order, path: list[float], bar: Bar, runtime: PineRuntime | None = None) -> tuple[int, float] | None:
         if order.type == "market":
             current_index = (self._runtime.bar_index + 1) if self._runtime is not None else order.created_bar_index
             return (len(path) - 1, bar.close) if self.process_orders_on_close and order.created_bar_index == current_index else (0, path[0])
+        if order.trail_offset is not None and order.trail_activation is not None:
+            return self._trailing_stop_event(order, path)
         level = order.limit if order.type == "limit" else order.stop
         if order.type == "stop_limit":
             stop_hit = self._crossed_event(path, order.stop, order.direction, is_stop=True)
@@ -337,7 +363,37 @@ class StrategyContext:
         if level is None:
             return None
         is_stop = order.type == "stop"
+        if order.type == "limit" and self.backtest_fill_limits_assumption not in (None, 0):
+            if self.backtest_fill_limits_assumption is None:
+                return self._crossed_event(path, level, order.direction, is_stop=is_stop)
+            mintick = runtime.syminfo.mintick if runtime is not None else 1.0
+            assumption = float(self.backtest_fill_limits_assumption) * mintick
+            test_level = level - assumption if order.direction == "long" else level + assumption
+            event = self._crossed_event(path, test_level, order.direction, is_stop=False)
+            return None if event is None else (event[0], level)
         return self._crossed_event(path, level, order.direction, is_stop=is_stop)
+
+    def _trailing_stop_event(self, order: Order, path: list[float]) -> tuple[int, float] | None:
+        assert order.trail_activation is not None
+        assert order.trail_offset is not None
+        long_exit = order.direction == "short"
+        best: float | None = None
+        for idx, price in enumerate(path):
+            if not order.trail_active:
+                activated = price >= order.trail_activation if long_exit else price <= order.trail_activation
+                if not activated:
+                    continue
+                order.trail_active = True
+                best = price
+            else:
+                best = price if best is None else (max(best, price) if long_exit else min(best, price))
+            candidate = best - order.trail_offset if long_exit else best + order.trail_offset
+            order.trail_stop = candidate if order.trail_stop is None else (max(order.trail_stop, candidate) if long_exit else min(order.trail_stop, candidate))
+            if long_exit and price <= order.trail_stop:
+                return idx, order.trail_stop
+            if not long_exit and price >= order.trail_stop:
+                return idx, order.trail_stop
+        return None
 
     def _crossed(self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool) -> float | None:
         event = self._crossed_event(path, level, direction, is_stop=is_stop)
@@ -387,7 +443,13 @@ class StrategyContext:
         if order.oca_name:
             for other in self.pending_orders:
                 if other is not order and other.oca_name == order.oca_name:
-                    other.status = "cancelled"
+                    if order.oca_type == "reduce" and other.qty is not None:
+                        other.qty = max(0.0, other.qty - qty)
+                        if other.qty <= 1e-12:
+                            other.status = "cancelled"
+                    else:
+                        other.status = "cancelled"
+        self._diagnose_margin_risk(runtime, bar.close)
 
     def _apply_position_fill(self, order: Order, qty: float, price: float, commission: float, runtime: PineRuntime, bar: Bar) -> None:
         signed = qty if order.direction == "long" else -qty
@@ -451,6 +513,17 @@ class StrategyContext:
     def _mark_to_market(self, price: float) -> None:
         self.openprofit = sum(((price - l.entry_price) if l.direction == "long" else (l.entry_price - price)) * l.qty - l.commission for l in self._lots)
         self.equity = self.initial_capital + self.netprofit + self.openprofit
+
+    def _diagnose_margin_risk(self, runtime: PineRuntime, mark_price: float) -> None:
+        if not self._lots:
+            return
+        margin = self.margin_long if self.position_size >= 0 else self.margin_short
+        if margin >= 100.0:
+            return
+        position_value = abs(self.position_size) * mark_price
+        required = position_value * margin / 100.0
+        if self.equity <= required:
+            self._emit(runtime, PL_MARGIN_LIQUIDATION_DIAGNOSTIC, "Margin requirement breached; PineLib diagnoses but does not force TradingView liquidation", equity=self.equity, required_margin=required, position_value=position_value)
 
     def _entry_qty_with_reversal_and_pyramiding(self, order: Order, qty: float) -> float:
         same_direction = (self.position_size >= 0 and order.direction == "long") or (self.position_size <= 0 and order.direction == "short")
