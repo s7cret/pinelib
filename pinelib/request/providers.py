@@ -40,6 +40,24 @@ class ProviderQueryMetadata:
     start: int | None
     end: int | None
     returned_bars: int
+    max_bars: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LowerTfQueryMetadata:
+    requested_symbol: str
+    requested_timeframe: str
+    provider_source: str
+    state_id: str
+    chart_bar_index: int
+    chart_bar_time: int
+    chart_bar_time_close: int | None
+    query_start: int | None
+    query_end: int | None
+    calc_bars_count: int | None
+    requested_bars: int
+    selected_bars: int
+    selected_bar_times: tuple[int, ...]
 
 
 class InMemoryDataProvider:
@@ -79,6 +97,7 @@ class InMemoryDataProvider:
                 start=start,
                 end=end,
                 returned_bars=len(filtered),
+                max_bars=max_bars,
             )
         )
         return filtered

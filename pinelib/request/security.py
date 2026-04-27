@@ -11,6 +11,7 @@ from pinelib.errors import (
     PineUnsupportedFeatureError,
 )
 from pinelib.reference import PineArray
+from pinelib.request.providers import LowerTfQueryMetadata
 
 GapsMode = Literal["barmerge.gaps_on", "barmerge.gaps_off"]
 LookaheadMode = Literal["barmerge.lookahead_on", "barmerge.lookahead_off"]
@@ -150,7 +151,11 @@ def security_lower_tf(
     - arrays contain fully closed lower-timeframe bars inside the active chart bar;
     - values are ordered oldest -> newest;
     - chart bars with no matching lower bars return an empty `PineArray`;
-    - `calc_bars_count` caps the returned intrabar array for the active chart bar;
+    - metadata is appended to `runtime.lower_tf_metadata_log` for deterministic audits;
+    - with `data_provider`, `calc_bars_count` is applied as a conservative global cap
+      from the first loaded chart bar through the active chart bar before interval
+      selection; with `intrabar_provider`, the provider API is chart-bar scoped, so
+      the cap is forwarded to the provider and recorded as provider-local;
     - unsupported nested requests fail closed with `PL_UNSUPPORTED_NESTED_SECURITY`.
 
     This intentionally does not approximate TradingView-only lifecycle details such as
@@ -174,26 +179,55 @@ def security_lower_tf(
     if runtime.current_bar is None:
         return PineArray()
 
+    query_start: int | None
+    query_end: int | None
+    provider_source: str
     if runtime.intrabar_provider is not None:
+        provider_source = "intrabar_provider"
+        query_start = runtime.current_bar.time
+        query_end = _bar_close_time(runtime.current_bar)
         requested_bars = runtime.intrabar_provider.get_intrabar_bars(
             symbol,
             runtime.current_bar,
             timeframe,
-            max_bars=None,
+            max_bars=calc_bars_count,
         )
         selected_bars = _bars_inside_chart_bar(requested_bars, runtime.current_bar)
     else:
+        provider_source = "data_provider"
         if runtime.data_provider is None:
             if ignore_invalid_symbol:
                 return PineArray()
             raise PineRequestError("request.security_lower_tf requires runtime.data_provider or runtime.intrabar_provider")
-        chart_start = runtime.chart_bars[0].time if runtime.chart_bars else runtime.current_bar.time
-        chart_end = _bar_close_time(runtime.current_bar)
-        requested_bars = runtime.data_provider.get_bars(symbol, timeframe, chart_start, chart_end)
+        query_start = runtime.chart_bars[0].time if runtime.chart_bars else runtime.current_bar.time
+        query_end = _bar_close_time(runtime.current_bar)
+        requested_bars = runtime.data_provider.get_bars(
+            symbol,
+            timeframe,
+            query_start,
+            query_end,
+            max_bars=calc_bars_count,
+        )
         selected_bars = _bars_inside_chart_bar(requested_bars, runtime.current_bar)
 
-    if calc_bars_count is not None:
-        selected_bars = selected_bars[:calc_bars_count]
+    metadata = LowerTfQueryMetadata(
+        requested_symbol=symbol,
+        requested_timeframe=timeframe,
+        provider_source=provider_source,
+        state_id=state_id,
+        chart_bar_index=runtime.bar_index + 1,
+        chart_bar_time=runtime.current_bar.time,
+        chart_bar_time_close=runtime.current_bar.time_close,
+        query_start=query_start,
+        query_end=query_end,
+        calc_bars_count=calc_bars_count,
+        requested_bars=len(requested_bars),
+        selected_bars=len(selected_bars),
+        selected_bar_times=tuple(bar.time for bar in selected_bars),
+    )
+    if hasattr(runtime, "lower_tf_metadata_log"):
+        runtime.lower_tf_metadata_log.append(metadata)
+
     if not selected_bars:
         return PineArray()
 

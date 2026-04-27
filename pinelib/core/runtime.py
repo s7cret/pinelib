@@ -10,7 +10,7 @@ from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions
 from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
 from pinelib.errors import PineRuntimeError
-from pinelib.request.providers import DataProvider, IntrabarDataProvider
+from pinelib.request.providers import DataProvider, IntrabarDataProvider, LowerTfQueryMetadata
 from pinelib.version import RUNTIME_CONTRACT_VERSION
 from pinelib.visual import VisualRecorder
 
@@ -31,6 +31,7 @@ class PineRuntime:
     indicator_state: dict[str, object] = field(init=False, default_factory=dict)
     strategy: object | None = field(init=False, default=None)
     request_depth: int = field(init=False, default=0)
+    lower_tf_metadata_log: list[LowerTfQueryMetadata] = field(init=False, default_factory=list)
     timefunc: TimeFunctions = field(init=False, default_factory=TimeFunctions)
     syminfo: SymbolInfo = field(init=False)
     commit_order: list[str] = field(init=False, default_factory=list)
@@ -152,6 +153,7 @@ class PineRuntime:
         )
         del namespace
         child.indicator_state = {}
+        child.lower_tf_metadata_log = self.lower_tf_metadata_log
         return child
 
     def _normalize_bar(self, bar: Bar) -> Bar:
