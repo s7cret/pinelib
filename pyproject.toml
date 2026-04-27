@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinelib"
-version = "0.8.0"
+version = "0.9.0"
 description = "PineLib runtime foundation aligned to runtime contract v1.4."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,6 +22,7 @@ dev = [
 
 [tool.setuptools]
 packages = ["pinelib", "pinelib.color", "pinelib.core", "pinelib.math", "pinelib.request", "pinelib.strategy", "pinelib.string", "pinelib.ta"]
+package-data = {"pinelib" = ["py.typed"]}
 
 [tool.black]
 line-length = 100
