@@ -59,6 +59,7 @@ from pinelib.request import (
     merge_requested_series_to_chart_bars,
     security,
 )
+from pinelib.strategy import Fill, Order, StrategyContext, StrategyDeclaration, Trade
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
 __all__ = [
@@ -95,6 +96,11 @@ __all__ = [
     "RUNTIME_CONTRACT_VERSION",
     "RuntimeConfig",
     "Series",
+    "Fill",
+    "Order",
+    "StrategyContext",
+    "StrategyDeclaration",
+    "Trade",
     "SymbolInfo",
     "TimeframeInfo",
     "TypeInfo",

@@ -124,6 +124,13 @@ class PineRuntime:
             self.indicator_state[state_id] = factory()
         return self.indicator_state[state_id]
 
+    def guard_recalc_count(self, count: int) -> None:
+        if count > self.config.max_recalculations_per_bar:
+            raise PineRuntimeError(
+                "Maximum strategy recalculations per bar exceeded",
+                context=None,
+            )
+
     def spawn_child_context(self, *, symbol: str, timeframe: str, namespace: str) -> "PineRuntime":
         child = PineRuntime(
             symbol_info=SymbolInfo(
