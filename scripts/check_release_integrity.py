@@ -8,6 +8,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+LEGACY_MANIFESTS_WITHOUT_PROVENANCE = {
+    "RELEASE_MANIFEST_v0_1_0.json": "v0.1.0 predates git_commit provenance; archive SHA is still enforced",
+}
 
 
 def _head() -> str:
@@ -29,6 +32,14 @@ def check(manifest_path: Path, *, require_head: bool) -> None:
         )
     commit = manifest.get("git_commit")
     if not isinstance(commit, str) or len(commit) < 7:
+        if manifest_path.name in LEGACY_MANIFESTS_WITHOUT_PROVENANCE and not require_head:
+            return
+        reason = LEGACY_MANIFESTS_WITHOUT_PROVENANCE.get(manifest_path.name)
+        if reason and require_head:
+            raise SystemExit(
+                f"Legacy manifest {manifest_path.name} has no HEAD provenance ({reason}); "
+                "check a current manifest explicitly when using --require-head"
+            )
         raise SystemExit("Manifest git_commit must be a git commit hash string")
     subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=ROOT, check=True)
     if require_head and commit != _head():

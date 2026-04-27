@@ -33,6 +33,7 @@ def _release_files() -> list[Path]:
     files.extend(sorted((ROOT / "scripts").glob("*.py")))
     files.extend(sorted((ROOT / "docs").rglob("*.md")))
     files.extend(sorted((ROOT / "docs").rglob("*.json")))
+    files.extend(path for path in sorted((ROOT / "fixtures").rglob("*")) if path.is_file())
     files.extend(sorted((ROOT / ".github" / "workflows").glob("*.yml")))
     files.extend(sorted((ROOT / ".github" / "workflows").glob("*.yaml")))
     return files

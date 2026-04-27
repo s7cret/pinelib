@@ -80,12 +80,15 @@ bars2 = load_bars("bars.parquet")     # optional pandas + pyarrow/fastparquet
 python -m compileall pinelib tests scripts
 pytest -q
 mypy pinelib
+python scripts/run_tv_golden_suite.py
 python scripts/build_release.py
+python scripts/check_release_integrity.py RELEASE_MANIFEST_v1_0_1.json --require-head
+python scripts/check_release_artifact_selftest.py pinelib_runtime_v1_0_1.zip
 ```
 
 ## Coverage and limitations
 
-v1.0.1 does **not** claim full TradingView parity. Unsupported or incomplete areas are explicit diagnostics/errors, not silent approximations; TradingView oracle exports remain pending external evidence.
+v1.0.1 does **not** claim full TradingView parity. Unsupported or incomplete areas are explicit diagnostics/errors, not silent approximations. TradingView oracle-exportable cases are verified under `fixtures/tradingview`; supplied-tick parity is platform-blocked because TradingView exposes no deterministic tick-stream oracle/export.
 
 Start here:
 
