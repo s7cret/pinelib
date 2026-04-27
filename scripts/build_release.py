@@ -20,6 +20,8 @@ ZIP_TIMESTAMP = (2024, 1, 1, 0, 0, 0)
 INCLUDE_PATHS = [
     ROOT / "README.md",
     *sorted(ROOT.glob("CHANGELOG_v*.md")),
+    *sorted(ROOT.glob("RELEASE_NOTES_v*.md")),
+    *sorted(ROOT.glob("FINAL_AUDIT_v*.md")),
     ROOT / "pyproject.toml",
 ]
 

@@ -1,12 +1,12 @@
-# PineLib Runtime v0.9.0
+# PineLib Runtime v1.0.0
 
 PineLib is a Python runtime foundation for AST2Python-generated Pine-compatible code.
-v0.9.0 is a release-candidate hardening milestone for `runtime_contract_v1.4` / `TZ_01`: public API review, semver policy, edge-test coverage, CI, typed packaging, performance smoke checks, and explicit coverage/limitations before 1.0.
+v1.0.0 is the first stable release for `runtime_contract_v1.4` / `TZ_01`: the public API surface is reviewed, packaging is typed, release artifacts are reproducible, and known parity limits are documented explicitly.
 
-Implemented through v0.9.0:
+Implemented through v1.0.0:
 
 - contract/version metadata for `pinelib` and runtime contract `1.4`
-- reviewed public top-level API surface via `pinelib.__all__`
+- stable reviewed public top-level API surface via `pinelib.__all__`
 - validated `Bar` model with UTC millisecond timestamps
 - `Series[T]` with Pine-compatible current vs committed history semantics
 - `PineRuntime` core loop with built-in bar series registration, commit ownership, recalculation guard scaffold, inputs, metadata, and diagnostics
@@ -14,14 +14,14 @@ Implemented through v0.9.0:
 - timezone/session-aware `time()` and `time_close()` helpers with IANA DST coverage
 - `request.security` foundation with merge modes, child runtime isolation, and explicit nested-request diagnostics
 - StrategyContext broker emulator MVP with market/limit/stop/stop-limit orders, exit reservations/OCA reduce, sizing, commission/slippage, Bar Magnifier provenance, and guarded `calc_on_order_fills`
-- v0.7 bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext`
+- bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext`
 - result snapshots, JSON-safe backtest report schema, golden-compare tolerance utility, strategy/equity compare reports, and optimizer-friendly params metadata capture
 - CSV OHLCV loader plus optional Parquet loader with graceful dependency errors
 - TradingView-exported indicator/trade CSV fixture loaders and sample contract scaffolding
 - visual recorder foundation and reference containers (`PineArray`, `PineMap`, `PineMatrix`)
 - TA helpers: `sma`, `ema`, `rma`, `rsi`, `macd`, `tr`, `atr`, `highest`, `lowest`, `change`, crosses, plus the v0.6 extended helper set
 - namespace helpers: expanded `pinelib.math`, basic `pinelib.string`, and basic `pinelib.color`
-- `py.typed`, mypy strict-ish package gate, CI workflow, release checklist, migration guide, and performance smoke tests
+- `py.typed`, mypy strict-ish package gate, CI workflow, release checklist, migration guide, final audit, and performance smoke tests
 
 ## Install
 
@@ -85,12 +85,13 @@ python scripts/build_release.py
 
 ## Coverage and limitations
 
-v0.9.0 does **not** claim full TradingView parity. Unsupported or incomplete areas are explicit diagnostics/errors, not silent approximations.
+v1.0.0 does **not** claim full TradingView parity. Unsupported or incomplete areas are explicit diagnostics/errors, not silent approximations.
 
 Start here:
 
-- `docs/public_api_v0_9_0.md`
+- `docs/public_api_v1_0_0.md`
 - `docs/semantic_versioning_policy.md`
-- `docs/coverage_map_v0_9_0.md`
-- `docs/migration_v0_8_to_v0_9.md`
-- `docs/release_checklist_v0_9_0.md`
+- `docs/coverage_map_v1_0_0.md`
+- `docs/migration_v0_9_to_v1_0.md`
+- `docs/release_checklist_v1_0_0.md`
+- `FINAL_AUDIT_v1.0.0.md`

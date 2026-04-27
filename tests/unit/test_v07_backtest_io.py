@@ -58,7 +58,7 @@ def test_generated_strategy_runner_snapshots_report_and_params() -> None:
     assert strategy.position_avg_price == 12
     assert [s.bar_index for s in result.snapshots] == [0, 1, 2]
     assert result.report.schema_version == "pinelib.backtest.report.v1"
-    assert result.report.package_version == "0.9.0"
+    assert result.report.package_version == "1.0.0"
     assert result.report.params == {"qty": 2}
     assert result.report.params_metadata["qty"]["default"] == 2
     assert result.report.fills[0]["fill_source"] == "ohlc_path"

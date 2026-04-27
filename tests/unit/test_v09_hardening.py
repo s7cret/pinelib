@@ -34,7 +34,7 @@ def test_public_api_all_is_stable_sorted_and_exports_version() -> None:
     names = pinelib.__all__
     assert len(names) == len(set(names))
     assert names == sorted(names)
-    assert pinelib.__version__ == "0.9.0"
+    assert pinelib.__version__ == "1.0.0"
     for name in names:
         assert hasattr(pinelib, name), name
 
