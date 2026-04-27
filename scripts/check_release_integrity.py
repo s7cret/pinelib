@@ -20,6 +20,23 @@ def _head() -> str:
     return result.stdout.strip()
 
 
+def _release_tree_matches(commit: str, files: list[str]) -> bool:
+    """Return True when manifest-listed release inputs did not drift after commit.
+
+    Release archives intentionally do not include the manifest/archive files, so a
+    manifest committed after artifact generation cannot literally point at its own
+    commit. For `--require-head`, accept an earlier commit only when every file
+    shipped in the archive is byte-identical between that commit and HEAD.
+    """
+
+    result = subprocess.run(
+        ["git", "diff", "--quiet", f"{commit}..HEAD", "--", *files],
+        cwd=ROOT,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def check(manifest_path: Path, *, require_head: bool) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     archive_path = ROOT / str(manifest["archive"])
@@ -43,7 +60,14 @@ def check(manifest_path: Path, *, require_head: bool) -> None:
         raise SystemExit("Manifest git_commit must be a git commit hash string")
     subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=ROOT, check=True)
     if require_head and commit != _head():
-        raise SystemExit(f"Manifest git_commit does not match HEAD: manifest={commit} HEAD={_head()}")
+        files = manifest.get("files")
+        if not isinstance(files, list) or not all(isinstance(path, str) for path in files):
+            raise SystemExit("Manifest files must be a list of release paths for --require-head")
+        if not _release_tree_matches(commit, files):
+            raise SystemExit(
+                f"Manifest git_commit does not match HEAD and release files drifted: "
+                f"manifest={commit} HEAD={_head()}"
+            )
 
 
 def main() -> None:
