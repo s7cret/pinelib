@@ -6,11 +6,11 @@ from typing import Any, Literal
 from pinelib.core.bar import Bar
 from pinelib.core.na import na
 from pinelib.errors import (
-    PL_UNSUPPORTED_LOWER_TF_SECURITY,
     PL_UNSUPPORTED_NESTED_SECURITY,
     PineRequestError,
     PineUnsupportedFeatureError,
 )
+from pinelib.reference import PineArray
 
 GapsMode = Literal["barmerge.gaps_on", "barmerge.gaps_off"]
 LookaheadMode = Literal["barmerge.lookahead_on", "barmerge.lookahead_off"]
@@ -121,23 +121,97 @@ def security(
     return merged[index]
 
 
-def security_lower_tf(*args: Any, runtime: Any, state_id: str, **kwargs: Any) -> Any:
-    """Explicit contract boundary for request.security_lower_tf.
+def _bar_close_time(bar: Bar) -> int:
+    return bar.time_close if bar.time_close is not None else bar.time
 
-    Pine's lower-timeframe request returns arrays per chart bar. PineLib does not yet
-    emulate that lifecycle, so generated code must receive a deterministic diagnostic
-    instead of a silent approximation.
+
+def _bars_inside_chart_bar(lower_bars: Sequence[Bar], chart_bar: Bar) -> list[Bar]:
+    """Return fully closed intrabars for a chart bar, ordered oldest to newest."""
+
+    chart_close = _bar_close_time(chart_bar)
+    return [bar for bar in lower_bars if chart_bar.time <= bar.time and _bar_close_time(bar) <= chart_close]
+
+
+def security_lower_tf(
+    symbol: str,
+    timeframe: str,
+    expression_callable: Callable[[Any], Any] | Sequence[Any],
+    *,
+    runtime: Any,
+    state_id: str,
+    ignore_invalid_symbol: bool = False,
+    currency: str | None = None,
+    calc_bars_count: int | None = None,
+) -> PineArray[Any]:
+    """Evaluate a lower-timeframe expression and return a Pine array for the current chart bar.
+
+    Supported first slice contract:
+    - deterministic local providers only (`runtime.data_provider` or `runtime.intrabar_provider`);
+    - arrays contain fully closed lower-timeframe bars inside the active chart bar;
+    - values are ordered oldest -> newest;
+    - chart bars with no matching lower bars return an empty `PineArray`;
+    - `calc_bars_count` caps the returned intrabar array for the active chart bar;
+    - unsupported nested requests fail closed with `PL_UNSUPPORTED_NESTED_SECURITY`.
+
+    This intentionally does not approximate TradingView-only lifecycle details such as
+    realtime partial intrabars or dynamic remote feeds.
     """
 
-    del args, kwargs
-    if hasattr(runtime, "config"):
+    del currency
+    if calc_bars_count is not None and calc_bars_count < 0:
+        raise PineRequestError("request.security_lower_tf calc_bars_count must be non-negative")
+    if runtime.request_depth > 0 and not runtime.config.supports_nested_security:
         runtime.config.emit_diagnostic(
-            PL_UNSUPPORTED_LOWER_TF_SECURITY,
-            "request.security_lower_tf is not implemented by PineLib runtime v1.0.x",
+            PL_UNSUPPORTED_NESTED_SECURITY,
+            "Nested request.security_lower_tf is not supported",
             state_id=state_id,
-            bar_index=getattr(runtime, "bar_index", None),
+            bar_index=runtime.bar_index,
         )
-    raise PineUnsupportedFeatureError(
-        "request.security_lower_tf is not implemented by PineLib runtime v1.0.x",
-        code=PL_UNSUPPORTED_LOWER_TF_SECURITY,
-    )
+        raise PineUnsupportedFeatureError(
+            "Nested request.security_lower_tf is not supported",
+            code=PL_UNSUPPORTED_NESTED_SECURITY,
+        )
+    if runtime.current_bar is None:
+        return PineArray()
+
+    if runtime.intrabar_provider is not None:
+        requested_bars = runtime.intrabar_provider.get_intrabar_bars(
+            symbol,
+            runtime.current_bar,
+            timeframe,
+            max_bars=None,
+        )
+        selected_bars = _bars_inside_chart_bar(requested_bars, runtime.current_bar)
+    else:
+        if runtime.data_provider is None:
+            if ignore_invalid_symbol:
+                return PineArray()
+            raise PineRequestError("request.security_lower_tf requires runtime.data_provider or runtime.intrabar_provider")
+        chart_start = runtime.chart_bars[0].time if runtime.chart_bars else runtime.current_bar.time
+        chart_end = _bar_close_time(runtime.current_bar)
+        requested_bars = runtime.data_provider.get_bars(symbol, timeframe, chart_start, chart_end)
+        selected_bars = _bars_inside_chart_bar(requested_bars, runtime.current_bar)
+
+    if calc_bars_count is not None:
+        selected_bars = selected_bars[:calc_bars_count]
+    if not selected_bars:
+        return PineArray()
+
+    if isinstance(expression_callable, Sequence) and not callable(expression_callable):
+        values = list(expression_callable)
+        if len(values) != len(selected_bars):
+            raise PineRequestError("request.security_lower_tf precomputed values length must match selected intrabars")
+        return PineArray(values)
+
+    expression = expression_callable
+    if not callable(expression):
+        raise PineRequestError("request.security_lower_tf expression must be callable or a value sequence")
+
+    child = runtime.spawn_child_context(symbol=symbol, timeframe=timeframe, namespace=state_id)
+    child.request_depth = runtime.request_depth + 1
+    values = []
+    for bar in selected_bars:
+        child.begin_bar(bar)
+        values.append(expression(child))
+        child.end_bar()
+    return PineArray(values)

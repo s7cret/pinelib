@@ -5,8 +5,8 @@ import pytest
 from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo
 from pinelib.errors import (
     PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
-    PL_UNSUPPORTED_LOWER_TF_SECURITY,
     PL_UNSUPPORTED_NESTED_SECURITY,
+    PineRequestError,
     PineUnsupportedFeatureError,
 )
 from pinelib.request.security import security, security_lower_tf
@@ -97,12 +97,12 @@ def test_margin_breach_is_explicit_diagnostic_not_silent_liquidation() -> None:
     assert any(d["code"] == PL_MARGIN_LIQUIDATION_DIAGNOSTIC for d in runtime.config.diagnostics)
 
 
-def test_request_security_lower_tf_has_stable_unsupported_contract() -> None:
+def test_request_security_lower_tf_missing_provider_fails_closed_without_synthetic_data() -> None:
     runtime = rt()
-    with pytest.raises(PineUnsupportedFeatureError) as exc:
+    runtime.begin_bar(bar(0, 10, 11, 9, 10))
+    with pytest.raises(PineRequestError):
         security_lower_tf("TEST:AAA", "1", lambda child: child.close[0], runtime=runtime, state_id="ltf")
-    assert exc.value.code == PL_UNSUPPORTED_LOWER_TF_SECURITY
-    assert runtime.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_LOWER_TF_SECURITY
+    assert list(security_lower_tf("TEST:AAA", "1", lambda child: child.close[0], runtime=runtime, state_id="ltf", ignore_invalid_symbol=True)) == []
 
 
 def test_nested_request_security_rejects_with_diagnostic() -> None:

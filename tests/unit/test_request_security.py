@@ -63,9 +63,12 @@ def test_request_security_callable_child_runtime_and_state_isolation() -> None:
 
     def expr(child: PineRuntime) -> float:
         child_bucket = child.get_indicator_state("shared", list)
+        assert isinstance(child_bucket, list)
         assert child_bucket is not parent_bucket
         child_bucket.append(child.close[0])
-        return float(child.close[0])
+        value = child.close[0]
+        assert isinstance(value, int | float)
+        return float(value)
 
     assert is_na(security("TEST:BBB", "120", expr, runtime=rt, state_id="req1"))
     rt.end_bar()

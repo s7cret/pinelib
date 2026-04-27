@@ -60,7 +60,9 @@ def test_generated_strategy_runner_snapshots_report_and_params() -> None:
     assert result.report.schema_version == "pinelib.backtest.report.v1"
     assert result.report.package_version == "1.0.1"
     assert result.report.params == {"qty": 2}
-    assert result.report.params_metadata["qty"]["default"] == 2
+    qty_metadata = result.report.params_metadata["qty"]
+    assert isinstance(qty_metadata, dict)
+    assert qty_metadata["default"] == 2
     assert result.report.fills[0]["fill_source"] == "ohlc_path"
 
 

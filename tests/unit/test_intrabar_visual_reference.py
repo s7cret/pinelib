@@ -126,8 +126,12 @@ def test_array_map_matrix_identity_and_copy() -> None:
 
     m = PineMap({"a": arr})
     m_clone = m.copy()
-    m.get("a").push(3)  # type: ignore[union-attr]
-    assert len(m_clone.get("a")) == 2  # shallow copy preserves reference values
+    copied = m_clone.get("a")
+    current = m.get("a")
+    assert current is not None
+    assert copied is not None
+    current.push(3)
+    assert len(copied) == 2  # shallow copy preserves reference values
 
     matrix = PineMatrix[int](2, 2, 0)
     matrix.set(0, 1, 9)
