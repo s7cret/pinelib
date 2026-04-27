@@ -59,17 +59,16 @@ def test_trailing_stop_activates_and_ratchets_for_long_position() -> None:
     assert strategy.fills[-1].price == 104
 
 
-def test_backtest_fill_limits_assumption_requires_price_improvement() -> None:
+def test_backtest_fill_limits_assumption_is_diagnosed_and_does_not_change_fills() -> None:
     strategy = StrategyContext(backtest_fill_limits_assumption=2)
     runtime = rt(strategy)
+    assert runtime.config.diagnostics[-1]["code"] == "PL_UNSUPPORTED_STRATEGY_SETTING"
     runtime.begin_bar(bar(0, 100, 101, 99, 100))
     strategy.order("L", "long", qty=1, limit=99)
     strategy.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
     runtime.end_bar()
 
     process(runtime, strategy, bar(1, 100, 101, 98.75, 100))
-    assert strategy.position_size == 0
-    process(runtime, strategy, bar(2, 100, 101, 98.5, 100))
     assert strategy.position_size == 1
     assert strategy.fills[-1].price == 99
 

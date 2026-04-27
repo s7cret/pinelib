@@ -72,6 +72,7 @@ class BarStateInfo:
     isrealtime: bool = False
     isnew: bool = True
     isconfirmed: bool = False
+    islastconfirmedhistory: bool = False
 
 
 @dataclass(frozen=True, slots=True)

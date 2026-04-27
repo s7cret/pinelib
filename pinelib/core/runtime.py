@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from pinelib.core.bar import Bar
@@ -38,6 +38,7 @@ class PineRuntime:
     inputs: InputRegistry = field(init=False)
     barstate: BarStateInfo = field(init=False, default_factory=BarStateInfo)
     visual: VisualRecorder = field(init=False)
+    request_namespace: str | None = field(init=False, default=None)
 
     open: Series[float] = field(init=False)
     high: Series[float] = field(init=False)
@@ -75,6 +76,7 @@ class PineRuntime:
             isrealtime=False,
             isnew=True,
             isconfirmed=False,
+            islastconfirmedhistory=False,
         )
         self._set_builtin_current(effective_bar, current_index)
 
@@ -97,6 +99,7 @@ class PineRuntime:
             isrealtime=True,
             isnew=True,
             isconfirmed=False,
+            islastconfirmedhistory=False,
         )
         self._set_builtin_current(effective_bar, current_index)
 
@@ -129,6 +132,7 @@ class PineRuntime:
             isrealtime=True,
             isnew=False,
             isconfirmed=bool(tick.is_final),
+            islastconfirmedhistory=False,
         )
         self._set_builtin_current(updated, current_index)
         return updated
@@ -147,7 +151,11 @@ class PineRuntime:
             isrealtime=was_realtime,
             isnew=False,
             isconfirmed=True,
+            islastconfirmedhistory=self.barstate.islastconfirmedhistory,
         )
+
+    def set_last_confirmed_history(self, value: bool = True) -> None:
+        self.barstate = replace(self.barstate, islastconfirmedhistory=value)
 
     def _set_builtin_current(self, bar: Bar, current_index: int) -> None:
         self.open.set_current(bar.open)
@@ -210,7 +218,7 @@ class PineRuntime:
             config=self.config,
             intrabar_provider=self.intrabar_provider,
         )
-        del namespace
+        child.request_namespace = namespace
         child.indicator_state = {}
         child.lower_tf_metadata_log = self.lower_tf_metadata_log
         return child

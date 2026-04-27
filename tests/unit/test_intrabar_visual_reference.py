@@ -81,6 +81,53 @@ def test_intrabar_tp_sl_ordering_can_differ_from_ohlc_path() -> None:
     assert s.closed_trade_log[-1].fill_source == "intrabar"
 
 
+def test_invalid_intrabar_close_warns_and_falls_back_unless_strict() -> None:
+    chart = bar(2, 10, 13, 5, 12)
+    assert chart.time_close is not None
+    invalid = [Bar(time=chart.time + 1_000, time_close=chart.time_close + 1, open=10, high=15, low=10, close=15)]
+    s = StrategyContext(use_bar_magnifier=True)
+    runtime = rt(s, Intrabars(invalid))
+    seed_long(s, runtime)
+    s.exit("tp", "L", qty=1, limit=14)
+    process(runtime, s, chart)
+    assert s.position_size == 1
+    assert s.fills[-1].fill_source == "ohlc_path"
+    assert any(d["code"] == PL_WARNING_BAR_MAGNIFIER_FALLBACK for d in runtime.config.diagnostics)
+
+    strict_strategy = StrategyContext(use_bar_magnifier=True)
+    strict_runtime = rt(strict_strategy, Intrabars(invalid), strict=True)
+    strict_runtime.begin_bar(chart)
+    with pytest.raises(PineStrategyError) as exc:
+        strict_strategy.process_orders_for_bar(runtime=strict_runtime, bar=chart)
+    assert exc.value.code == PL_MISSING_INTRABAR_DATA
+
+
+def test_intrabar_open_before_chart_open_is_rejected() -> None:
+    chart = bar(2, 10, 13, 5, 12)
+    invalid = [Bar(time=chart.time - 1, time_close=chart.time + 999, open=10, high=15, low=10, close=15)]
+    s = StrategyContext(use_bar_magnifier=True)
+    runtime = rt(s, Intrabars(invalid))
+    seed_long(s, runtime)
+    s.exit("tp", "L", qty=1, limit=14)
+    process(runtime, s, chart)
+    assert s.position_size == 1
+    assert any(d["code"] == PL_WARNING_BAR_MAGNIFIER_FALLBACK for d in runtime.config.diagnostics)
+
+
+def test_non_monotonic_intrabar_closes_are_rejected() -> None:
+    chart = bar(2, 10, 13, 5, 12)
+    invalid = [
+        Bar(time=chart.time, time_close=chart.time + 2_000, open=10, high=11, low=9, close=10),
+        Bar(time=chart.time + 1_000, time_close=chart.time + 1_500, open=10, high=15, low=10, close=15),
+    ]
+    s = StrategyContext(use_bar_magnifier=True)
+    runtime = rt(s, Intrabars(invalid))
+    seed_long(s, runtime)
+    s.exit("tp", "L", qty=1, limit=14)
+    process(runtime, s, chart)
+    assert s.position_size == 1
+
+
 def test_missing_intrabar_data_warns_and_falls_back_unless_strict() -> None:
     s = StrategyContext(use_bar_magnifier=True)
     runtime = rt(s, Intrabars([]))
@@ -96,10 +143,6 @@ def test_missing_intrabar_data_warns_and_falls_back_unless_strict() -> None:
     assert exc.value.code == PL_MISSING_INTRABAR_DATA
 
 
-def test_calc_on_every_tick_emits_fallback_diagnostic() -> None:
-    s = StrategyContext(calc_on_every_tick=True)
-    runtime = rt(s)
-    assert any(d["code"] == PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK for d in runtime.config.diagnostics)
 
 
 def test_visual_id_lifecycle_and_limits() -> None:

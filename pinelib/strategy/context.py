@@ -193,8 +193,6 @@ class StrategyContext:
 
     def _validate_settings(self, runtime: PineRuntime) -> None:
         unsupported: list[str] = []
-        if self.calc_on_every_tick:
-            self._emit(runtime, PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK, "calc_on_every_tick needs realtime/tick data; historical runs expose an explicit diagnostic unless intrabar/realtime execution is supplied")
         if self.backtest_fill_limits_assumption not in (None, 0):
             unsupported.append("backtest_fill_limits_assumption")
         if self.close_entries_rule not in ("FIFO", "ANY"):
@@ -384,14 +382,6 @@ class StrategyContext:
         if level is None:
             return None
         is_stop = order.type == "stop"
-        if order.type == "limit" and self.backtest_fill_limits_assumption not in (None, 0):
-            if self.backtest_fill_limits_assumption is None:
-                return self._crossed_event(path, level, order.direction, is_stop=is_stop)
-            mintick = runtime.syminfo.mintick if runtime is not None else 1.0
-            assumption = float(self.backtest_fill_limits_assumption) * mintick
-            test_level = level - assumption if order.direction == "long" else level + assumption
-            event = self._crossed_event(path, test_level, order.direction, is_stop=False)
-            return None if event is None else (event[0], level)
         return self._crossed_event(path, level, order.direction, is_stop=is_stop)
 
     def _trailing_stop_event(self, order: Order, path: list[float]) -> tuple[int, float] | None:
@@ -610,14 +600,33 @@ class StrategyContext:
 
     def _validate_intrabar_bars(self, chart_bar: Bar, bars: list[Bar]) -> bool:
         last_time: int | None = None
-        chart_close = chart_bar.time_close
+        last_close: int | None = None
+        chart_close = self._bar_close_time(chart_bar)
         for intrabar in bars:
-            if intrabar.time < chart_bar.time or (chart_close is not None and intrabar.time > chart_close):
+            intrabar_close = self._bar_close_time(intrabar)
+            if intrabar.time < chart_bar.time or intrabar.time > chart_close or intrabar_close > chart_close:
                 return False
             if last_time is not None and intrabar.time <= last_time:
                 return False
+            if last_close is not None and intrabar_close <= last_close:
+                return False
             last_time = intrabar.time
+            last_close = intrabar_close
         return True
+
+    @staticmethod
+    def _bar_close_time(bar: Bar) -> int:
+        return bar.time_close if bar.time_close is not None else bar.time
+
+    def note_calc_on_every_tick_historical_fallback(self, runtime: PineRuntime) -> None:
+        if self._calc_every_tick_warned:
+            return
+        self._calc_every_tick_warned = True
+        self._emit(
+            runtime,
+            PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
+            "calc_on_every_tick=True but no explicit realtime tick stream was supplied for this historical bar; running one close-only pass",
+        )
 
     def _intrabar_path(self, bars: list[Bar]) -> list[float]:
         path: list[float] = []

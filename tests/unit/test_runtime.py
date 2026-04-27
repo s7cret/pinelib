@@ -1,3 +1,5 @@
+import pytest
+
 from pinelib import Bar, PineRuntime, RuntimeConfig, SymbolInfo, TimeframeInfo, na
 
 
@@ -39,6 +41,29 @@ def test_runtime_indicator_state_is_stable_and_child_context_isolated() -> None:
 
     child = runtime.spawn_child_context(symbol="TEST:BBB", timeframe="5", namespace="req")
     assert child.contract_version == "1.4"
+    assert child.request_namespace == "req"
     assert child.syminfo.tickerid == "TEST:BBB"
     assert str(child.timeframe.value) == "5"
     assert child.series_registry is not runtime.series_registry
+
+
+def test_series_history_allowed_metadata_is_enforced() -> None:
+    from pinelib import TypeInfo
+    from pinelib.errors import PL_HISTORY_NOT_ALLOWED, PL_REFERENCE_HISTORY_UNSUPPORTED, PineHistoryError
+
+    runtime = _runtime()
+    normal = runtime.series("normal", "float")
+    normal.set_current(1.0)
+    runtime.end_bar() if runtime.current_bar is not None else None
+    forbidden = runtime.series("forbidden", "float", type_info=TypeInfo("float", "simple", is_history_allowed=False))
+    with pytest.raises(PineHistoryError) as exc:
+        _ = forbidden[1]
+    assert exc.value.code == PL_HISTORY_NOT_ALLOWED
+
+    ref = runtime.series("ref", "object", type_info=TypeInfo("array", "series", is_reference_type=True))
+    with pytest.raises(PineHistoryError) as ref_exc:
+        _ = ref[1]
+    assert ref_exc.value.code == PL_REFERENCE_HISTORY_UNSUPPORTED
+
+    allowed_bool = runtime.series("flag", "bool", type_info=TypeInfo("bool", "series", is_history_allowed=True))
+    assert allowed_bool[1] is False

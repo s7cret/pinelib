@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "1.4",
+  "cases": [
+    {"id": "session_time_time_close_timeframe_guard", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_time.csv"]},
+    {"id": "request_security_gaps_lookahead", "status": "pending_external_oracle", "required_files": ["bars.csv", "requested_bars.csv", "expected_security.csv"]},
+    {"id": "request_security_lower_tf_intrabar_validation", "status": "pending_external_oracle", "required_files": ["bars.csv", "lower_tf_bars.csv", "expected_lower_tf.json"]},
+    {"id": "strategy_market_limit_stop_stop_limit", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_trades.csv"]},
+    {"id": "strategy_exit_oca_reservation", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_trades.csv"]},
+    {"id": "calc_on_every_tick_supplied_ticks", "status": "pending_external_oracle", "required_files": ["bars.csv", "ticks.csv", "expected_report.json"]},
+    {"id": "ta_stateful_indicators", "status": "pending_external_oracle", "required_files": ["bars.csv", "expected_indicators.csv"]}
+  ]
+}

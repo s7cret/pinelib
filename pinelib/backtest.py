@@ -111,12 +111,19 @@ def run_generated_strategy(
     callback = _resolve_strategy_callback(strategy_instance)
     max_recalcs = schedule.max_recalculations_per_bar or runtime.config.max_recalculations_per_bar
 
-    ticks_by_bar = iter(realtime_ticks) if realtime_ticks is not None else None
-    for bar in bars:
-        bar_ticks = list(next(ticks_by_bar)) if ticks_by_bar is not None else []
+    bars_list = list(bars)
+    ticks_list = [list(ticks) for ticks in realtime_ticks] if realtime_ticks is not None else [[] for _ in bars_list]
+    if len(ticks_list) < len(bars_list):
+        ticks_list.extend([[] for _ in range(len(bars_list) - len(ticks_list))])
+    first_realtime_index = next((idx for idx, ticks in enumerate(ticks_list) if ticks), None)
+    last_confirmed_history_index = (first_realtime_index - 1) if first_realtime_index is not None else (len(bars_list) - 1)
+
+    for idx, bar in enumerate(bars_list):
+        bar_ticks = ticks_list[idx] if idx < len(ticks_list) else []
         if bar_ticks:
             if not strategy.calc_on_every_tick or not schedule.calc_on_every_tick:
                 runtime.begin_bar(bar)
+                runtime.set_last_confirmed_history(idx == last_confirmed_history_index)
                 active_bar = runtime.current_bar
                 if active_bar is None:
                     raise PineRuntimeError("runtime did not set current_bar")
@@ -133,6 +140,9 @@ def run_generated_strategy(
                         _run_fill_recalcs(callback, runtime, strategy, active_bar, schedule, max_recalcs)
         else:
             runtime.begin_bar(bar)
+            runtime.set_last_confirmed_history(idx == last_confirmed_history_index)
+            if strategy.calc_on_every_tick and schedule.calc_on_every_tick:
+                strategy.note_calc_on_every_tick_historical_fallback(runtime)
             active_bar = runtime.current_bar
             if active_bar is None:  # defensive; begin_bar guarantees this
                 raise PineRuntimeError("runtime did not set current_bar")

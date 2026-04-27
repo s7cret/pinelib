@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pinelib.core.na import na
-from pinelib.errors import PineSessionError
+from pinelib.core.types import parse_timeframe_to_ms
+from pinelib.errors import PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC, PineSessionError, PineUnsupportedFeatureError
 
 if TYPE_CHECKING:
     from pinelib.core.runtime import PineRuntime
@@ -105,7 +106,7 @@ class TimeFunctions:
         *,
         runtime: "PineRuntime",
     ) -> int | object:
-        del timeframe
+        self._validate_timeframe(timeframe, runtime)
         if runtime.current_bar is None:
             return na
         resolved_tz = timezone or runtime.syminfo.timezone
@@ -120,7 +121,7 @@ class TimeFunctions:
         *,
         runtime: "PineRuntime",
     ) -> int | object:
-        del timeframe
+        self._validate_timeframe(timeframe, runtime)
         if runtime.current_bar is None:
             return na
         resolved_tz = timezone or runtime.syminfo.timezone
@@ -160,6 +161,27 @@ class TimeFunctions:
             session,
             timezone_name,
         )
+
+    def _validate_timeframe(self, timeframe: str | None, runtime: "PineRuntime") -> None:
+        if timeframe is None:
+            return
+        requested = timeframe.strip().upper()
+        chart = runtime.timeframe.value.strip().upper()
+        requested_ms = parse_timeframe_to_ms(timeframe)
+        chart_ms = runtime.timeframe.interval_ms
+        if requested == chart or (requested_ms is not None and chart_ms is not None and requested_ms == chart_ms):
+            return
+        message = (
+            f"time()/time_close() requested timeframe {timeframe!r}, but PineLib v1.0.1 only supports "
+            "None or the active chart timeframe; non-chart timeframe aggregation is unsupported"
+        )
+        runtime.config.emit_diagnostic(
+            PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC,
+            message,
+            requested_timeframe=timeframe,
+            chart_timeframe=runtime.timeframe.value,
+        )
+        raise PineUnsupportedFeatureError(message, code=PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC)
 
     def _calendar_value(
         self,

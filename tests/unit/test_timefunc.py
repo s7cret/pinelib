@@ -69,3 +69,26 @@ def test_overnight_session_is_supported() -> None:
     runtime.begin_bar(bar)
     assert runtime.timefunc.time(runtime=runtime) == bar.time
     assert runtime.timefunc.time_close(runtime=runtime) == bar.time_close
+
+import pytest
+from pinelib.errors import PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC, PineUnsupportedFeatureError
+
+
+def test_time_and_time_close_accept_chart_timeframe() -> None:
+    runtime = _runtime("0000-2359:1234567", "UTC")
+    bar = Bar(time=1_700_000_000_000, time_close=1_700_003_599_999, open=1, high=1, low=1, close=1)
+    runtime.begin_bar(bar)
+    assert runtime.timefunc.time("60", runtime=runtime) == bar.time
+    assert runtime.timefunc.time_close("1H", runtime=runtime) == bar.time_close
+
+
+def test_time_and_time_close_non_chart_timeframe_is_explicit_unsupported() -> None:
+    runtime = _runtime("0000-2359:1234567", "UTC")
+    bar = Bar(time=1_700_000_000_000, time_close=1_700_003_599_999, open=1, high=1, low=1, close=1)
+    runtime.begin_bar(bar)
+    with pytest.raises(PineUnsupportedFeatureError) as exc:
+        runtime.timefunc.time("D", runtime=runtime)
+    assert exc.value.code == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
+    assert runtime.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
+    with pytest.raises(PineUnsupportedFeatureError):
+        runtime.timefunc.time_close("D", runtime=runtime)

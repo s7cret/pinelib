@@ -5,7 +5,7 @@ from typing import Generic, TypeVar
 
 from pinelib.core.na import na
 from pinelib.core.types import RuntimeConfig, TypeInfo
-from pinelib.errors import PL_REFERENCE_HISTORY_UNSUPPORTED, PineHistoryError, PineTypeError
+from pinelib.errors import PL_HISTORY_NOT_ALLOWED, PL_REFERENCE_HISTORY_UNSUPPORTED, PineHistoryError, PineTypeError
 
 T = TypeVar("T")
 
@@ -44,6 +44,11 @@ class Series(Generic[T]):
             raise PineHistoryError("Negative history offsets are not supported")
         if offset == 0:
             return self.current
+        if self.type_info and not self.type_info.is_history_allowed:
+            raise PineHistoryError(
+                f"History access is not allowed for series {self.name!r}",
+                code=PL_HISTORY_NOT_ALLOWED,
+            )
         if self.type_info and self.type_info.is_reference_type:
             mode = self.runtime_config.reference_history_mode if self.runtime_config else "unsupported"
             if mode == "unsupported":

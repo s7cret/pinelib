@@ -4,6 +4,7 @@ import pytest
 from typing import cast
 
 from pinelib import (
+    PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
     Bar,
     PineRuntime,
     PineStrategyError,
@@ -82,3 +83,69 @@ def test_fill_orders_on_standard_ohlc_is_captured_but_diagnosed() -> None:
     strategy.attach_runtime(rt)
     codes = [d["code"] for d in rt.config.diagnostics]
     assert "PL_UNSUPPORTED_STRATEGY_SETTING" in codes
+
+
+def test_calc_on_every_tick_historical_fallback_emits_once_at_execution() -> None:
+    class CountingStrategy:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def on_bar(self, rt: PineRuntime, strategy: StrategyContext) -> None:
+            del rt, strategy
+            self.calls += 1
+
+    generated = CountingStrategy()
+    runtime = _rt()
+    strategy = StrategyContext(calc_on_every_tick=True)
+    strategy.attach_runtime(runtime)
+    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [d["code"] for d in runtime.config.diagnostics]
+    run_generated_strategy(generated, runtime, strategy, [_bar(0), _bar(1)])
+    codes = [d["code"] for d in runtime.config.diagnostics]
+    assert codes.count(PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK) == 1
+    assert generated.calls == 2
+
+
+def test_calc_on_every_tick_supplied_ticks_do_not_emit_false_fallback() -> None:
+    class StateStrategy:
+        def __init__(self) -> None:
+            self.states: list[tuple[bool, bool, bool]] = []
+
+        def on_bar(self, rt: PineRuntime, strategy: StrategyContext) -> None:
+            del strategy
+            self.states.append((rt.barstate.ishistory, rt.barstate.isrealtime, rt.barstate.islastconfirmedhistory))
+
+    generated = StateStrategy()
+    runtime = _rt()
+    strategy = StrategyContext(calc_on_every_tick=True)
+    run_generated_strategy(
+        generated,
+        runtime,
+        strategy,
+        [_bar(0)],
+        realtime_ticks=[[TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
+    )
+    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [d["code"] for d in runtime.config.diagnostics]
+    assert generated.states == [(False, True, False), (False, True, False)]
+
+
+def test_islastconfirmedhistory_marks_historical_bar_before_realtime() -> None:
+    class StateStrategy:
+        def __init__(self) -> None:
+            self.states: list[tuple[bool, bool, bool]] = []
+
+        def on_bar(self, rt: PineRuntime, strategy: StrategyContext) -> None:
+            del strategy
+            self.states.append((rt.barstate.ishistory, rt.barstate.isrealtime, rt.barstate.islastconfirmedhistory))
+
+    generated = StateStrategy()
+    runtime = _rt()
+    strategy = StrategyContext(calc_on_every_tick=True)
+    run_generated_strategy(
+        generated,
+        runtime,
+        strategy,
+        [_bar(0), _bar(1)],
+        realtime_ticks=[[], [TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
+    )
+    assert [d["code"] for d in runtime.config.diagnostics].count(PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK) == 1
+    assert generated.states == [(True, False, True), (False, True, False), (False, True, False)]
