@@ -1,9 +1,9 @@
-# PineLib Runtime v0.5.0
+# PineLib Runtime v0.6.0
 
 PineLib is a Python runtime foundation for AST2Python-generated Pine-compatible code.
-v0.5.0 continues the v1.4 runtime contract / TZ_01 track with Bar Magnifier execution provenance plus visual/reference foundations.
+v0.6.0 continues the v1.4 runtime contract / TZ_01 track with extended TA coverage and basic `math`, `string`, and `color` namespaces.
 
-Implemented through v0.5.0:
+Implemented through v0.6.0:
 
 - contract/version metadata for `pinelib` and runtime contract `1.4`
 - validated `Bar` model with UTC millisecond timestamps
@@ -12,17 +12,10 @@ Implemented through v0.5.0:
 - `DataProvider` / `IntrabarDataProvider` protocols and in-memory provider
 - timezone/session-aware `time()` and `time_close()` helpers
 - `request.security` foundation with explicit nested-request diagnostics
-- P0 TA helpers and Pine numeric/operator helpers
-- `StrategyContext` broker emulator MVP from v0.4.0
-- Bar Magnifier foundation:
-  - provider-backed intrabar path when `use_bar_magnifier=True`
-  - strict missing-data error `PL_MISSING_INTRABAR_DATA`
-  - non-strict warning fallback `PL_WARNING_BAR_MAGNIFIER_FALLBACK`
-  - `fill_source` provenance (`intrabar` / `ohlc_path`) on fills and closed trades
-  - TP/SL bracket arbitration by earliest crossing in the active path
-- `calc_on_every_tick` historical fallback diagnostic `PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK`
-- visual recorder foundation with stable `PineObjectId` for label/line/box/table lifecycle, set/delete events, and count limits
-- reference container foundation: `PineArray`, `PineMap`, `PineMatrix`, and explicit `PL_REFERENCE_HISTORY_UNSUPPORTED`
+- StrategyContext broker emulator MVP plus Bar Magnifier provenance from v0.5.0
+- visual recorder foundation and reference containers (`PineArray`, `PineMap`, `PineMatrix`)
+- TA helpers: `sma`, `ema`, `rma`, `rsi`, `macd`, `tr`, `atr`, `highest`, `lowest`, `change`, crosses, plus v0.6 additions: `bb`, `bbw`, fast `stoch`, `dmi`/`adx`, `supertrend`, `wma`, `vwma`, `hma`, `swma`, `alma`, `sar`, `pivot_high`/`pivot_low`, `valuewhen`, `barssince`, `linreg`, `variance`, `stdev`, `dev`, percentile/percentrank basics, `vwap`, `mfi`, `cci`, `obv`, `mom`, `roc`, `correlation`, `rising`, and `falling`
+- namespace helpers: expanded `pinelib.math`, basic `pinelib.string`, and basic `pinelib.color`
 
 ## Install
 
@@ -55,9 +48,8 @@ assert strategy.position_avg_price == 12
 assert strategy.fills[-1].fill_source == "ohlc_path"
 ```
 
-## Coverage map for v0.5
+## Coverage map for v0.6
 
-- Core runtime, inputs, request/security, sessions/time helpers, P0 TA base: implemented foundation
-- Strategy broker emulator: MVP plus Bar Magnifier provider path and fill provenance
-- Visual/reference types: deterministic recorder and minimal identity/copy foundations
-- Deferred: full TradingView Bar Magnifier parity matrix, realtime tick execution, full visual API/rendering, full reference history semantics, trailing exits, advanced margin/leverage, and complete golden TradingView parity suite
+- Batch and runtime modes are preserved for existing stateful indicators; runtime stateful helpers require explicit `state_id`.
+- Several new TA helpers are batch-first; incomplete overloads raise explicit `PineRuntimeError` instead of silently approximating.
+- Deferred: full TradingView TA overload matrix, complete visual API/rendering, full reference history semantics, realtime tick execution, advanced strategy parity, and golden TradingView parity suite.

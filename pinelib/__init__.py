@@ -1,4 +1,4 @@
-from pinelib import ta
+from pinelib import color, string, ta
 from pinelib.core import (
     Bar,
     BarStateInfo,
@@ -137,6 +137,8 @@ __all__ = [
     "pine_sub",
     "pine_sum",
     "security",
+    "color",
+    "string",
     "ta",
 ]
 
