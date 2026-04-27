@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Protocol
 
 from pinelib.core.bar import Bar
@@ -30,11 +31,25 @@ class IntrabarDataProvider(Protocol):
     ) -> list[Bar]: ...
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderQueryMetadata:
+    requested_symbol: str
+    requested_timeframe: str
+    normalized_symbol: str
+    normalized_timeframe: str
+    start: int | None
+    end: int | None
+    returned_bars: int
+
+
 class InMemoryDataProvider:
     def __init__(self, bars_by_key: Mapping[tuple[str, str], list[Bar]]) -> None:
         self._bars_by_key: dict[tuple[str, str], list[Bar]] = {}
+        self.metadata_log: list[ProviderQueryMetadata] = []
         for key, bars in bars_by_key.items():
-            self._bars_by_key[key] = self._validate_bars(list(bars))
+            symbol, timeframe = key
+            normalized_key = (self.normalize_symbol(symbol), self.normalize_timeframe(timeframe))
+            self._bars_by_key[normalized_key] = self._validate_bars(list(bars))
 
     def get_bars(
         self,
@@ -45,15 +60,36 @@ class InMemoryDataProvider:
         *,
         max_bars: int | None = None,
     ) -> list[Bar]:
-        bars = list(self._bars_by_key.get((symbol, timeframe), []))
+        normalized_symbol = self.normalize_symbol(symbol)
+        normalized_timeframe = self.normalize_timeframe(timeframe)
+        bars = list(self._bars_by_key.get((normalized_symbol, normalized_timeframe), []))
         filtered = [
             bar
             for bar in bars
             if (start is None or bar.time >= start) and (end is None or bar.time <= end)
         ]
         if max_bars is not None:
-            return filtered[:max_bars]
+            filtered = filtered[:max_bars]
+        self.metadata_log.append(
+            ProviderQueryMetadata(
+                requested_symbol=symbol,
+                requested_timeframe=timeframe,
+                normalized_symbol=normalized_symbol,
+                normalized_timeframe=normalized_timeframe,
+                start=start,
+                end=end,
+                returned_bars=len(filtered),
+            )
+        )
         return filtered
+
+    @staticmethod
+    def normalize_symbol(symbol: str) -> str:
+        return symbol.strip().upper()
+
+    @staticmethod
+    def normalize_timeframe(timeframe: str) -> str:
+        return timeframe.strip().upper()
 
     @staticmethod
     def _validate_bars(bars: list[Bar]) -> list[Bar]:

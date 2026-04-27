@@ -32,10 +32,46 @@ class SymbolInfo:
 class TimeframeInfo:
     value: str
     interval_ms: int | None = None
+    isseconds: bool = False
+    isminutes: bool = False
+    isdaily: bool = False
+    isweekly: bool = False
+    multiplier: int | None = None
 
     @classmethod
     def from_string(cls, value: str) -> "TimeframeInfo":
-        return cls(value=value, interval_ms=parse_timeframe_to_ms(value))
+        normalized = value.strip().upper()
+        interval_ms = parse_timeframe_to_ms(value)
+        multiplier: int | None = None
+        isseconds = normalized.endswith("S")
+        isdaily = normalized.endswith("D") or normalized == "D"
+        isweekly = normalized.endswith("W") or normalized == "W"
+        isminutes = normalized.isdigit() or normalized.endswith("M") or normalized.endswith("H")
+        if normalized.isdigit():
+            multiplier = int(normalized)
+        elif normalized in {"S", "D", "W"}:
+            multiplier = 1
+        elif len(normalized) > 1 and normalized[:-1].isdigit():
+            multiplier = int(normalized[:-1])
+        return cls(
+            value=value,
+            interval_ms=interval_ms,
+            isseconds=isseconds,
+            isminutes=isminutes,
+            isdaily=isdaily,
+            isweekly=isweekly,
+            multiplier=multiplier,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BarStateInfo:
+    isfirst: bool = False
+    islast: bool = True
+    ishistory: bool = True
+    isrealtime: bool = False
+    isnew: bool = True
+    isconfirmed: bool = False
 
 
 @dataclass(slots=True)
@@ -46,7 +82,13 @@ class RuntimeConfig:
     max_recalculations_per_bar: int = 16
     allow_incomplete_bar_time_close: bool = True
     diagnostics_as_errors: bool = False
+    diagnostics: list[dict[str, object]] = field(default_factory=list)
     extra: dict[str, object] = field(default_factory=dict)
+
+    def emit_diagnostic(self, code: str, message: str, **extra: object) -> None:
+        payload: dict[str, object] = {"code": code, "message": message}
+        payload.update(extra)
+        self.diagnostics.append(payload)
 
 
 def parse_timeframe_to_ms(value: str) -> int | None:

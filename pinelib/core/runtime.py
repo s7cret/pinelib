@@ -4,10 +4,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pinelib.core.bar import Bar
+from pinelib.core.inputs import InputRegistry
 from pinelib.core.na import na
 from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions
-from pinelib.core.types import RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
+from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
 from pinelib.errors import PineRuntimeError
 from pinelib.request.providers import DataProvider, IntrabarDataProvider
 from pinelib.version import RUNTIME_CONTRACT_VERSION
@@ -32,6 +33,8 @@ class PineRuntime:
     timefunc: TimeFunctions = field(init=False, default_factory=TimeFunctions)
     syminfo: SymbolInfo = field(init=False)
     commit_order: list[str] = field(init=False, default_factory=list)
+    inputs: InputRegistry = field(init=False)
+    barstate: BarStateInfo = field(init=False, default_factory=BarStateInfo)
 
     open: Series[float] = field(init=False)
     high: Series[float] = field(init=False)
@@ -46,6 +49,7 @@ class PineRuntime:
         self.syminfo = self.symbol_info
         if isinstance(self.timeframe, str):
             self.timeframe = TimeframeInfo.from_string(self.timeframe)
+        self.inputs = InputRegistry(self.config)
         self.open = self.series("open", "float")
         self.high = self.series("high", "float")
         self.low = self.series("low", "float")
@@ -60,6 +64,14 @@ class PineRuntime:
         self.current_bar = effective_bar
         self.chart_bars.append(effective_bar)
         current_index = self.bar_index + 1
+        self.barstate = BarStateInfo(
+            isfirst=current_index == 0,
+            islast=True,
+            ishistory=True,
+            isrealtime=False,
+            isnew=True,
+            isconfirmed=False,
+        )
         self.open.set_current(effective_bar.open)
         self.high.set_current(effective_bar.high)
         self.low.set_current(effective_bar.low)
@@ -75,6 +87,14 @@ class PineRuntime:
         for name in self.commit_order:
             self.series_registry[name].commit_current()
         self.bar_index += 1
+        self.barstate = BarStateInfo(
+            isfirst=self.bar_index == 0,
+            islast=True,
+            ishistory=True,
+            isrealtime=False,
+            isnew=False,
+            isconfirmed=True,
+        )
 
     def series(
         self,
@@ -105,8 +125,7 @@ class PineRuntime:
         return self.indicator_state[state_id]
 
     def spawn_child_context(self, *, symbol: str, timeframe: str, namespace: str) -> "PineRuntime":
-        del namespace
-        return PineRuntime(
+        child = PineRuntime(
             symbol_info=SymbolInfo(
                 tickerid=symbol,
                 timezone=self.syminfo.timezone,
@@ -121,6 +140,9 @@ class PineRuntime:
             config=self.config,
             intrabar_provider=self.intrabar_provider,
         )
+        del namespace
+        child.indicator_state = {}
+        return child
 
     def _normalize_bar(self, bar: Bar) -> Bar:
         if bar.time_close is not None:

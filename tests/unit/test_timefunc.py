@@ -43,6 +43,18 @@ def test_session_filter_returns_na_outside_session() -> None:
     assert is_na(runtime.timefunc.time_close(runtime=runtime))
 
 
+def test_dst_week_uses_iana_timezone_rules() -> None:
+    runtime = _runtime("0000-2359:1234567", "America/New_York")
+    before_dst = Bar(time=1_709_988_000_000, time_close=1_709_991_599_999, open=1, high=1, low=1, close=1)
+    after_dst = Bar(time=1_710_331_200_000, time_close=1_710_334_799_999, open=1, high=1, low=1, close=1)
+
+    runtime.begin_bar(before_dst)
+    assert runtime.timefunc.hour(runtime=runtime) == 7
+    runtime.end_bar()
+    runtime.begin_bar(after_dst)
+    assert runtime.timefunc.hour(runtime=runtime) == 8
+
+
 def test_overnight_session_is_supported() -> None:
     runtime = _runtime("1700-1700:23456", "America/New_York")
     bar = Bar(

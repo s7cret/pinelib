@@ -1,4 +1,5 @@
 from pinelib.core.bar import Bar
+from pinelib.core.inputs import InputMetadata, InputRegistry
 from pinelib.core.na import fixnan, is_na, na, nz
 from pinelib.core.operators import pine_add, pine_bool, pine_div, pine_mul, pine_range, pine_sub
 from pinelib.core.precision import (
@@ -13,12 +14,15 @@ from pinelib.core.precision import (
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions, is_timestamp_in_session, parse_session
-from pinelib.core.types import RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
+from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TimeframeInfo, TypeInfo
 
 __all__ = [
     "Bar",
+    "InputMetadata",
+    "InputRegistry",
     "PineRuntime",
     "RuntimeConfig",
+    "BarStateInfo",
     "Series",
     "SymbolInfo",
     "TimeFunctions",

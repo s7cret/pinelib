@@ -1,6 +1,9 @@
 from pinelib import ta
 from pinelib.core import (
     Bar,
+    BarStateInfo,
+    InputMetadata,
+    InputRegistry,
     PineRuntime,
     RuntimeConfig,
     Series,
@@ -48,14 +51,25 @@ from pinelib.errors import (
     PineUnsupportedFeatureError,
 )
 from pinelib.math import pine_abs, pine_max, pine_min, pine_round, pine_sum
-from pinelib.request import DataProvider, InMemoryDataProvider, IntrabarDataProvider
+from pinelib.request import (
+    DataProvider,
+    InMemoryDataProvider,
+    IntrabarDataProvider,
+    ProviderQueryMetadata,
+    merge_requested_series_to_chart_bars,
+    security,
+)
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
 __all__ = [
     "Bar",
+    "BarStateInfo",
     "DataProvider",
     "InMemoryDataProvider",
+    "InputMetadata",
+    "InputRegistry",
     "IntrabarDataProvider",
+    "ProviderQueryMetadata",
     "PACKAGE_VERSION",
     "PL_DATA_FORMAT_ERROR",
     "PL_INPUT_VALIDATION_ERROR",
@@ -85,6 +99,7 @@ __all__ = [
     "TimeframeInfo",
     "TypeInfo",
     "fixnan",
+    "merge_requested_series_to_chart_bars",
     "is_na",
     "na",
     "nz",
@@ -106,6 +121,7 @@ __all__ = [
     "pine_round",
     "pine_sub",
     "pine_sum",
+    "security",
     "ta",
 ]
 

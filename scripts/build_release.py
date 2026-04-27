@@ -19,8 +19,7 @@ ARCHIVE_PATH = ROOT / f"pinelib_runtime_v{VERSION_SLUG}.zip"
 ZIP_TIMESTAMP = (2024, 1, 1, 0, 0, 0)
 INCLUDE_PATHS = [
     ROOT / "README.md",
-    ROOT / "CHANGELOG_v0.1.0.md",
-    ROOT / "CHANGELOG_v0.2.0.md",
+    *sorted(ROOT.glob("CHANGELOG_v*.md")),
     ROOT / "pyproject.toml",
 ]
 
