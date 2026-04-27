@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
+
+MANIFEST_PATH = ROOT / "RELEASE_MANIFEST_v0_1_0.json"
+ARCHIVE_PATH = ROOT / "pinelib_runtime_v0_1_0.zip"
+ZIP_TIMESTAMP = (2024, 1, 1, 0, 0, 0)
+INCLUDE_PATHS = [
+    ROOT / "README.md",
+    ROOT / "CHANGELOG_v0.1.0.md",
+    ROOT / "pyproject.toml",
+]
+
+
+def _tracked_python_files() -> list[Path]:
+    files = sorted((ROOT / "pinelib").rglob("*.py"))
+    files.extend(sorted((ROOT / "tests").rglob("*.py")))
+    files.extend(sorted((ROOT / "scripts").glob("*.py")))
+    files.extend(sorted((ROOT / "docs").rglob("*.md")))
+    return files
+
+
+def _zip_write(zip_file: ZipFile, file_path: Path) -> None:
+    relative_name = file_path.relative_to(ROOT).as_posix()
+    info = ZipInfo(relative_name, date_time=ZIP_TIMESTAMP)
+    info.compress_type = ZIP_DEFLATED
+    info.external_attr = 0o644 << 16
+    zip_file.writestr(info, file_path.read_bytes())
+
+
+def _git_commit() -> str | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def build_release() -> None:
+    files = [*INCLUDE_PATHS, *_tracked_python_files()]
+    files = sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())
+    with ZipFile(ARCHIVE_PATH, "w") as archive:
+        for file_path in files:
+            _zip_write(archive, file_path)
+
+    sha256 = hashlib.sha256(ARCHIVE_PATH.read_bytes()).hexdigest()
+    manifest = {
+        "package": "pinelib",
+        "version": PACKAGE_VERSION,
+        "contract_version": RUNTIME_CONTRACT_VERSION,
+        "archive": ARCHIVE_PATH.name,
+        "archive_sha256": sha256,
+        "git_commit": _git_commit(),
+        "files": [path.relative_to(ROOT).as_posix() for path in files],
+    }
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    build_release()
