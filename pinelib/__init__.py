@@ -1,3 +1,4 @@
+from pinelib import ta
 from pinelib.core import (
     Bar,
     PineRuntime,
@@ -13,7 +14,14 @@ from pinelib.core import (
     pine_add,
     pine_bool,
     pine_div,
+    pine_eq,
+    pine_gt,
+    pine_gte,
+    pine_isclose,
+    pine_lt,
+    pine_lte,
     pine_mul,
+    pine_ne,
     pine_range,
     pine_sub,
 )
@@ -39,6 +47,7 @@ from pinelib.errors import (
     PineTypeError,
     PineUnsupportedFeatureError,
 )
+from pinelib.math import pine_abs, pine_max, pine_min, pine_round, pine_sum
 from pinelib.request import DataProvider, InMemoryDataProvider, IntrabarDataProvider
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
@@ -79,13 +88,25 @@ __all__ = [
     "is_na",
     "na",
     "nz",
+    "pine_abs",
     "pine_add",
     "pine_bool",
     "pine_div",
+    "pine_eq",
+    "pine_gt",
+    "pine_gte",
+    "pine_isclose",
+    "pine_lt",
+    "pine_lte",
+    "pine_max",
+    "pine_min",
     "pine_mul",
+    "pine_ne",
     "pine_range",
+    "pine_round",
     "pine_sub",
+    "pine_sum",
+    "ta",
 ]
 
 __version__ = PACKAGE_VERSION
-

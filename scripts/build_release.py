@@ -13,12 +13,14 @@ if str(ROOT) not in sys.path:
 
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
-MANIFEST_PATH = ROOT / "RELEASE_MANIFEST_v0_1_0.json"
-ARCHIVE_PATH = ROOT / "pinelib_runtime_v0_1_0.zip"
+VERSION_SLUG = PACKAGE_VERSION.replace(".", "_")
+MANIFEST_PATH = ROOT / f"RELEASE_MANIFEST_v{VERSION_SLUG}.json"
+ARCHIVE_PATH = ROOT / f"pinelib_runtime_v{VERSION_SLUG}.zip"
 ZIP_TIMESTAMP = (2024, 1, 1, 0, 0, 0)
 INCLUDE_PATHS = [
     ROOT / "README.md",
     ROOT / "CHANGELOG_v0.1.0.md",
+    ROOT / "CHANGELOG_v0.2.0.md",
     ROOT / "pyproject.toml",
 ]
 
@@ -54,7 +56,7 @@ def _git_commit() -> str | None:
 
 def build_release() -> None:
     files = [*INCLUDE_PATHS, *_tracked_python_files()]
-    files = sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())
+    files = sorted(set(files), key=lambda path: path.relative_to(ROOT).as_posix())
     with ZipFile(ARCHIVE_PATH, "w") as archive:
         for file_path in files:
             _zip_write(archive, file_path)
