@@ -96,7 +96,7 @@ python scripts/check_release_artifact_selftest.py pinelib_runtime_v1_0_1.zip
 
 ## License
 
-This repository is currently packaged with a proprietary/all-rights-reserved license. See `LICENSE`.
+MIT. See `LICENSE`.
 
 ## Coverage and limitations
 
