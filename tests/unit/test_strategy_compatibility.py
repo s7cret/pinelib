@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from pinelib.strategy import (
@@ -12,13 +14,17 @@ from pinelib.strategy import (
 def test_broker_boundary_documents_amended_owner_split() -> None:
     boundary = broker_boundary()
 
+    pinelib_owns = cast(list[str], boundary["pinelib_owns"])
+    backtest_engine_owns = cast(list[str], boundary["backtest_engine_owns"])
+    claim_boundary = cast(list[str], boundary["claim_boundary"])
+
     assert boundary["status"] == BROKER_BOUNDARY_STATUS
-    assert "strategy order-intent facade" in boundary["pinelib_owns"]
-    assert "fill simulation" in boundary["backtest_engine_owns"]
+    assert "strategy order-intent facade" in pinelib_owns
+    assert "fill simulation" in backtest_engine_owns
     assert boundary["adapter"] == (
         "backtest_engine.adapters.generated_strategy.make_generated_strategy_adapter"
     )
-    assert "no full TradingView parity claim" in boundary["claim_boundary"]
+    assert "no full TradingView parity claim" in claim_boundary
 
 
 class _GeneratedStrategy:
