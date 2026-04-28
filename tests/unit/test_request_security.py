@@ -17,7 +17,10 @@ from pinelib import (
 
 def _bars(times: list[int], tf_ms: int, closes: list[float] | None = None) -> list[Bar]:
     values = closes or [float(i + 1) for i in range(len(times))]
-    return [Bar(time=t, time_close=t + tf_ms - 1, open=v, high=v, low=v, close=v) for t, v in zip(times, values, strict=True)]
+    return [
+        Bar(time=t, time_close=t + tf_ms - 1, open=v, high=v, low=v, close=v)
+        for t, v in zip(times, values, strict=True)
+    ]
 
 
 def _runtime(provider: InMemoryDataProvider) -> PineRuntime:
@@ -38,7 +41,9 @@ def test_merge_gaps_and_lookahead_modes() -> None:
     assert is_na(off[0])
     assert off[1:] == [10.0, 10.0, 20.0]
 
-    gaps_on = merge_requested_series_to_chart_bars(values, requested_bars=requested, chart_bars=chart, gaps="barmerge.gaps_on")
+    gaps_on = merge_requested_series_to_chart_bars(
+        values, requested_bars=requested, chart_bars=chart, gaps="barmerge.gaps_on"
+    )
     assert is_na(gaps_on[0])
     assert gaps_on[1] == 10.0
     assert is_na(gaps_on[2])

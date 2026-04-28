@@ -36,7 +36,9 @@ def _value(raw: str) -> float | object:
     return na if raw == "" else float(raw)
 
 
-def _assert_close(actual: Any, expected: str, *, row_id: str, column: str, tolerance: float = VALUE_TOLERANCE) -> None:
+def _assert_close(
+    actual: Any, expected: str, *, row_id: str, column: str, tolerance: float = VALUE_TOLERANCE
+) -> None:
     expected_value = _value(expected)
     if is_na(expected_value):
         assert is_na(actual), f"{row_id} {column}: expected na, got {actual!r}"
@@ -63,7 +65,13 @@ def _assert_columns_close(
             continue
         actual = actual_rows[bar_index]
         for column in columns:
-            _assert_close(actual[column], expected[column], row_id=f"bar_index={bar_index}", column=column, tolerance=tolerance)
+            _assert_close(
+                actual[column],
+                expected[column],
+                row_id=f"bar_index={bar_index}",
+                column=column,
+                tolerance=tolerance,
+            )
             checked += 1
     assert checked > 0
 
@@ -80,7 +88,9 @@ def _bar_from_row(row: Mapping[str, str], *, time_close: int | None = None) -> B
     )
 
 
-def _expected_by_non_negative_index(rows: Iterable[Mapping[str, str]]) -> dict[int, Mapping[str, str]]:
+def _expected_by_non_negative_index(
+    rows: Iterable[Mapping[str, str]],
+) -> dict[int, Mapping[str, str]]:
     return {int(row["bar_index"]): row for row in rows if int(row["bar_index"]) >= 0}
 
 
@@ -106,7 +116,9 @@ def test_tradingview_oracle_manifest_counts_verified_and_blocked_cases_without_p
         elif case["status"] == "platform_blocked":
             assert case.get("blocked_reason", "").strip()
             assert case.get("blocked_by", "").strip()
-            assert all(not (case_dir / required_file).exists() for required_file in case["required_files"])
+            assert all(
+                not (case_dir / required_file).exists() for required_file in case["required_files"]
+            )
 
     result = subprocess.run(
         [sys.executable, "scripts/run_tv_golden_suite.py"],
@@ -117,13 +129,17 @@ def test_tradingview_oracle_manifest_counts_verified_and_blocked_cases_without_p
     )
     summary = json.loads(result.stdout)
     assert summary["oracle_verified"] == sum(case["status"] == "oracle_verified" for case in cases)
-    assert summary["platform_blocked"] == sum(case["status"] == "platform_blocked" for case in cases)
+    assert summary["platform_blocked"] == sum(
+        case["status"] == "platform_blocked" for case in cases
+    )
     assert summary["pending_external_oracle"] == 0
 
 
 def test_calc_on_every_tick_supplied_ticks_is_platform_blocked_not_pending() -> None:
     case_dir = FIXTURES / "calc_on_every_tick_supplied_ticks"
-    case = next(case for case in _manifest()["cases"] if case["id"] == "calc_on_every_tick_supplied_ticks")
+    case = next(
+        case for case in _manifest()["cases"] if case["id"] == "calc_on_every_tick_supplied_ticks"
+    )
     evidence = json.loads((case_dir / "evidence.json").read_text(encoding="utf-8"))
     blocked_evidence = (case_dir / "platform_blocked_evidence.md").read_text(encoding="utf-8")
 
@@ -143,7 +159,9 @@ def test_session_time_time_close_timeframe_guard_matches_tradingview_daily_time_
     expected_rows = _load_csv(case_dir / "expected_time.csv")
     expected_by_index = _expected_by_non_negative_index(expected_rows)
     runtime = PineRuntime(
-        symbol_info=SymbolInfo(tickerid="NASDAQ:AAPL", timezone="America/New_York", session="0930-1600:23456"),
+        symbol_info=SymbolInfo(
+            tickerid="NASDAQ:AAPL", timezone="America/New_York", session="0930-1600:23456"
+        ),
         timeframe=TimeframeInfo.from_string("1D"),
     )
 
@@ -175,7 +193,14 @@ def test_request_security_gaps_and_lookahead_matches_tradingview_expected_csv() 
     expected_by_index = _expected_by_non_negative_index(expected_rows)
     assert len(chart_rows) == len(expected_by_index)
     chart_bars = [
-        Bar(time=int(row["time"]) * 1000, open=1.0, high=1.0, low=1.0, close=1.0, time_close=int(row["time_W"]))
+        Bar(
+            time=int(row["time"]) * 1000,
+            open=1.0,
+            high=1.0,
+            low=1.0,
+            close=1.0,
+            time_close=int(row["time_W"]),
+        )
         for row in expected_rows
     ]
 
@@ -191,7 +216,10 @@ def test_request_security_gaps_and_lookahead_matches_tradingview_expected_csv() 
         seen_close_times.add(close_time)
         weekly_closes.append((close_time, float(value)))
 
-    off_gaps_on_bars = [Bar(time=close_time, open=value, high=value, low=value, close=value, time_close=close_time) for close_time, value in weekly_closes]
+    off_gaps_on_bars = [
+        Bar(time=close_time, open=value, high=value, low=value, close=value, time_close=close_time)
+        for close_time, value in weekly_closes
+    ]
     off_gaps_on_values = [bar.close for bar in off_gaps_on_bars]
     off_gaps_off_points: list[tuple[int, float]] = []
     last_off_value: str | None = None
@@ -220,27 +248,50 @@ def test_request_security_gaps_and_lookahead_matches_tradingview_expected_csv() 
     actual_by_index: dict[int, dict[str, Any]] = {}
     merged = {
         "sec_w_gaps_on_la_off": merge_requested_series_to_chart_bars(
-            off_gaps_on_values, requested_bars=off_gaps_on_bars, chart_bars=chart_bars, gaps="barmerge.gaps_on", lookahead="barmerge.lookahead_off"
+            off_gaps_on_values,
+            requested_bars=off_gaps_on_bars,
+            chart_bars=chart_bars,
+            gaps="barmerge.gaps_on",
+            lookahead="barmerge.lookahead_off",
         ),
         "sec_w_gaps_off_la_off": merge_requested_series_to_chart_bars(
-            off_gaps_off_values, requested_bars=off_gaps_off_bars, chart_bars=chart_bars, gaps="barmerge.gaps_off", lookahead="barmerge.lookahead_off"
+            off_gaps_off_values,
+            requested_bars=off_gaps_off_bars,
+            chart_bars=chart_bars,
+            gaps="barmerge.gaps_off",
+            lookahead="barmerge.lookahead_off",
         ),
         "sec_w_gaps_on_la_on": merge_requested_series_to_chart_bars(
-            on_values, requested_bars=on_bars, chart_bars=chart_bars, gaps="barmerge.gaps_on", lookahead="barmerge.lookahead_on"
+            on_values,
+            requested_bars=on_bars,
+            chart_bars=chart_bars,
+            gaps="barmerge.gaps_on",
+            lookahead="barmerge.lookahead_on",
         ),
         "sec_w_gaps_off_la_on": merge_requested_series_to_chart_bars(
-            on_values, requested_bars=on_bars, chart_bars=chart_bars, gaps="barmerge.gaps_off", lookahead="barmerge.lookahead_on"
+            on_values,
+            requested_bars=on_bars,
+            chart_bars=chart_bars,
+            gaps="barmerge.gaps_off",
+            lookahead="barmerge.lookahead_on",
         ),
     }
     for row_number, row in enumerate(expected_rows):
         bar_index = int(row["bar_index"])
         if bar_index >= 0:
-            actual_by_index[bar_index] = {name: values[row_number] for name, values in merged.items()}
+            actual_by_index[bar_index] = {
+                name: values[row_number] for name, values in merged.items()
+            }
 
     _assert_columns_close(
         actual_by_index,
         expected_by_index.values(),
-        ["sec_w_gaps_on_la_off", "sec_w_gaps_off_la_off", "sec_w_gaps_on_la_on", "sec_w_gaps_off_la_on"],
+        [
+            "sec_w_gaps_on_la_off",
+            "sec_w_gaps_off_la_off",
+            "sec_w_gaps_on_la_on",
+            "sec_w_gaps_off_la_on",
+        ],
     )
 
 
@@ -262,7 +313,9 @@ def test_request_security_lower_tf_matches_tradingview_intrabar_fixture() -> Non
         for row in lower_rows
     ]
     runtime = PineRuntime(
-        symbol_info=SymbolInfo(tickerid="NASDAQ:AAPL", timezone="America/New_York", session="0930-1600:23456"),
+        symbol_info=SymbolInfo(
+            tickerid="NASDAQ:AAPL", timezone="America/New_York", session="0930-1600:23456"
+        ),
         timeframe=TimeframeInfo.from_string("1D"),
         data_provider=InMemoryDataProvider({("NASDAQ:AAPL", "60"): lower_bars}),
     )
@@ -272,24 +325,63 @@ def test_request_security_lower_tf_matches_tradingview_intrabar_fixture() -> Non
         bar_index = int(row["bar_index"])
         runtime.begin_bar(_bar_from_row(row, time_close=int(row["time_close"]) * 1000))
         close_values = list(
-            security_lower_tf("NASDAQ:AAPL", "60", lambda child: child.close[0], runtime=runtime, state_id="ltf_close")
+            security_lower_tf(
+                "NASDAQ:AAPL",
+                "60",
+                lambda child: child.close[0],
+                runtime=runtime,
+                state_id="ltf_close",
+            )
         )
         high_values = list(
-            security_lower_tf("NASDAQ:AAPL", "60", lambda child: child.high[0], runtime=runtime, state_id="ltf_high")
+            security_lower_tf(
+                "NASDAQ:AAPL",
+                "60",
+                lambda child: child.high[0],
+                runtime=runtime,
+                state_id="ltf_high",
+            )
         )
         low_values = list(
-            security_lower_tf("NASDAQ:AAPL", "60", lambda child: child.low[0], runtime=runtime, state_id="ltf_low")
+            security_lower_tf(
+                "NASDAQ:AAPL", "60", lambda child: child.low[0], runtime=runtime, state_id="ltf_low"
+            )
         )
         exp = expected_by_index[bar_index]
         assert len(close_values) == exp["count"]
         assert len(high_values) == exp["count"]
         assert len(low_values) == exp["count"]
         for actual, expected_close in zip(close_values, exp["close_values"], strict=True):
-            assert math.isclose(float(actual), float(expected_close), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
-        assert math.isclose(float(close_values[0]), float(exp["first_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
-        assert math.isclose(float(close_values[-1]), float(exp["last_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
-        assert math.isclose(max(float(value) for value in high_values), float(exp["high_max"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
-        assert math.isclose(min(float(value) for value in low_values), float(exp["low_min"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
+            assert math.isclose(
+                float(actual),
+                float(expected_close),
+                rel_tol=VALUE_TOLERANCE,
+                abs_tol=VALUE_TOLERANCE,
+            )
+        assert math.isclose(
+            float(close_values[0]),
+            float(exp["first_close"]),
+            rel_tol=VALUE_TOLERANCE,
+            abs_tol=VALUE_TOLERANCE,
+        )
+        assert math.isclose(
+            float(close_values[-1]),
+            float(exp["last_close"]),
+            rel_tol=VALUE_TOLERANCE,
+            abs_tol=VALUE_TOLERANCE,
+        )
+        assert math.isclose(
+            max(float(value) for value in high_values),
+            float(exp["high_max"]),
+            rel_tol=VALUE_TOLERANCE,
+            abs_tol=VALUE_TOLERANCE,
+        )
+        assert math.isclose(
+            min(float(value) for value in low_values),
+            float(exp["low_min"]),
+            rel_tol=VALUE_TOLERANCE,
+            abs_tol=VALUE_TOLERANCE,
+        )
         runtime.end_bar()
         checked += 1
 
@@ -304,9 +396,19 @@ def test_crypto_247_intraday_fixture_preserves_tradingview_hourly_bars() -> None
     assert len(rows) == expected["bar_count"] == 300
     assert int(rows[0]["time"]) == expected["first_time"]
     assert int(rows[-1]["time"]) == expected["last_time"]
-    assert math.isclose(float(rows[0]["close"]), float(expected["first_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
-    assert math.isclose(float(rows[-1]["close"]), float(expected["last_close"]), rel_tol=VALUE_TOLERANCE, abs_tol=VALUE_TOLERANCE)
-    for previous, current in zip(rows, rows[1:]):
+    assert math.isclose(
+        float(rows[0]["close"]),
+        float(expected["first_close"]),
+        rel_tol=VALUE_TOLERANCE,
+        abs_tol=VALUE_TOLERANCE,
+    )
+    assert math.isclose(
+        float(rows[-1]["close"]),
+        float(expected["last_close"]),
+        rel_tol=VALUE_TOLERANCE,
+        abs_tol=VALUE_TOLERANCE,
+    )
+    for previous, current in zip(rows, rows[1:], strict=False):
         assert int(current["time"]) - int(previous["time"]) == expected["expected_step_seconds"]
     assert math.isclose(
         sum(float(row["volume"]) for row in rows),
@@ -337,7 +439,9 @@ def test_strategy_tester_trade_exports_are_tradingview_reportdata_backed() -> No
         trades = _load_csv(case_dir / "expected_trades.csv")
         filled_orders = _load_csv(case_dir / "filled_orders.csv")
         evidence = json.loads((case_dir / "evidence.json").read_text(encoding="utf-8"))
-        report_data = json.loads((case_dir / "strategy_report_data.json").read_text(encoding="utf-8"))
+        report_data = json.loads(
+            (case_dir / "strategy_report_data.json").read_text(encoding="utf-8")
+        )
 
         assert len(trades) == expected_counts["trades"]
         assert len(filled_orders) == expected_counts["filled_orders"]
@@ -383,8 +487,8 @@ def test_ta_stateful_indicators_match_tradingview_after_visible_warmup() -> None
         for position, row in enumerate(bars_rows)
     }
 
-    # The TradingView export includes 100 pre-visible warmup bars, while bars.csv intentionally stores only
-    # the visible 300 bars. Compare from bar 200 once EMA/RMA/RSI/ATR/MACD state has converged to TV values.
+    # The TradingView export includes 100 pre-visible warmup bars, while bars.csv intentionally stores only  # noqa: E501
+    # the visible 300 bars. Compare from bar 200 once EMA/RMA/RSI/ATR/MACD state has converged to TV values.  # noqa: E501
     _assert_columns_close(
         actual_by_index,
         expected_rows,
@@ -392,5 +496,5 @@ def test_ta_stateful_indicators_match_tradingview_after_visible_warmup() -> None
         start_index=WARMED_STATEFUL_START_INDEX,
         tolerance=1e-5,
     )
-    # Stateless rolling outputs are exact on the visible input and protect the full expected CSV tail too.
+    # Stateless rolling outputs are exact on the visible input and protect the full expected CSV tail too.  # noqa: E501
     _assert_columns_close(actual_by_index, expected_rows, ["sma5", "stoch14"], start_index=13)

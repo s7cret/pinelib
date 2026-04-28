@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-
 Qualifier = Literal["const", "input", "simple", "series"]
 ReferenceHistoryMode = Literal["unsupported", "identity"]
 
@@ -39,7 +38,7 @@ class TimeframeInfo:
     multiplier: int | None = None
 
     @classmethod
-    def from_string(cls, value: str) -> "TimeframeInfo":
+    def from_string(cls, value: str) -> TimeframeInfo:
         normalized = value.strip().upper()
         interval_ms = parse_timeframe_to_ms(value)
         multiplier: int | None = None
@@ -139,4 +138,3 @@ def parse_timeframe_to_ms(value: str) -> int | None:
     if unit_ms is None:
         return None
     return amount * unit_ms
-

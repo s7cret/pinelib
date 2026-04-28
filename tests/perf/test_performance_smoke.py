@@ -10,7 +10,15 @@ def test_runtime_ta_smoke_benchmark() -> None:
     start = perf_counter()
     for index in range(2_000):
         price = 100.0 + (index % 17)
-        runtime.begin_bar(Bar(time=1_700_000_000_000 + index * 60_000, open=price, high=price + 1, low=price - 1, close=price))
+        runtime.begin_bar(
+            Bar(
+                time=1_700_000_000_000 + index * 60_000,
+                open=price,
+                high=price + 1,
+                low=price - 1,
+                close=price,
+            )
+        )
         ta.sma(runtime.close, 20, runtime=runtime, state_id="bench:sma")
         ta.ema(runtime.close, 20, runtime=runtime, state_id="bench:ema")
         ta.rsi(runtime.close, 14, runtime=runtime, state_id="bench:rsi")
@@ -26,7 +34,14 @@ def test_strategy_broker_smoke_benchmark() -> None:
     start = perf_counter()
     for index in range(1_000):
         price = 100.0 + (index % 5)
-        bar = Bar(time=1_700_000_000_000 + index * 60_000, time_close=1_700_000_000_000 + index * 60_000 + 59_999, open=price, high=price + 2, low=price - 2, close=price)
+        bar = Bar(
+            time=1_700_000_000_000 + index * 60_000,
+            time_close=1_700_000_000_000 + index * 60_000 + 59_999,
+            open=price,
+            high=price + 2,
+            low=price - 2,
+            close=price,
+        )
         runtime.begin_bar(bar)
         if index % 100 == 0:
             strategy.entry(f"L{index}", "long", qty=1)

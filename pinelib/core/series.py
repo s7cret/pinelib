@@ -5,7 +5,12 @@ from typing import Generic, TypeVar
 
 from pinelib.core.na import na
 from pinelib.core.types import RuntimeConfig, TypeInfo
-from pinelib.errors import PL_HISTORY_NOT_ALLOWED, PL_REFERENCE_HISTORY_UNSUPPORTED, PineHistoryError, PineTypeError
+from pinelib.errors import (
+    PL_HISTORY_NOT_ALLOWED,
+    PL_REFERENCE_HISTORY_UNSUPPORTED,
+    PineHistoryError,
+    PineTypeError,
+)
 
 T = TypeVar("T")
 
@@ -50,7 +55,9 @@ class Series(Generic[T]):
                 code=PL_HISTORY_NOT_ALLOWED,
             )
         if self.type_info and self.type_info.is_reference_type:
-            mode = self.runtime_config.reference_history_mode if self.runtime_config else "unsupported"
+            mode = (
+                self.runtime_config.reference_history_mode if self.runtime_config else "unsupported"
+            )
             if mode == "unsupported":
                 raise PineHistoryError(
                     "Reference history is unsupported",
@@ -60,4 +67,3 @@ class Series(Generic[T]):
         if index < 0:
             return False if self.dtype == "bool" else na
         return self._history[index]
-

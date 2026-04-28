@@ -19,7 +19,6 @@ from pinelib import (
 from pinelib.backtest import BacktestReport, StrategySchedule
 from pinelib.errors import PineDataFormatError, PineGoldenMismatchError, PineRuntimeError
 
-
 BASE = 1704067200000
 
 

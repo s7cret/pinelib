@@ -102,7 +102,9 @@ class InputRegistry:
         self._register(name, "symbol", default, title)
         return default
 
-    def session(self, name: str, default: str, *, title: str | None = None, timezone: str = "UTC") -> str:
+    def session(
+        self, name: str, default: str, *, title: str | None = None, timezone: str = "UTC"
+    ) -> str:
         parse_session(default, timezone)
         self._register(name, "session", default, title)
         return default
@@ -127,9 +129,17 @@ class InputRegistry:
         normalized_options = tuple(options) if options is not None else None
         if normalized_options is not None and default not in normalized_options:
             self._fail(name, "input default must be one of options")
-        if minval is not None and isinstance(default, builtins.int | builtins.float) and default < minval:
+        if (
+            minval is not None
+            and isinstance(default, builtins.int | builtins.float)
+            and default < minval
+        ):
             self._fail(name, "input default is below minval")
-        if maxval is not None and isinstance(default, builtins.int | builtins.float) and default > maxval:
+        if (
+            maxval is not None
+            and isinstance(default, builtins.int | builtins.float)
+            and default > maxval
+        ):
             self._fail(name, "input default is above maxval")
         meta = InputMetadata(
             name=name,

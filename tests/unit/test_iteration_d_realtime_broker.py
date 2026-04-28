@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
 from typing import cast
+
+import pytest
 
 from pinelib import (
     PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
@@ -17,12 +18,14 @@ from pinelib import (
 )
 
 
-def _bar(i: int, o: float = 10, h: float = 10, l: float = 10, c: float = 10) -> Bar:
-    return Bar(time=i * 60_000, open=o, high=h, low=l, close=c, time_close=(i + 1) * 60_000 - 1)
+def _bar(i: int, o: float = 10, h: float = 10, low: float = 10, c: float = 10) -> Bar:
+    return Bar(time=i * 60_000, open=o, high=h, low=low, close=c, time_close=(i + 1) * 60_000 - 1)
 
 
 def _rt(config: RuntimeConfig | None = None) -> PineRuntime:
-    return PineRuntime(SymbolInfo("TEST:D"), TimeframeInfo.from_string("1"), config=config or RuntimeConfig())
+    return PineRuntime(
+        SymbolInfo("TEST:D"), TimeframeInfo.from_string("1"), config=config or RuntimeConfig()
+    )
 
 
 def test_realtime_tick_scheduler_updates_barstate_and_builtin_series() -> None:
@@ -39,7 +42,7 @@ def test_realtime_tick_scheduler_updates_barstate_and_builtin_series() -> None:
     assert final.high == 12
     assert final.low == 9
     assert final.close == 9
-    assert rt.volume.current == 7
+    assert cast(float, rt.volume.current) == 7
     assert rt.barstate.isconfirmed is True
     rt.end_bar()
     assert rt.bar_index == 0
@@ -98,7 +101,9 @@ def test_calc_on_every_tick_historical_fallback_emits_once_at_execution() -> Non
     runtime = _rt()
     strategy = StrategyContext(calc_on_every_tick=True)
     strategy.attach_runtime(runtime)
-    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [d["code"] for d in runtime.config.diagnostics]
+    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [
+        d["code"] for d in runtime.config.diagnostics
+    ]
     run_generated_strategy(generated, runtime, strategy, [_bar(0), _bar(1)])
     codes = [d["code"] for d in runtime.config.diagnostics]
     assert codes.count(PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK) == 1
@@ -112,7 +117,9 @@ def test_calc_on_every_tick_supplied_ticks_do_not_emit_false_fallback() -> None:
 
         def on_bar(self, rt: PineRuntime, strategy: StrategyContext) -> None:
             del strategy
-            self.states.append((rt.barstate.ishistory, rt.barstate.isrealtime, rt.barstate.islastconfirmedhistory))
+            self.states.append(
+                (rt.barstate.ishistory, rt.barstate.isrealtime, rt.barstate.islastconfirmedhistory)
+            )
 
     generated = StateStrategy()
     runtime = _rt()
@@ -124,7 +131,9 @@ def test_calc_on_every_tick_supplied_ticks_do_not_emit_false_fallback() -> None:
         [_bar(0)],
         realtime_ticks=[[TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
     )
-    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [d["code"] for d in runtime.config.diagnostics]
+    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [
+        d["code"] for d in runtime.config.diagnostics
+    ]
     assert generated.states == [(False, True, False), (False, True, False)]
 
 
@@ -135,7 +144,9 @@ def test_islastconfirmedhistory_marks_historical_bar_before_realtime() -> None:
 
         def on_bar(self, rt: PineRuntime, strategy: StrategyContext) -> None:
             del strategy
-            self.states.append((rt.barstate.ishistory, rt.barstate.isrealtime, rt.barstate.islastconfirmedhistory))
+            self.states.append(
+                (rt.barstate.ishistory, rt.barstate.isrealtime, rt.barstate.islastconfirmedhistory)
+            )
 
     generated = StateStrategy()
     runtime = _rt()
@@ -147,5 +158,7 @@ def test_islastconfirmedhistory_marks_historical_bar_before_realtime() -> None:
         [_bar(0), _bar(1)],
         realtime_ticks=[[], [TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
     )
-    assert [d["code"] for d in runtime.config.diagnostics].count(PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK) == 1
+    assert [d["code"] for d in runtime.config.diagnostics].count(
+        PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK
+    ) == 1
     assert generated.states == [(True, False, True), (False, True, False), (False, True, False)]

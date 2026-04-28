@@ -61,4 +61,15 @@ def replace(source: str, target: str, replacement: str, occurrence: int | None =
     return target.join(parts[: occurrence + 1]) + replacement + target.join(parts[occurrence + 1 :])
 
 
-__all__ = ["tostring", "tonumber", "contains", "startswith", "endswith", "lower", "upper", "length", "substring", "replace"]
+__all__ = [
+    "tostring",
+    "tonumber",
+    "contains",
+    "startswith",
+    "endswith",
+    "lower",
+    "upper",
+    "length",
+    "substring",
+    "replace",
+]

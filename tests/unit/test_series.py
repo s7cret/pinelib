@@ -1,3 +1,5 @@
+from typing import cast
+
 from pinelib import Series, na
 
 
@@ -10,7 +12,7 @@ def test_series_current_and_committed_history_are_separate() -> None:
     series.commit_current()
     series.set_current(20.0)
     assert series[0] == 20.0
-    assert series[1] == 10.0
+    assert cast(float, series[1]) == 10.0
 
 
 def test_missing_bool_history_returns_false() -> None:

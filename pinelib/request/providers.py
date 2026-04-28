@@ -121,4 +121,3 @@ class InMemoryDataProvider:
                     raise PineDataFormatError("Duplicate bar time is not allowed")
             last_time = bar.time
         return bars
-

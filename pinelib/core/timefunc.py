@@ -7,7 +7,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pinelib.core.na import na
 from pinelib.core.types import parse_timeframe_to_ms
-from pinelib.errors import PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC, PineSessionError, PineUnsupportedFeatureError
+from pinelib.errors import (
+    PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC,
+    PineSessionError,
+    PineUnsupportedFeatureError,
+)
 
 if TYPE_CHECKING:
     from pinelib.core.runtime import PineRuntime
@@ -72,7 +76,9 @@ def _localize(timestamp_ms: int, timezone_name: str) -> datetime:
 
 
 def _interval_bounds(local_dt: datetime, spec: SessionSpec) -> tuple[datetime, datetime]:
-    day_start = local_dt.replace(hour=spec.start.hour, minute=spec.start.minute, second=0, microsecond=0)
+    day_start = local_dt.replace(
+        hour=spec.start.hour, minute=spec.start.minute, second=0, microsecond=0
+    )
     day_end = local_dt.replace(hour=spec.end.hour, minute=spec.end.minute, second=0, microsecond=0)
     if not spec.is_overnight:
         return day_start, day_end
@@ -104,14 +110,18 @@ class TimeFunctions:
         session: str | None = None,
         timezone: str | None = None,
         *,
-        runtime: "PineRuntime",
+        runtime: PineRuntime,
     ) -> int | object:
         self._validate_timeframe(timeframe, runtime)
         if runtime.current_bar is None:
             return na
         resolved_tz = timezone or runtime.syminfo.timezone
         session_value = session or runtime.syminfo.session
-        return runtime.current_bar.time if self._bar_in_session(runtime, session_value, resolved_tz) else na
+        return (
+            runtime.current_bar.time
+            if self._bar_in_session(runtime, session_value, resolved_tz)
+            else na
+        )
 
     def time_close(
         self,
@@ -119,60 +129,68 @@ class TimeFunctions:
         session: str | None = None,
         timezone: str | None = None,
         *,
-        runtime: "PineRuntime",
+        runtime: PineRuntime,
     ) -> int | object:
         self._validate_timeframe(timeframe, runtime)
         if runtime.current_bar is None:
             return na
         resolved_tz = timezone or runtime.syminfo.timezone
         session_value = session or runtime.syminfo.session
-        return runtime.current_bar.time_close if self._bar_in_session(runtime, session_value, resolved_tz) else na
+        return (
+            runtime.current_bar.time_close
+            if self._bar_in_session(runtime, session_value, resolved_tz)
+            else na
+        )
 
-    def year(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def year(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "year")
 
-    def month(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def month(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "month")
 
-    def weekofyear(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def weekofyear(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "weekofyear")
 
-    def dayofmonth(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def dayofmonth(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "dayofmonth")
 
-    def dayofweek(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def dayofweek(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "dayofweek")
 
-    def hour(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def hour(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "hour")
 
-    def minute(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def minute(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "minute")
 
-    def second(self, *, runtime: "PineRuntime", timezone: str | None = None) -> int:
+    def second(self, *, runtime: PineRuntime, timezone: str | None = None) -> int:
         return self._calendar_value(runtime, timezone, "second")
 
-    def _bar_in_session(self, runtime: "PineRuntime", session: str, timezone_name: str) -> bool:
+    def _bar_in_session(self, runtime: PineRuntime, session: str, timezone_name: str) -> bool:
         assert runtime.current_bar is not None
         if runtime.current_bar.time_close is None:
             raise PineSessionError("Current bar is missing time_close")
-        return is_timestamp_in_session(runtime.current_bar.time, session, timezone_name) and is_timestamp_in_session(
+        return is_timestamp_in_session(
+            runtime.current_bar.time, session, timezone_name
+        ) and is_timestamp_in_session(
             runtime.current_bar.time_close,
             session,
             timezone_name,
         )
 
-    def _validate_timeframe(self, timeframe: str | None, runtime: "PineRuntime") -> None:
+    def _validate_timeframe(self, timeframe: str | None, runtime: PineRuntime) -> None:
         if timeframe is None:
             return
         requested = timeframe.strip().upper()
         chart = runtime.timeframe.value.strip().upper()
         requested_ms = parse_timeframe_to_ms(timeframe)
         chart_ms = runtime.timeframe.interval_ms
-        if requested == chart or (requested_ms is not None and chart_ms is not None and requested_ms == chart_ms):
+        if requested == chart or (
+            requested_ms is not None and chart_ms is not None and requested_ms == chart_ms
+        ):
             return
         message = (
-            f"time()/time_close() requested timeframe {timeframe!r}, but PineLib v1.0.1 only supports "
+            f"time()/time_close() requested timeframe {timeframe!r}, but PineLib v1.0.1 only supports "  # noqa: E501
             "None or the active chart timeframe; non-chart timeframe aggregation is unsupported"
         )
         runtime.config.emit_diagnostic(
@@ -185,7 +203,7 @@ class TimeFunctions:
 
     def _calendar_value(
         self,
-        runtime: "PineRuntime",
+        runtime: PineRuntime,
         timezone_name: str | None,
         field_name: str,
     ) -> int:

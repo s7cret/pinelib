@@ -60,7 +60,9 @@ class VisualRecorder:
 
     def set(self, object_id: PineObjectId, **attrs: Any) -> None:
         if object_id not in self.objects:
-            raise PineRuntimeError(f"Unknown or deleted Pine object id {object_id.kind}:{object_id.value}")
+            raise PineRuntimeError(
+                f"Unknown or deleted Pine object id {object_id.kind}:{object_id.value}"
+            )
         self.objects[object_id].update(attrs)
         self.events.append(VisualEvent("set", object_id, dict(attrs)))
 

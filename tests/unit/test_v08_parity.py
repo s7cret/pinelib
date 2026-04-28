@@ -19,8 +19,12 @@ from pinelib import (
     load_tradingview_trades_csv,
     run_generated_strategy,
 )
-from pinelib.errors import PL_MARGIN_FIELDS_DIAGNOSTIC, PL_UNSUPPORTED_STRATEGY_SETTING, PineGoldenMismatchError, PineStrategyError
-
+from pinelib.errors import (
+    PL_MARGIN_FIELDS_DIAGNOSTIC,
+    PL_UNSUPPORTED_STRATEGY_SETTING,
+    PineGoldenMismatchError,
+    PineStrategyError,
+)
 
 BASE = 1704067200000
 
@@ -45,9 +49,7 @@ def runtime(strict: bool = False) -> PineRuntime:
 def test_tradingview_indicator_and_trades_fixture_loader(tmp_path: Path) -> None:
     indicators = tmp_path / "tv_indicators.csv"
     indicators.write_text(
-        "time,plot_sma,signal,label\n"
-        f"{BASE},10.0,na,buy\n"
-        f"{BASE + 60_000},10.5,1,\n",
+        f"time,plot_sma,signal,label\n{BASE},10.0,na,buy\n{BASE + 60_000},10.5,1,\n",
         encoding="utf-8",
     )
     fixture = load_tradingview_indicator_csv(indicators)
@@ -55,9 +57,13 @@ def test_tradingview_indicator_and_trades_fixture_loader(tmp_path: Path) -> None
     assert fixture.columns["plot_sma"] == [10.0, 10.5]
     assert fixture.columns["signal"] == [None, 1]
 
-    report = compare_indicator_fixture({"plot_sma": [10.00001, 10.49999]}, fixture, columns=["plot_sma"], abs_tol=1e-3)
+    report = compare_indicator_fixture(
+        {"plot_sma": [10.00001, 10.49999]}, fixture, columns=["plot_sma"], abs_tol=1e-3
+    )
     assert report.matches
-    bad = compare_indicator_fixture({"plot_sma": [9.0, 10.5]}, fixture, columns=["plot_sma"], abs_tol=1e-6)
+    bad = compare_indicator_fixture(
+        {"plot_sma": [9.0, 10.5]}, fixture, columns=["plot_sma"], abs_tol=1e-6
+    )
     assert not bad.matches
     assert bad.mismatches[0]["field"] == "plot_sma"
 
@@ -74,7 +80,9 @@ def test_strategy_compare_reports_and_assertions() -> None:
     assert report.max_abs_diff == pytest.approx(0.001)
     assert_strategy_report_close(actual, expected, abs_tol=0.01)
     with pytest.raises(PineGoldenMismatchError):
-        assert_strategy_report_close(actual, expected, fields=["final_equity"], abs_tol=1e-6, rel_tol=0.0)
+        assert_strategy_report_close(
+            actual, expected, fields=["final_equity"], abs_tol=1e-6, rel_tol=0.0
+        )
 
 
 def test_strategy_trade_and_equity_tolerance_report() -> None:
@@ -85,9 +93,13 @@ def test_strategy_trade_and_equity_tolerance_report() -> None:
             if rt.bar_index_series.current == 2:
                 strategy.close("L")
 
-    result = run_generated_strategy(RoundTrip(), runtime(), StrategyContext(process_orders_on_close=True), bars())
+    result = run_generated_strategy(
+        RoundTrip(), runtime(), StrategyContext(process_orders_on_close=True), bars()
+    )
     expected = result.report.to_dict() | {"final_equity": result.report.final_equity + 0.0001}
-    report = compare_strategy_reports(result.report.to_dict(), expected, fields=["final_equity", "closedtrades"], abs_tol=0.001)
+    report = compare_strategy_reports(
+        result.report.to_dict(), expected, fields=["final_equity", "closedtrades"], abs_tol=0.001
+    )
     assert report.matches
     assert result.report.closed_trades[0]["profit"] == pytest.approx(2.0)
 

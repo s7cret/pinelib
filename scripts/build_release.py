@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
+from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION  # noqa: E402
 
 VERSION_SLUG = PACKAGE_VERSION.replace(".", "_")
 MANIFEST_PATH = ROOT / f"RELEASE_MANIFEST_v{VERSION_SLUG}.json"
@@ -77,7 +77,9 @@ def build_release() -> None:
         "git_commit": _git_commit(),
         "files": [path.relative_to(ROOT).as_posix() for path in files],
     }
-    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    MANIFEST_PATH.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":

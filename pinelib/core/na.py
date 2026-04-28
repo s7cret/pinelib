@@ -65,4 +65,3 @@ def fixnan(value: Any) -> Any:
                 return historical
         return na
     return na if is_na(value) else value
-

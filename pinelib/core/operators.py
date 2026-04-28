@@ -43,4 +43,3 @@ def pine_range(start: int, end: int, step: int | None = None) -> range:
         raise ValueError("Pine for-loop step cannot be zero")
     stop = end + (1 if step > 0 else -1)
     return range(int(start), int(stop), int(step))
-

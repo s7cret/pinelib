@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from copy import copy as shallow_copy
 from dataclasses import dataclass, field
-from typing import Generic, Iterable, Iterator, TypeVar
+from typing import Generic, TypeVar
 
 from pinelib.core.types import RuntimeConfig
 from pinelib.errors import PL_REFERENCE_HISTORY_UNSUPPORTED, PineUnsupportedFeatureError
@@ -25,7 +26,7 @@ class PineArray(Generic[T]):
     def set(self, index: int, value: T) -> None:
         self._values[index] = value
 
-    def copy(self) -> "PineArray[T]":
+    def copy(self) -> PineArray[T]:
         return PineArray(self._values)
 
     def __len__(self) -> int:
@@ -48,7 +49,7 @@ class PineMap(Generic[K, V]):
     def remove(self, key: K) -> V:
         return self._values.pop(key)
 
-    def copy(self) -> "PineMap[K, V]":
+    def copy(self) -> PineMap[K, V]:
         return PineMap(self._values)
 
     def __len__(self) -> int:
@@ -63,7 +64,9 @@ class PineMatrix(Generic[T]):
     _values: list[list[T | None]] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._values = [[shallow_copy(self.initial) for _ in range(self.columns)] for _ in range(self.rows)]
+        self._values = [
+            [shallow_copy(self.initial) for _ in range(self.columns)] for _ in range(self.rows)
+        ]
 
     def get(self, row: int, column: int) -> T | None:
         return self._values[row][column]
@@ -71,7 +74,7 @@ class PineMatrix(Generic[T]):
     def set(self, row: int, column: int, value: T) -> None:
         self._values[row][column] = value
 
-    def copy(self) -> "PineMatrix[T]":
+    def copy(self) -> PineMatrix[T]:
         clone: PineMatrix[T] = PineMatrix(self.rows, self.columns)
         clone._values = [list(row) for row in self._values]
         return clone

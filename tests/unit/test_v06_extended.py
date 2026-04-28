@@ -1,8 +1,8 @@
 import math
 
 from pinelib import color, string, ta
-from pinelib.core.na import is_na, na
 from pinelib import math as pine_math
+from pinelib.core.na import is_na, na
 
 
 def test_bb_macd_dmi_extended_helpers() -> None:
@@ -33,7 +33,8 @@ def test_supertrend_direction_tv_sign_convention() -> None:
     low = [9, 10, 11, 12, 13, 29, 30]
     close = [9.5, 10.5, 11.5, 12.5, 13.5, 29.5, 30.5]
     _, direction = ta.supertrend(1.0, 2, high=high, low=low, close=close)
-    assert any(d == -1 for d in direction if not is_na(d))  # TV: -1 is uptrend/green
+    # TV: -1 is uptrend/green
+    assert any(d == -1 for d in direction if not is_na(d))
     assert all(d in (na, 1, -1) for d in direction)
 
 

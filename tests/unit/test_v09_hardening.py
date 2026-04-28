@@ -23,11 +23,22 @@ from pinelib.errors import PineRequestError, PineSessionError, PineTypeError
 
 def _bar(index: int, close: float = 10.0, *, time: int | None = None) -> Bar:
     start = 1_704_067_200_000 + index * 3_600_000 if time is None else time
-    return Bar(time=start, time_close=start + 3_599_999, open=close, high=close + 1, low=close - 1, close=close)
+    return Bar(
+        time=start,
+        time_close=start + 3_599_999,
+        open=close,
+        high=close + 1,
+        low=close - 1,
+        close=close,
+    )
 
 
 def _runtime() -> PineRuntime:
-    return PineRuntime(SymbolInfo("TEST:AAA", timezone="UTC", session="0000-2359:1234567"), TimeframeInfo.from_string("60"), config=RuntimeConfig())
+    return PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC", session="0000-2359:1234567"),
+        TimeframeInfo.from_string("60"),
+        config=RuntimeConfig(),
+    )
 
 
 def test_public_api_all_is_stable_sorted_and_exports_version() -> None:
@@ -48,7 +59,9 @@ def test_strategy_stop_limit_waits_for_stop_then_fills_at_limit() -> None:
     strategy.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
     runtime.end_bar()
 
-    runtime.begin_bar(Bar(time=_bar(1).time, time_close=_bar(1).time_close, open=10, high=13, low=8, close=11))
+    runtime.begin_bar(
+        Bar(time=_bar(1).time, time_close=_bar(1).time_close, open=10, high=13, low=8, close=11)
+    )
     strategy.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
     runtime.end_bar()
     assert strategy.fills[-1].order_id == "SL"
@@ -81,21 +94,37 @@ def test_strategy_any_close_rule_prefers_requested_entry_id() -> None:
 def test_request_security_invalid_merge_args_and_missing_symbol_ignore() -> None:
     chart = [_bar(0), _bar(1)]
     provider = InMemoryDataProvider({("TEST:AAA", "60"): chart})
-    runtime = PineRuntime(SymbolInfo("TEST:AAA"), TimeframeInfo.from_string("60"), data_provider=provider, config=RuntimeConfig())
+    runtime = PineRuntime(
+        SymbolInfo("TEST:AAA"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(),
+    )
     runtime.chart_bars = chart
     runtime.begin_bar(chart[0])
-    assert is_na(security("MISSING", "60", [1.0], runtime=runtime, state_id="missing", ignore_invalid_symbol=True))
+    assert is_na(
+        security(
+            "MISSING", "60", [1.0], runtime=runtime, state_id="missing", ignore_invalid_symbol=True
+        )
+    )
     with pytest.raises(PineRequestError):
         pinelib.merge_requested_series_to_chart_bars([1.0], requested_bars=[], chart_bars=chart)
     with pytest.raises(PineRequestError):
-        pinelib.merge_requested_series_to_chart_bars([1.0], requested_bars=[chart[0]], chart_bars=chart, gaps="bad")
+        pinelib.merge_requested_series_to_chart_bars(
+            [1.0], requested_bars=[chart[0]], chart_bars=chart, gaps="bad"
+        )
 
 
 def test_session_dst_fall_back_ambiguous_hours_use_timezone_database() -> None:
-    runtime = PineRuntime(SymbolInfo("TEST:AAA", timezone="America/New_York", session="0000-2359:1234567"), TimeframeInfo.from_string("60"))
+    runtime = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="America/New_York", session="0000-2359:1234567"),
+        TimeframeInfo.from_string("60"),
+    )
     # 2024-11-03 05:30Z and 06:30Z are both 01:30 local on different DST folds.
     for timestamp in (1_730_610_600_000, 1_730_614_200_000):
-        runtime.begin_bar(Bar(time=timestamp, time_close=timestamp + 3_599_999, open=1, high=1, low=1, close=1))
+        runtime.begin_bar(
+            Bar(time=timestamp, time_close=timestamp + 3_599_999, open=1, high=1, low=1, close=1)
+        )
         assert runtime.timefunc.hour(runtime=runtime) == 1
         assert runtime.timefunc.time(runtime=runtime) == timestamp
         runtime.end_bar()

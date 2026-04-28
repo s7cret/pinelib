@@ -14,4 +14,3 @@ def test_bar_validates_ohlc_relationships() -> None:
 def test_bar_rejects_time_close_before_time() -> None:
     with pytest.raises(PineDataFormatError):
         Bar(time=10, time_close=9, open=1.0, high=1.5, low=0.5, close=1.2)
-

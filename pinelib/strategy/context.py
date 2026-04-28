@@ -6,8 +6,8 @@ from typing import Any, Literal
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.errors import (
-    PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
     PL_MARGIN_FIELDS_DIAGNOSTIC,
+    PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
     PL_MISSING_INTRABAR_DATA,
     PL_UNSUPPORTED_STRATEGY_SETTING,
     PL_WARNING_BAR_MAGNIFIER_FALLBACK,
@@ -210,21 +210,56 @@ class StrategyContext:
             self._emit(
                 runtime,
                 PL_MARGIN_FIELDS_DIAGNOSTIC,
-                "margin_long/margin_short are captured and margin-call risk is diagnosed; forced liquidation remains explicit/non-parity",
+                "margin_long/margin_short are captured and margin-call risk is diagnosed; forced liquidation remains explicit/non-parity",  # noqa: E501
                 margin_long=self.margin_long,
                 margin_short=self.margin_short,
             )
 
-    def entry(self, id: str, direction: Direction, qty: float | None = None, limit: float | None = None, stop: float | None = None, *, source_map: object | None = None) -> None:
+    def entry(
+        self,
+        id: str,
+        direction: Direction,
+        qty: float | None = None,
+        limit: float | None = None,
+        stop: float | None = None,
+        *,
+        source_map: object | None = None,
+    ) -> None:
         self._add_order(id, direction, qty, limit, stop, "entry", source_map=source_map)
 
-    def order(self, id: str, direction: Direction, qty: float | None = None, limit: float | None = None, stop: float | None = None, oca_name: str | None = None, oca_type: str | None = None, *, source_map: object | None = None) -> None:
+    def order(
+        self,
+        id: str,
+        direction: Direction,
+        qty: float | None = None,
+        limit: float | None = None,
+        stop: float | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        *,
+        source_map: object | None = None,
+    ) -> None:
         order = self._make_order(id, direction, qty, limit, stop, "order", source_map)
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
 
-    def exit(self, id: str, from_entry: str | None = None, qty: float | None = None, qty_percent: float | None = None, limit: float | None = None, stop: float | None = None, profit: float | None = None, loss: float | None = None, trail_price: float | None = None, trail_points: float | None = None, trail_offset: float | None = None, *, source_map: object | None = None) -> None:
+    def exit(
+        self,
+        id: str,
+        from_entry: str | None = None,
+        qty: float | None = None,
+        qty_percent: float | None = None,
+        limit: float | None = None,
+        stop: float | None = None,
+        profit: float | None = None,
+        loss: float | None = None,
+        trail_price: float | None = None,
+        trail_points: float | None = None,
+        trail_offset: float | None = None,
+        *,
+        source_map: object | None = None,
+    ) -> None:
         if trail_offset is not None and (trail_price is not None or trail_points is not None):
             available = abs(self._available_exit_qty(from_entry))
             requested = self._resolve_exit_qty(qty, qty_percent, available)
@@ -234,15 +269,44 @@ class StrategyContext:
             exit_direction: Direction = "short" if self.position_size > 0 else "long"
             activation = trail_price
             if activation is None and trail_points is not None and self.position_avg_price:
-                activation = self.position_avg_price + (trail_points if self.position_size > 0 else -trail_points)
+                activation = self.position_avg_price + (
+                    trail_points if self.position_size > 0 else -trail_points
+                )
             if activation is None:
-                self._emit(None, PL_UNSUPPORTED_STRATEGY_SETTING, "strategy.exit trailing stop requires trail_price or trail_points", order_id=id)
+                self._emit(
+                    None,
+                    PL_UNSUPPORTED_STRATEGY_SETTING,
+                    "strategy.exit trailing stop requires trail_price or trail_points",
+                    order_id=id,
+                )
                 return
             created_bar_index, created_time = self._created_order_location()
-            self.pending_orders.append(Order(id, exit_direction, actual, "stop", "exit", from_entry=from_entry, parent_exit_id=id, oca_name=f"exit:{id}:{from_entry or '*'}", oca_type="reduce", created_bar_index=created_bar_index, created_time=created_time, source_map=source_map, trail_activation=float(activation), trail_offset=float(trail_offset)))
+            self.pending_orders.append(
+                Order(
+                    id,
+                    exit_direction,
+                    actual,
+                    "stop",
+                    "exit",
+                    from_entry=from_entry,
+                    parent_exit_id=id,
+                    oca_name=f"exit:{id}:{from_entry or '*'}",
+                    oca_type="reduce",
+                    created_bar_index=created_bar_index,
+                    created_time=created_time,
+                    source_map=source_map,
+                    trail_activation=float(activation),
+                    trail_offset=float(trail_offset),
+                )
+            )
             return
         if trail_price is not None or trail_points is not None or trail_offset is not None:
-            self._emit(None, PL_UNSUPPORTED_STRATEGY_SETTING, "Incomplete trailing stop arguments; expected trail_offset plus trail_price or trail_points", order_id=id)
+            self._emit(
+                None,
+                PL_UNSUPPORTED_STRATEGY_SETTING,
+                "Incomplete trailing stop arguments; expected trail_offset plus trail_price or trail_points",  # noqa: E501
+                order_id=id,
+            )
             return
         if limit is None and profit is not None and self.position_avg_price:
             limit = self.position_avg_price + (profit if self.position_size >= 0 else -profit)
@@ -250,37 +314,128 @@ class StrategyContext:
             stop = self.position_avg_price - (loss if self.position_size >= 0 else -loss)
         available = abs(self._available_exit_qty(from_entry))
         requested = self._resolve_exit_qty(qty, qty_percent, available)
-        reserved = sum(o.qty or 0.0 for o in self.pending_orders if o.kind == "exit" and o.status == "pending" and o.from_entry == from_entry)
+        reserved = sum(
+            o.qty or 0.0
+            for o in self.pending_orders
+            if o.kind == "exit" and o.status == "pending" and o.from_entry == from_entry
+        )
         actual = max(0.0, min(requested, max(0.0, available - reserved)))
         if actual < requested or (qty_percent is not None and qty_percent > 100):
-            self._emit(None, PL_WARNING_EXIT_QTY_REDUCED, "strategy.exit quantity reduced to available unreserved position", order_id=id, requested=requested, actual=actual)
+            self._emit(
+                None,
+                PL_WARNING_EXIT_QTY_REDUCED,
+                "strategy.exit quantity reduced to available unreserved position",
+                order_id=id,
+                requested=requested,
+                actual=actual,
+            )
         if actual <= 0:
             return
         direction: Direction = "short" if self.position_size > 0 else "long"
         group = f"exit:{id}:{from_entry or '*'}"
         created_bar_index, created_time = self._created_order_location()
         if limit is not None:
-            self.pending_orders.append(Order(f"{id}:limit", direction, actual, "limit", "exit", limit=limit, from_entry=from_entry, parent_exit_id=id, oca_name=group, oca_type="reduce", created_bar_index=created_bar_index, created_time=created_time, source_map=source_map))
+            self.pending_orders.append(
+                Order(
+                    f"{id}:limit",
+                    direction,
+                    actual,
+                    "limit",
+                    "exit",
+                    limit=limit,
+                    from_entry=from_entry,
+                    parent_exit_id=id,
+                    oca_name=group,
+                    oca_type="reduce",
+                    created_bar_index=created_bar_index,
+                    created_time=created_time,
+                    source_map=source_map,
+                )
+            )
         if stop is not None:
-            self.pending_orders.append(Order(f"{id}:stop", direction, actual, "stop", "exit", stop=stop, from_entry=from_entry, parent_exit_id=id, oca_name=group, oca_type="reduce", created_bar_index=created_bar_index, created_time=created_time, source_map=source_map))
+            self.pending_orders.append(
+                Order(
+                    f"{id}:stop",
+                    direction,
+                    actual,
+                    "stop",
+                    "exit",
+                    stop=stop,
+                    from_entry=from_entry,
+                    parent_exit_id=id,
+                    oca_name=group,
+                    oca_type="reduce",
+                    created_bar_index=created_bar_index,
+                    created_time=created_time,
+                    source_map=source_map,
+                )
+            )
         if limit is None and stop is None:
-            self.pending_orders.append(Order(id, direction, actual, "market", "exit", from_entry=from_entry, parent_exit_id=id, oca_name=group, oca_type="reduce", created_bar_index=created_bar_index, created_time=created_time, source_map=source_map))
+            self.pending_orders.append(
+                Order(
+                    id,
+                    direction,
+                    actual,
+                    "market",
+                    "exit",
+                    from_entry=from_entry,
+                    parent_exit_id=id,
+                    oca_name=group,
+                    oca_type="reduce",
+                    created_bar_index=created_bar_index,
+                    created_time=created_time,
+                    source_map=source_map,
+                )
+            )
 
-    def close(self, id: str, qty: float | None = None, qty_percent: float | None = None, immediately: bool = False, *, source_map: object | None = None) -> None:
-        available = abs(sum(l.qty for l in self._lots if l.entry_id == id))
+    def close(
+        self,
+        id: str,
+        qty: float | None = None,
+        qty_percent: float | None = None,
+        immediately: bool = False,
+        *,
+        source_map: object | None = None,
+    ) -> None:
+        available = abs(sum(lot.qty for lot in self._lots if lot.entry_id == id))
         if available <= 0:
             return
         close_qty = self._resolve_exit_qty(qty, qty_percent, available)
         direction: Direction = "short" if self.position_size > 0 else "long"
         created_bar_index, created_time = self._created_order_location()
-        self.pending_orders.append(Order(f"close:{id}", direction, min(close_qty, available), "market", "close", from_entry=id, created_bar_index=created_bar_index, created_time=created_time, source_map=source_map, immediate=immediately))
+        self.pending_orders.append(
+            Order(
+                f"close:{id}",
+                direction,
+                min(close_qty, available),
+                "market",
+                "close",
+                from_entry=id,
+                created_bar_index=created_bar_index,
+                created_time=created_time,
+                source_map=source_map,
+                immediate=immediately,
+            )
+        )
 
     def close_all(self, immediately: bool = False, *, source_map: object | None = None) -> None:
         if self.position_size == 0:
             return
         direction: Direction = "short" if self.position_size > 0 else "long"
         created_bar_index, created_time = self._created_order_location()
-        self.pending_orders.append(Order("close_all", direction, abs(self.position_size), "market", "close", created_bar_index=created_bar_index, created_time=created_time, source_map=source_map, immediate=immediately))
+        self.pending_orders.append(
+            Order(
+                "close_all",
+                direction,
+                abs(self.position_size),
+                "market",
+                "close",
+                created_bar_index=created_bar_index,
+                created_time=created_time,
+                source_map=source_map,
+                immediate=immediately,
+            )
+        )
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
         del source_map
@@ -302,7 +457,14 @@ class StrategyContext:
     def update_position_equity_trades_after_fill(self) -> None:
         self._fill_recalc_pending = False
 
-    def process_orders_for_bar(self, *, runtime: PineRuntime, bar: Bar, recalc_phase: bool = False, intrabar_bars: list[Bar] | None = None) -> None:
+    def process_orders_for_bar(
+        self,
+        *,
+        runtime: PineRuntime,
+        bar: Bar,
+        recalc_phase: bool = False,
+        intrabar_bars: list[Bar] | None = None,
+    ) -> None:
         self.attach_runtime(runtime) if runtime.strategy is not self else None
         path, fill_source = self._execution_path(runtime, bar, intrabar_bars)
         fills_before = len(self.fills)
@@ -335,10 +497,31 @@ class StrategyContext:
             return [bar.open, bar.high, bar.low, bar.close]
         return [bar.open, bar.low, bar.high, bar.close]
 
-    def _add_order(self, id: str, direction: Direction, qty: float | None, limit: float | None, stop: float | None, kind: OrderKind, *, source_map: object | None) -> None:
-        self.pending_orders.append(self._make_order(id, direction, qty, limit, stop, kind, source_map))
+    def _add_order(
+        self,
+        id: str,
+        direction: Direction,
+        qty: float | None,
+        limit: float | None,
+        stop: float | None,
+        kind: OrderKind,
+        *,
+        source_map: object | None,
+    ) -> None:
+        self.pending_orders.append(
+            self._make_order(id, direction, qty, limit, stop, kind, source_map)
+        )
 
-    def _make_order(self, id: str, direction: Direction, qty: float | None, limit: float | None, stop: float | None, kind: OrderKind, source_map: object | None) -> Order:
+    def _make_order(
+        self,
+        id: str,
+        direction: Direction,
+        qty: float | None,
+        limit: float | None,
+        stop: float | None,
+        kind: OrderKind,
+        source_map: object | None,
+    ) -> Order:
         typ: OrderType = "market"
         if limit is not None and stop is not None:
             typ = "stop_limit"
@@ -347,11 +530,26 @@ class StrategyContext:
         elif stop is not None:
             typ = "stop"
         created_bar_index, created_time = self._created_order_location()
-        return Order(id=id, direction=direction, qty=qty, type=typ, kind=kind, limit=limit, stop=stop, created_bar_index=created_bar_index, created_time=created_time, source_map=source_map)
+        return Order(
+            id=id,
+            direction=direction,
+            qty=qty,
+            type=typ,
+            kind=kind,
+            limit=limit,
+            stop=stop,
+            created_bar_index=created_bar_index,
+            created_time=created_time,
+            source_map=source_map,
+        )
 
     def _created_order_location(self) -> tuple[int, int | None]:
         if self._runtime is not None and self._runtime.current_bar is not None:
-            index = self._runtime.bar_index if self._runtime.barstate.isconfirmed else self._runtime.bar_index + 1
+            index = (
+                self._runtime.bar_index
+                if self._runtime.barstate.isconfirmed
+                else self._runtime.bar_index + 1
+            )
             return index, self._runtime.current_bar.time
         if self._runtime is not None:
             return self._runtime.bar_index, None
@@ -369,10 +567,20 @@ class StrategyContext:
         event = self._find_fill_event(order, path, bar, self._runtime)
         return None if event is None else event[1]
 
-    def _find_fill_event(self, order: Order, path: list[float], bar: Bar, runtime: PineRuntime | None = None) -> tuple[int, float] | None:
+    def _find_fill_event(
+        self, order: Order, path: list[float], bar: Bar, runtime: PineRuntime | None = None
+    ) -> tuple[int, float] | None:
         if order.type == "market":
-            current_index = (self._runtime.bar_index + 1) if self._runtime is not None else order.created_bar_index
-            return (len(path) - 1, bar.close) if self.process_orders_on_close and order.created_bar_index == current_index else (0, path[0])
+            current_index = (
+                (self._runtime.bar_index + 1)
+                if self._runtime is not None
+                else order.created_bar_index
+            )
+            return (
+                (len(path) - 1, bar.close)
+                if self.process_orders_on_close and order.created_bar_index == current_index
+                else (0, path[0])
+            )
         if order.trail_offset is not None and order.trail_activation is not None:
             return self._trailing_stop_event(order, path)
         level = order.limit if order.type == "limit" else order.stop
@@ -393,26 +601,44 @@ class StrategyContext:
         best: float | None = None
         for idx, price in enumerate(path):
             if not order.trail_active:
-                activated = price >= order.trail_activation if long_exit else price <= order.trail_activation
+                activated = (
+                    price >= order.trail_activation
+                    if long_exit
+                    else price <= order.trail_activation
+                )
                 if not activated:
                     continue
                 order.trail_active = True
                 best = price
             else:
-                best = price if best is None else (max(best, price) if long_exit else min(best, price))
+                best = (
+                    price if best is None else (max(best, price) if long_exit else min(best, price))
+                )
             candidate = best - order.trail_offset if long_exit else best + order.trail_offset
-            order.trail_stop = candidate if order.trail_stop is None else (max(order.trail_stop, candidate) if long_exit else min(order.trail_stop, candidate))
+            order.trail_stop = (
+                candidate
+                if order.trail_stop is None
+                else (
+                    max(order.trail_stop, candidate)
+                    if long_exit
+                    else min(order.trail_stop, candidate)
+                )
+            )
             if long_exit and price <= order.trail_stop:
                 return idx, order.trail_stop
             if not long_exit and price >= order.trail_stop:
                 return idx, order.trail_stop
         return None
 
-    def _crossed(self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool) -> float | None:
+    def _crossed(
+        self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool
+    ) -> float | None:
         event = self._crossed_event(path, level, direction, is_stop=is_stop)
         return None if event is None else event[1]
 
-    def _crossed_event(self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool) -> tuple[int, float] | None:
+    def _crossed_event(
+        self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool
+    ) -> tuple[int, float] | None:
         if level is None:
             return None
         for idx, price in enumerate(path):
@@ -433,7 +659,14 @@ class StrategyContext:
             return price >= level if direction == "long" else price <= level
         return price <= level if direction == "long" else price >= level
 
-    def _fill_order(self, order: Order, price: float, runtime: PineRuntime, bar: Bar, fill_source: str = "ohlc_path") -> None:
+    def _fill_order(
+        self,
+        order: Order,
+        price: float,
+        runtime: PineRuntime,
+        bar: Bar,
+        fill_source: str = "ohlc_path",
+    ) -> None:
         qty = self._resolved_order_qty(order, price)
         if order.kind == "entry":
             qty = self._entry_qty_with_reversal_and_pyramiding(order, qty)
@@ -452,7 +685,19 @@ class StrategyContext:
         order.status = "filled"
         order.filled_qty = qty
         order.fill_price = fill_price
-        self.fills.append(Fill(order.id, order.direction, qty, fill_price, commission, runtime.bar_index + 1, bar.time, order.kind, fill_source))
+        self.fills.append(
+            Fill(
+                order.id,
+                order.direction,
+                qty,
+                fill_price,
+                commission,
+                runtime.bar_index + 1,
+                bar.time,
+                order.kind,
+                fill_source,
+            )
+        )
         if order.oca_name:
             for other in self.pending_orders:
                 if other is not order and other.oca_name == order.oca_name:
@@ -464,10 +709,28 @@ class StrategyContext:
                         other.status = "cancelled"
         self._diagnose_margin_risk(runtime, bar.close)
 
-    def _apply_position_fill(self, order: Order, qty: float, price: float, commission: float, runtime: PineRuntime, bar: Bar) -> None:
+    def _apply_position_fill(
+        self,
+        order: Order,
+        qty: float,
+        price: float,
+        commission: float,
+        runtime: PineRuntime,
+        bar: Bar,
+    ) -> None:
         signed = qty if order.direction == "long" else -qty
         if self.position_size == 0 or self.position_size * signed > 0:
-            self._lots.append(_OpenLot(order.id, "long" if signed > 0 else "short", qty, price, bar.time, runtime.bar_index + 1, commission))
+            self._lots.append(
+                _OpenLot(
+                    order.id,
+                    "long" if signed > 0 else "short",
+                    qty,
+                    price,
+                    bar.time,
+                    runtime.bar_index + 1,
+                    commission,
+                )
+            )
             self.equity -= commission
         else:
             remaining = qty
@@ -475,8 +738,14 @@ class StrategyContext:
                 if remaining <= 0:
                     break
                 close_qty = min(lot.qty, remaining)
-                profit = (price - lot.entry_price) * close_qty if lot.direction == "long" else (lot.entry_price - price) * close_qty
-                prorated_entry_commission = lot.commission * (close_qty / lot.qty) if lot.qty else 0.0
+                profit = (
+                    (price - lot.entry_price) * close_qty
+                    if lot.direction == "long"
+                    else (lot.entry_price - price) * close_qty
+                )
+                prorated_entry_commission = (
+                    lot.commission * (close_qty / lot.qty) if lot.qty else 0.0
+                )
                 total_commission = commission * (close_qty / qty) + prorated_entry_commission
                 net_profit = profit - total_commission
                 self.netprofit += net_profit
@@ -490,14 +759,43 @@ class StrategyContext:
                     self.losstrades += 1
                 else:
                     self.eventrades += 1
-                self.closed_trade_log.append(Trade(lot.entry_id, lot.direction, lot.entry_time, lot.entry_bar_index, lot.entry_price, bar.time, runtime.bar_index + 1, price, close_qty, total_commission, net_profit, net_profit / (lot.entry_price * close_qty) * 100 if lot.entry_price and close_qty else 0.0, order.id, order.fill_source))
+                self.closed_trade_log.append(
+                    Trade(
+                        lot.entry_id,
+                        lot.direction,
+                        lot.entry_time,
+                        lot.entry_bar_index,
+                        lot.entry_price,
+                        bar.time,
+                        runtime.bar_index + 1,
+                        price,
+                        close_qty,
+                        total_commission,
+                        net_profit,
+                        net_profit / (lot.entry_price * close_qty) * 100
+                        if lot.entry_price and close_qty
+                        else 0.0,
+                        order.id,
+                        order.fill_source,
+                    )
+                )
                 lot.qty -= close_qty
                 lot.commission -= prorated_entry_commission
                 remaining -= close_qty
                 if lot.qty <= 1e-12:
                     self._lots.remove(lot)
             if remaining > 1e-12 and order.kind in {"entry", "order"}:
-                self._lots.append(_OpenLot(order.id, "long" if signed > 0 else "short", remaining, price, bar.time, runtime.bar_index + 1, commission * (remaining / qty)))
+                self._lots.append(
+                    _OpenLot(
+                        order.id,
+                        "long" if signed > 0 else "short",
+                        remaining,
+                        price,
+                        bar.time,
+                        runtime.bar_index + 1,
+                        commission * (remaining / qty),
+                    )
+                )
         self._recompute_position(price)
 
     def _lots_for_close(self, order: Order) -> list[_OpenLot]:
@@ -509,22 +807,45 @@ class StrategyContext:
         return lots
 
     def _recompute_position(self, mark_price: float) -> None:
-        long_qty = sum(l.qty for l in self._lots if l.direction == "long")
-        short_qty = sum(l.qty for l in self._lots if l.direction == "short")
+        long_qty = sum(lot.qty for lot in self._lots if lot.direction == "long")
+        short_qty = sum(lot.qty for lot in self._lots if lot.direction == "short")
         self.position_size = long_qty - short_qty
         if self._lots:
-            total = sum(l.qty for l in self._lots)
-            self.position_avg_price = sum(l.qty * l.entry_price for l in self._lots) / total
+            total = sum(lot.qty for lot in self._lots)
+            self.position_avg_price = sum(lot.qty * lot.entry_price for lot in self._lots) / total
             self.position_entry_name = self._lots[0].entry_id
         else:
             self.position_avg_price = 0.0
             self.position_entry_name = None
         self.opentrades = len(self._lots)
-        self.open_trade_log = [Trade(l.entry_id, l.direction, l.entry_time, l.entry_bar_index, l.entry_price, None, None, None, l.qty, l.commission, 0.0, 0.0, None, None) for l in self._lots]
+        self.open_trade_log = [
+            Trade(
+                lot.entry_id,
+                lot.direction,
+                lot.entry_time,
+                lot.entry_bar_index,
+                lot.entry_price,
+                None,
+                None,
+                None,
+                lot.qty,
+                lot.commission,
+                0.0,
+                0.0,
+                None,
+                None,
+            )
+            for lot in self._lots
+        ]
         self._mark_to_market(mark_price)
 
     def _mark_to_market(self, price: float) -> None:
-        self.openprofit = sum(((price - l.entry_price) if l.direction == "long" else (l.entry_price - price)) * l.qty - l.commission for l in self._lots)
+        self.openprofit = sum(
+            ((price - lot.entry_price) if lot.direction == "long" else (lot.entry_price - price))
+            * lot.qty
+            - lot.commission
+            for lot in self._lots
+        )
         self.equity = self.initial_capital + self.netprofit + self.openprofit
         self._update_equity_extremes()
 
@@ -546,12 +867,21 @@ class StrategyContext:
         position_value = abs(self.position_size) * mark_price
         required = position_value * margin / 100.0
         if self.equity <= required:
-            self._emit(runtime, PL_MARGIN_LIQUIDATION_DIAGNOSTIC, "Margin requirement breached; PineLib diagnoses but does not force TradingView liquidation", equity=self.equity, required_margin=required, position_value=position_value)
+            self._emit(
+                runtime,
+                PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
+                "Margin requirement breached; PineLib diagnoses but does not force TradingView liquidation",  # noqa: E501
+                equity=self.equity,
+                required_margin=required,
+                position_value=position_value,
+            )
 
     def _entry_qty_with_reversal_and_pyramiding(self, order: Order, qty: float) -> float:
-        same_direction = (self.position_size >= 0 and order.direction == "long") or (self.position_size <= 0 and order.direction == "short")
+        same_direction = (self.position_size >= 0 and order.direction == "long") or (
+            self.position_size <= 0 and order.direction == "short"
+        )
         if same_direction and self.position_size != 0:
-            same_lots = sum(1 for l in self._lots if l.direction == order.direction)
+            same_lots = sum(1 for lot in self._lots if lot.direction == order.direction)
             if same_lots >= self.pyramiding:
                 return 0.0
         if self.position_size and not same_direction:
@@ -567,9 +897,14 @@ class StrategyContext:
             return self.default_qty_value / price
         if self.default_qty_type == "percent_of_equity":
             return self.equity * self.default_qty_value / 100.0 / price
-        raise PineStrategyError(f"Unsupported default_qty_type {self.default_qty_type!r}", code=PL_UNSUPPORTED_STRATEGY_SETTING)
+        raise PineStrategyError(
+            f"Unsupported default_qty_type {self.default_qty_type!r}",
+            code=PL_UNSUPPORTED_STRATEGY_SETTING,
+        )
 
-    def _resolve_exit_qty(self, qty: float | None, qty_percent: float | None, available: float) -> float:
+    def _resolve_exit_qty(
+        self, qty: float | None, qty_percent: float | None, available: float
+    ) -> float:
         if qty is not None:
             return float(qty)
         if qty_percent is not None:
@@ -582,7 +917,7 @@ class StrategyContext:
         else:
             lots = self._lots
         sign = 1.0 if self.position_size >= 0 else -1.0
-        return sign * sum(l.qty for l in lots)
+        return sign * sum(lot.qty for lot in lots)
 
     def _apply_slippage(self, price: float, direction: Direction) -> float:
         return price + self.slippage if direction == "long" else price - self.slippage
@@ -594,9 +929,14 @@ class StrategyContext:
             return self.commission_value
         if self.commission_type == "cash_per_contract":
             return abs(qty) * self.commission_value
-        raise PineStrategyError(f"Unsupported commission_type {self.commission_type!r}", code=PL_UNSUPPORTED_STRATEGY_SETTING)
+        raise PineStrategyError(
+            f"Unsupported commission_type {self.commission_type!r}",
+            code=PL_UNSUPPORTED_STRATEGY_SETTING,
+        )
 
-    def _execution_path(self, runtime: PineRuntime, bar: Bar, intrabar_bars: list[Bar] | None) -> tuple[list[float], str]:
+    def _execution_path(
+        self, runtime: PineRuntime, bar: Bar, intrabar_bars: list[Bar] | None
+    ) -> tuple[list[float], str]:
         if not self.use_bar_magnifier:
             return self.ohlc_path(bar), "ohlc_path"
         bars = intrabar_bars
@@ -605,7 +945,11 @@ class StrategyContext:
         if bars and self._validate_intrabar_bars(bar, bars):
             return self._intrabar_path(bars), "intrabar"
         message = "Bar Magnifier requested but valid intrabar data is missing for chart bar"
-        if self.declaration.strict_tv_parity or runtime.config.strict_tv_parity or runtime.config.diagnostics_as_errors:
+        if (
+            self.declaration.strict_tv_parity
+            or runtime.config.strict_tv_parity
+            or runtime.config.diagnostics_as_errors
+        ):
             raise PineStrategyError(message, code=PL_MISSING_INTRABAR_DATA)
         self._emit(runtime, PL_WARNING_BAR_MAGNIFIER_FALLBACK, message, bar_time=bar.time)
         return self.ohlc_path(bar), "ohlc_path"
@@ -616,7 +960,11 @@ class StrategyContext:
         chart_close = self._bar_close_time(chart_bar)
         for intrabar in bars:
             intrabar_close = self._bar_close_time(intrabar)
-            if intrabar.time < chart_bar.time or intrabar.time > chart_close or intrabar_close > chart_close:
+            if (
+                intrabar.time < chart_bar.time
+                or intrabar.time > chart_close
+                or intrabar_close > chart_close
+            ):
                 return False
             if last_time is not None and intrabar.time <= last_time:
                 return False
@@ -637,7 +985,7 @@ class StrategyContext:
         self._emit(
             runtime,
             PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
-            "calc_on_every_tick=True but no explicit realtime tick stream was supplied for this historical bar; running one close-only pass",
+            "calc_on_every_tick=True but no explicit realtime tick stream was supplied for this historical bar; running one close-only pass",  # noqa: E501
         )
 
     def _intrabar_path(self, bars: list[Bar]) -> list[float]:

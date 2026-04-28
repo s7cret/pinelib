@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -39,7 +38,9 @@ def check(archive_path: Path) -> None:
                 if isinstance(value, str) and value:
                     candidate = extract_root / value
                     if not candidate.exists():
-                        raise SystemExit(f"Archive missing fixture reference for case {case.get('id')}: {value}")
+                        raise SystemExit(
+                            f"Archive missing fixture reference for case {case.get('id')}: {value}"
+                        )
         _run([sys.executable, "scripts/run_tv_golden_suite.py"], cwd=extract_root)
 
 

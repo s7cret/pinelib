@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-
 PL_UNSUPPORTED_NESTED_SECURITY: Final[str] = "PL_UNSUPPORTED_NESTED_SECURITY"
 PL_WARNING_EXIT_QTY_REDUCED: Final[str] = "PL_WARNING_EXIT_QTY_REDUCED"
 PL_DATA_FORMAT_ERROR: Final[str] = "PL_DATA_FORMAT_ERROR"
@@ -95,4 +94,3 @@ class PineDataFormatError(PineRuntimeError):
 class PineSessionError(PineRuntimeError):
     def __init__(self, message: str, *, context: ErrorContext | None = None) -> None:
         super().__init__(message, code=PL_SESSION_PARSE_ERROR, context=context)
-

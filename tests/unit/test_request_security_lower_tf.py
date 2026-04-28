@@ -16,7 +16,10 @@ from pinelib import (
 
 def _bars(times: list[int], tf_ms: int, closes: list[float] | None = None) -> list[Bar]:
     values = closes or [float(i + 1) for i in range(len(times))]
-    return [Bar(time=t, time_close=t + tf_ms - 1, open=v, high=v, low=v, close=v) for t, v in zip(times, values, strict=True)]
+    return [
+        Bar(time=t, time_close=t + tf_ms - 1, open=v, high=v, low=v, close=v)
+        for t, v in zip(times, values, strict=True)
+    ]
 
 
 def _runtime(provider: InMemoryDataProvider) -> PineRuntime:
@@ -35,12 +38,16 @@ def test_security_lower_tf_returns_ordered_array_for_current_chart_bar() -> None
     rt = _runtime(provider)
 
     rt.begin_bar(chart[0])
-    arr = security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf")
+    arr = security_lower_tf(
+        "TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf"
+    )
     assert list(arr) == [10.0, 11.0, 12.0]
     rt.end_bar()
 
     rt.begin_bar(chart[1])
-    arr = security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf")
+    arr = security_lower_tf(
+        "TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf"
+    )
     assert list(arr) == [20.0, 21.0]
 
 
@@ -51,12 +58,26 @@ def test_security_lower_tf_empty_and_calc_bars_count_cap() -> None:
     rt = _runtime(provider)
 
     rt.begin_bar(chart[0])
-    arr = security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf", calc_bars_count=2)
+    arr = security_lower_tf(
+        "TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf", calc_bars_count=2
+    )
     assert list(arr) == [10.0, 11.0]
     rt.end_bar()
 
     rt.begin_bar(chart[1])
-    assert list(security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf", calc_bars_count=2)) == []
+    assert (
+        list(
+            security_lower_tf(
+                "TEST:BBB",
+                "1",
+                lambda child: child.close[0],
+                runtime=rt,
+                state_id="ltf",
+                calc_bars_count=2,
+            )
+        )
+        == []
+    )
     assert rt.lower_tf_metadata_log[-1].provider_source == "data_provider"
     assert rt.lower_tf_metadata_log[-1].requested_bars == 2
     assert rt.lower_tf_metadata_log[-1].selected_bars == 0
@@ -70,13 +91,18 @@ def test_security_lower_tf_precomputed_length_and_nested_fail_closed() -> None:
     rt = _runtime(provider)
     rt.begin_bar(chart[0])
 
-    assert list(security_lower_tf("TEST:BBB", "1", [1.0, 2.0], runtime=rt, state_id="pre")) == [1.0, 2.0]
+    assert list(security_lower_tf("TEST:BBB", "1", [1.0, 2.0], runtime=rt, state_id="pre")) == [
+        1.0,
+        2.0,
+    ]
     with pytest.raises(PineRequestError):
         security_lower_tf("TEST:BBB", "1", [1.0], runtime=rt, state_id="bad-pre")
 
     rt.request_depth = 1
     with pytest.raises(PineUnsupportedFeatureError) as excinfo:
-        security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="nested")
+        security_lower_tf(
+            "TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="nested"
+        )
     assert excinfo.value.code == PL_UNSUPPORTED_NESTED_SECURITY
     assert rt.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_NESTED_SECURITY
 
@@ -87,7 +113,14 @@ def test_security_lower_tf_metadata_records_intrabar_provider_source() -> None:
             self.max_bars: int | None = None
             self.bars = bars
 
-        def get_intrabar_bars(self, symbol: str, chart_bar: Bar, lower_timeframe: str | None = None, *, max_bars: int | None = None) -> list[Bar]:
+        def get_intrabar_bars(
+            self,
+            symbol: str,
+            chart_bar: Bar,
+            lower_timeframe: str | None = None,
+            *,
+            max_bars: int | None = None,
+        ) -> list[Bar]:
             del symbol, chart_bar, lower_timeframe
             self.max_bars = max_bars
             return self.bars[:max_bars] if max_bars is not None else self.bars
@@ -102,7 +135,9 @@ def test_security_lower_tf_metadata_records_intrabar_provider_source() -> None:
     )
     rt.begin_bar(chart[0])
 
-    arr = security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf", calc_bars_count=2)
+    arr = security_lower_tf(
+        "TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf", calc_bars_count=2
+    )
 
     assert list(arr) == [10.0, 11.0]
     assert intrabars.max_bars == 2

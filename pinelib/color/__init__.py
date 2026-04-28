@@ -20,7 +20,7 @@ class Color:
 
 
 def rgb(red: int, green: int, blue: int, transp: int = 0) -> Color:
-    # Pine transparency is 0 opaque .. 100 transparent; store as alpha byte compatible with existing v0.6 consumers.
+    # Pine transparency is 0 opaque .. 100 transparent; store as alpha byte compatible with existing v0.6 consumers.  # noqa: E501
     alpha = round(max(0, min(100, transp)) * 255 / 100)
     return Color(int(red), int(green), int(blue), alpha)
 
@@ -55,4 +55,21 @@ orange = rgb(255, 165, 0)
 purple = rgb(128, 0, 128)
 gray = rgb(128, 128, 128)
 
-__all__ = ["Color", "rgb", "new", "r", "g", "b", "t", "black", "white", "red", "green", "blue", "yellow", "orange", "purple", "gray"]
+__all__ = [
+    "Color",
+    "rgb",
+    "new",
+    "r",
+    "g",
+    "b",
+    "t",
+    "black",
+    "white",
+    "red",
+    "green",
+    "blue",
+    "yellow",
+    "orange",
+    "purple",
+    "gray",
+]

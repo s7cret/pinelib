@@ -6,6 +6,7 @@ from pinelib import (
     PineMap,
     PineMatrix,
     PineRuntime,
+    PineRuntimeError,
     PineStrategyError,
     PineUnsupportedFeatureError,
     RuntimeConfig,
@@ -19,25 +20,38 @@ from pinelib.errors import (
     PL_MISSING_INTRABAR_DATA,
     PL_REFERENCE_HISTORY_UNSUPPORTED,
     PL_WARNING_BAR_MAGNIFIER_FALLBACK,
-    PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
 )
 
 
-def bar(i: int, o: float, h: float, l: float, c: float) -> Bar:
+def bar(i: int, o: float, h: float, low: float, c: float) -> Bar:
     t = 1704067200000 + i * 3_600_000
-    return Bar(time=t, time_close=t + 3_599_999, open=o, high=h, low=l, close=c)
+    return Bar(time=t, time_close=t + 3_599_999, open=o, high=h, low=low, close=c)
+
+
+def current_bar(runtime: PineRuntime) -> Bar:
+    assert runtime.current_bar is not None
+    return runtime.current_bar
 
 
 class Intrabars:
     def __init__(self, values: list[Bar]) -> None:
         self.values = values
 
-    def get_intrabar_bars(self, symbol: str, chart_bar: Bar, lower_timeframe: str | None = None, *, max_bars: int | None = None) -> list[Bar]:
+    def get_intrabar_bars(
+        self,
+        symbol: str,
+        chart_bar: Bar,
+        lower_timeframe: str | None = None,
+        *,
+        max_bars: int | None = None,
+    ) -> list[Bar]:
         del symbol, chart_bar, lower_timeframe, max_bars
         return self.values
 
 
-def rt(strategy: StrategyContext | None = None, provider: object | None = None, *, strict: bool = False) -> PineRuntime:
+def rt(
+    strategy: StrategyContext | None = None, provider: object | None = None, *, strict: bool = False
+) -> PineRuntime:
     runtime = PineRuntime(
         SymbolInfo("TEST:AAA", mintick=0.01),
         TimeframeInfo.from_string("60"),
@@ -64,7 +78,8 @@ def seed_long(strategy: StrategyContext, runtime: PineRuntime) -> None:
 
 
 def test_intrabar_tp_sl_ordering_can_differ_from_ohlc_path() -> None:
-    chart = bar(2, 10, 15, 5, 12)  # synthetic path hits stop before target because open is closer to high
+    # synthetic path hits stop before target because open is closer to high
+    chart = bar(2, 10, 15, 5, 12)
     intrabars = [
         Bar(time=chart.time, time_close=chart.time + 999, open=10, high=10, low=6, close=6),
         Bar(time=chart.time + 1000, time_close=chart.time + 1999, open=6, high=15, low=6, close=12),
@@ -84,7 +99,16 @@ def test_intrabar_tp_sl_ordering_can_differ_from_ohlc_path() -> None:
 def test_invalid_intrabar_close_warns_and_falls_back_unless_strict() -> None:
     chart = bar(2, 10, 13, 5, 12)
     assert chart.time_close is not None
-    invalid = [Bar(time=chart.time + 1_000, time_close=chart.time_close + 1, open=10, high=15, low=10, close=15)]
+    invalid = [
+        Bar(
+            time=chart.time + 1_000,
+            time_close=chart.time_close + 1,
+            open=10,
+            high=15,
+            low=10,
+            close=15,
+        )
+    ]
     s = StrategyContext(use_bar_magnifier=True)
     runtime = rt(s, Intrabars(invalid))
     seed_long(s, runtime)
@@ -104,7 +128,9 @@ def test_invalid_intrabar_close_warns_and_falls_back_unless_strict() -> None:
 
 def test_intrabar_open_before_chart_open_is_rejected() -> None:
     chart = bar(2, 10, 13, 5, 12)
-    invalid = [Bar(time=chart.time - 1, time_close=chart.time + 999, open=10, high=15, low=10, close=15)]
+    invalid = [
+        Bar(time=chart.time - 1, time_close=chart.time + 999, open=10, high=15, low=10, close=15)
+    ]
     s = StrategyContext(use_bar_magnifier=True)
     runtime = rt(s, Intrabars(invalid))
     seed_long(s, runtime)
@@ -118,7 +144,14 @@ def test_non_monotonic_intrabar_closes_are_rejected() -> None:
     chart = bar(2, 10, 13, 5, 12)
     invalid = [
         Bar(time=chart.time, time_close=chart.time + 2_000, open=10, high=11, low=9, close=10),
-        Bar(time=chart.time + 1_000, time_close=chart.time + 1_500, open=10, high=15, low=10, close=15),
+        Bar(
+            time=chart.time + 1_000,
+            time_close=chart.time + 1_500,
+            open=10,
+            high=15,
+            low=10,
+            close=15,
+        ),
     ]
     s = StrategyContext(use_bar_magnifier=True)
     runtime = rt(s, Intrabars(invalid))
@@ -139,10 +172,11 @@ def test_missing_intrabar_data_warns_and_falls_back_unless_strict() -> None:
     strict_runtime = rt(strict_strategy, Intrabars([]), strict=True)
     strict_runtime.begin_bar(bar(0, 10, 11, 9, 10))
     with pytest.raises(PineStrategyError) as exc:
-        strict_strategy.process_orders_for_bar(runtime=strict_runtime, bar=strict_runtime.current_bar)  # type: ignore[arg-type]
+        strict_strategy.process_orders_for_bar(
+            runtime=strict_runtime,
+            bar=current_bar(strict_runtime),
+        )
     assert exc.value.code == PL_MISSING_INTRABAR_DATA
-
-
 
 
 def test_visual_id_lifecycle_and_limits() -> None:
@@ -151,7 +185,7 @@ def test_visual_id_lifecycle_and_limits() -> None:
     assert label == label
     recorder.set(label, text="b")
     assert recorder.objects[label]["text"] == "b"
-    with pytest.raises(Exception):
+    with pytest.raises(PineRuntimeError):
         recorder.label_new(text="too many")
     recorder.delete(label)
     second = recorder.label_new(text="ok")

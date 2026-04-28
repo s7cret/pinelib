@@ -28,7 +28,7 @@ class Bar:
         if self.low > min(self.open, self.close):
             raise PineDataFormatError("Bar low must be <= min(open, close)")
 
-    def with_time_close(self, time_close: int) -> "Bar":
+    def with_time_close(self, time_close: int) -> Bar:
         return Bar(
             time=self.time,
             open=self.open,
@@ -38,4 +38,3 @@ class Bar:
             volume=self.volume,
             time_close=time_close,
         )
-

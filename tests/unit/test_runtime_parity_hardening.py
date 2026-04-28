@@ -12,7 +12,9 @@ from pinelib.errors import (
 from pinelib.request.security import security, security_lower_tf
 
 
-def rt(strategy: StrategyContext | None = None, *, config: RuntimeConfig | None = None) -> PineRuntime:
+def rt(
+    strategy: StrategyContext | None = None, *, config: RuntimeConfig | None = None
+) -> PineRuntime:
     runtime = PineRuntime(
         SymbolInfo("TEST:AAA", mintick=0.25),
         TimeframeInfo.from_string("60"),
@@ -23,9 +25,9 @@ def rt(strategy: StrategyContext | None = None, *, config: RuntimeConfig | None 
     return runtime
 
 
-def bar(i: int, o: float, h: float, l: float, c: float) -> Bar:
+def bar(i: int, o: float, h: float, low: float, c: float) -> Bar:
     t = 1_704_067_200_000 + i * 3_600_000
-    return Bar(time=t, time_close=t + 3_599_999, open=o, high=h, low=l, close=c)
+    return Bar(time=t, time_close=t + 3_599_999, open=o, high=h, low=low, close=c)
 
 
 def process(runtime: PineRuntime, strategy: StrategyContext, b: Bar) -> None:
@@ -100,8 +102,22 @@ def test_request_security_lower_tf_missing_provider_fails_closed_without_synthet
     runtime = rt()
     runtime.begin_bar(bar(0, 10, 11, 9, 10))
     with pytest.raises(PineRequestError):
-        security_lower_tf("TEST:AAA", "1", lambda child: child.close[0], runtime=runtime, state_id="ltf")
-    assert list(security_lower_tf("TEST:AAA", "1", lambda child: child.close[0], runtime=runtime, state_id="ltf", ignore_invalid_symbol=True)) == []
+        security_lower_tf(
+            "TEST:AAA", "1", lambda child: child.close[0], runtime=runtime, state_id="ltf"
+        )
+    assert (
+        list(
+            security_lower_tf(
+                "TEST:AAA",
+                "1",
+                lambda child: child.close[0],
+                runtime=runtime,
+                state_id="ltf",
+                ignore_invalid_symbol=True,
+            )
+        )
+        == []
+    )
 
 
 def test_nested_request_security_rejects_with_diagnostic() -> None:

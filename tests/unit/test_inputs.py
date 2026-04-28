@@ -1,10 +1,22 @@
 import pytest
 
-from pinelib import PL_INPUT_VALIDATION_ERROR, Bar, PineRuntime, PineRuntimeError, RuntimeConfig, SymbolInfo, TimeframeInfo
+from pinelib import (
+    PL_INPUT_VALIDATION_ERROR,
+    Bar,
+    PineRuntime,
+    PineRuntimeError,
+    RuntimeConfig,
+    SymbolInfo,
+    TimeframeInfo,
+)
 
 
 def _runtime() -> PineRuntime:
-    return PineRuntime(SymbolInfo("TEST:AAA", timezone="UTC"), TimeframeInfo.from_string("60"), config=RuntimeConfig())
+    return PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        config=RuntimeConfig(),
+    )
 
 
 def test_input_metadata_and_basic_validation() -> None:
@@ -15,7 +27,10 @@ def test_input_metadata_and_basic_validation() -> None:
     assert rt.inputs.string("mode", "fast", options=["fast", "slow"]) == "fast"
     assert rt.inputs.timeframe("tf", "15", options=["5", "15", "1H"]) == "15"
     assert rt.inputs.symbol("sym", "BINANCE:BTCUSDT") == "BINANCE:BTCUSDT"
-    assert rt.inputs.session("sess", "0930-1600:23456", timezone="America/New_York") == "0930-1600:23456"
+    assert (
+        rt.inputs.session("sess", "0930-1600:23456", timezone="America/New_York")
+        == "0930-1600:23456"
+    )
     assert rt.inputs.source("src", rt.close) is rt.close
     assert rt.inputs.metadata["len"].kind == "int"
     assert rt.inputs.metadata["len"].options == (7, 14)

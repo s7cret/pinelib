@@ -25,4 +25,3 @@ def test_basic_numeric_helpers_propagate_na() -> None:
 def test_pine_bool_rejects_na() -> None:
     with pytest.raises(PineNAError):
         pine_bool(na)
-

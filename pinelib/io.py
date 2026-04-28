@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable, SupportsInt, SupportsIndex
+from typing import Any, SupportsIndex, SupportsInt
 
 from pinelib.core.bar import Bar
 from pinelib.errors import PineDataFormatError, PineUnsupportedFeatureError
@@ -75,11 +76,15 @@ def load_bars_parquet(path: str | Path) -> list[Bar]:
     try:
         import pandas as pd  # type: ignore[import-untyped]
     except ImportError as exc:  # pragma: no cover - environment dependent
-        raise PineUnsupportedFeatureError("Parquet loading requires optional dependency pandas with a parquet engine") from exc
+        raise PineUnsupportedFeatureError(
+            "Parquet loading requires optional dependency pandas with a parquet engine"
+        ) from exc
     try:
         frame = pd.read_parquet(path)
     except ImportError as exc:  # pragma: no cover - environment dependent
-        raise PineUnsupportedFeatureError("Parquet loading requires pyarrow or fastparquet") from exc
+        raise PineUnsupportedFeatureError(
+            "Parquet loading requires pyarrow or fastparquet"
+        ) from exc
     rows: Iterable[dict[str, Any]] = frame.to_dict(orient="records")
     fieldnames = [str(c) for c in frame.columns]
     mapping = _column_mapping(fieldnames)

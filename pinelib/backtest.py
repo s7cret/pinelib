@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Protocol, cast, runtime_checkable
+from typing import Protocol, cast, runtime_checkable
 
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
@@ -75,7 +76,9 @@ class BacktestReport:
         return asdict(self)
 
     def write_json(self, path: str | Path) -> None:
-        Path(path).write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        Path(path).write_text(
+            json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,11 +115,17 @@ def run_generated_strategy(
     max_recalcs = schedule.max_recalculations_per_bar or runtime.config.max_recalculations_per_bar
 
     bars_list = list(bars)
-    ticks_list = [list(ticks) for ticks in realtime_ticks] if realtime_ticks is not None else [[] for _ in bars_list]
+    ticks_list = (
+        [list(ticks) for ticks in realtime_ticks]
+        if realtime_ticks is not None
+        else [[] for _ in bars_list]
+    )
     if len(ticks_list) < len(bars_list):
         ticks_list.extend([[] for _ in range(len(bars_list) - len(ticks_list))])
     first_realtime_index = next((idx for idx, ticks in enumerate(ticks_list) if ticks), None)
-    last_confirmed_history_index = (first_realtime_index - 1) if first_realtime_index is not None else (len(bars_list) - 1)
+    last_confirmed_history_index = (
+        (first_realtime_index - 1) if first_realtime_index is not None else (len(bars_list) - 1)
+    )
 
     for idx, bar in enumerate(bars_list):
         bar_ticks = ticks_list[idx] if idx < len(ticks_list) else []
@@ -136,8 +145,12 @@ def run_generated_strategy(
                     active_bar = runtime.update_realtime_tick(tick)
                     callback(runtime, strategy)
                     if schedule.process_orders:
-                        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar, recalc_phase=idx > 0)
-                        _run_fill_recalcs(callback, runtime, strategy, active_bar, schedule, max_recalcs)
+                        strategy.process_orders_for_bar(
+                            runtime=runtime, bar=active_bar, recalc_phase=idx > 0
+                        )
+                        _run_fill_recalcs(
+                            callback, runtime, strategy, active_bar, schedule, max_recalcs
+                        )
         else:
             runtime.begin_bar(bar)
             runtime.set_last_confirmed_history(idx == last_confirmed_history_index)
@@ -177,7 +190,11 @@ def _run_fill_recalcs(
     max_recalcs: int,
 ) -> None:
     recalc_count = 0
-    while schedule.calc_on_order_fills and strategy.calc_on_order_fills and strategy.has_fill_recalc_pending():
+    while (
+        schedule.calc_on_order_fills
+        and strategy.calc_on_order_fills
+        and strategy.has_fill_recalc_pending()
+    ):
         recalc_count += 1
         if recalc_count > max_recalcs:
             raise PineRuntimeError("Maximum strategy recalculations per bar exceeded")
@@ -268,7 +285,14 @@ def write_result_snapshot(result: BacktestResult, path: str | Path) -> None:
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def compare_golden(actual: object, expected: object, *, abs_tol: float = 1e-9, rel_tol: float = 1e-9, path: str = "$") -> None:
+def compare_golden(
+    actual: object,
+    expected: object,
+    *,
+    abs_tol: float = 1e-9,
+    rel_tol: float = 1e-9,
+    path: str = "$",
+) -> None:
     """Compare JSON-like structures with numeric tolerances."""
 
     import math
@@ -279,13 +303,19 @@ def compare_golden(actual: object, expected: object, *, abs_tol: float = 1e-9, r
         return
     if isinstance(actual, dict) and isinstance(expected, dict):
         if set(actual) != set(expected):
-            raise PineGoldenMismatchError(f"Golden key mismatch at {path}: {sorted(actual)} != {sorted(expected)}")
+            raise PineGoldenMismatchError(
+                f"Golden key mismatch at {path}: {sorted(actual)} != {sorted(expected)}"
+            )
         for key in actual:
-            compare_golden(actual[key], expected[key], abs_tol=abs_tol, rel_tol=rel_tol, path=f"{path}.{key}")
+            compare_golden(
+                actual[key], expected[key], abs_tol=abs_tol, rel_tol=rel_tol, path=f"{path}.{key}"
+            )
         return
     if isinstance(actual, list) and isinstance(expected, list):
         if len(actual) != len(expected):
-            raise PineGoldenMismatchError(f"Golden length mismatch at {path}: {len(actual)} != {len(expected)}")
+            raise PineGoldenMismatchError(
+                f"Golden length mismatch at {path}: {len(actual)} != {len(expected)}"
+            )
         for idx, (left, right) in enumerate(zip(actual, expected, strict=True)):
             compare_golden(left, right, abs_tol=abs_tol, rel_tol=rel_tol, path=f"{path}[{idx}]")
         return
@@ -293,13 +323,17 @@ def compare_golden(actual: object, expected: object, *, abs_tol: float = 1e-9, r
         raise PineGoldenMismatchError(f"Golden mismatch at {path}: {actual!r} != {expected!r}")
 
 
-def _resolve_strategy_callback(strategy_instance: object) -> Callable[[PineRuntime, StrategyContext], None]:
+def _resolve_strategy_callback(
+    strategy_instance: object,
+) -> Callable[[PineRuntime, StrategyContext], None]:
     on_bar = getattr(strategy_instance, "on_bar", None)
     if callable(on_bar):
         return cast(Callable[[PineRuntime, StrategyContext], None], on_bar)
     if callable(strategy_instance):
         return cast(Callable[[PineRuntime, StrategyContext], None], strategy_instance)
-    raise PineRuntimeError("Generated strategy must define on_bar(runtime, strategy) or be callable")
+    raise PineRuntimeError(
+        "Generated strategy must define on_bar(runtime, strategy) or be callable"
+    )
 
 
 def _fill_to_dict(fill: Fill) -> dict[str, object]:

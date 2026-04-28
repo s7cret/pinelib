@@ -8,7 +8,14 @@ from pinelib.core.inputs import InputRegistry
 from pinelib.core.na import na
 from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions
-from pinelib.core.types import BarStateInfo, RuntimeConfig, SymbolInfo, TickUpdate, TimeframeInfo, TypeInfo
+from pinelib.core.types import (
+    BarStateInfo,
+    RuntimeConfig,
+    SymbolInfo,
+    TickUpdate,
+    TimeframeInfo,
+    TypeInfo,
+)
 from pinelib.errors import PineRuntimeError
 from pinelib.request.providers import DataProvider, IntrabarDataProvider, LowerTfQueryMetadata
 from pinelib.version import RUNTIME_CONTRACT_VERSION
@@ -177,7 +184,9 @@ class PineRuntime:
         existing = self.series_registry.get(name)
         if existing is not None:
             if existing.dtype != dtype:
-                raise PineRuntimeError(f"Series {name!r} already exists with dtype {existing.dtype!r}")
+                raise PineRuntimeError(
+                    f"Series {name!r} already exists with dtype {existing.dtype!r}"
+                )
             return existing
         series = Series[Any](
             name=name,
@@ -202,7 +211,7 @@ class PineRuntime:
                 context=None,
             )
 
-    def spawn_child_context(self, *, symbol: str, timeframe: str, namespace: str) -> "PineRuntime":
+    def spawn_child_context(self, *, symbol: str, timeframe: str, namespace: str) -> PineRuntime:
         child = PineRuntime(
             symbol_info=SymbolInfo(
                 tickerid=symbol,
@@ -227,8 +236,12 @@ class PineRuntime:
         if bar.time_close is not None:
             return bar
         if not self.config.allow_incomplete_bar_time_close:
-            raise PineRuntimeError("Bar.time_close is required when runtime config forbids inference")
+            raise PineRuntimeError(
+                "Bar.time_close is required when runtime config forbids inference"
+            )
         timeframe = self.timeframe
         if timeframe.interval_ms is None:
-            raise PineRuntimeError("Bar.time_close is missing and timeframe close inference is unavailable")
+            raise PineRuntimeError(
+                "Bar.time_close is missing and timeframe close inference is unavailable"
+            )
         return bar.with_time_close(bar.time + timeframe.interval_ms - 1)

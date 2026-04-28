@@ -38,7 +38,11 @@ def merge_requested_series_to_chart_bars(
         value: Any = na
         chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
         for requested_bar, requested_value in zip(requested_bars, requested_values, strict=True):
-            requested_close = requested_bar.time_close if requested_bar.time_close is not None else requested_bar.time
+            requested_close = (
+                requested_bar.time_close
+                if requested_bar.time_close is not None
+                else requested_bar.time
+            )
             if lookahead == "barmerge.lookahead_on":
                 if gaps == "barmerge.gaps_on":
                     matches = chart_bar.time <= requested_bar.time <= chart_close
@@ -91,7 +95,11 @@ def security(
         raise PineRequestError("request.security requires runtime.data_provider")
 
     start = runtime.chart_bars[0].time if runtime.chart_bars else None
-    end = runtime.chart_bars[-1].time_close if runtime.chart_bars and runtime.chart_bars[-1].time_close is not None else None
+    end = (
+        runtime.chart_bars[-1].time_close
+        if runtime.chart_bars and runtime.chart_bars[-1].time_close is not None
+        else None
+    )
     requested_bars = runtime.data_provider.get_bars(
         symbol,
         timeframe,
@@ -110,7 +118,9 @@ def security(
         requested_values = []
         expression = expression_callable
         if not callable(expression):
-            raise PineRequestError("request.security expression must be callable or a value sequence")
+            raise PineRequestError(
+                "request.security expression must be callable or a value sequence"
+            )
         for bar in requested_bars:
             child.begin_bar(bar)
             requested_values.append(expression(child))
@@ -137,7 +147,11 @@ def _bars_inside_chart_bar(lower_bars: Sequence[Bar], chart_bar: Bar) -> list[Ba
     """Return fully closed intrabars for a chart bar, ordered oldest to newest."""
 
     chart_close = _bar_close_time(chart_bar)
-    return [bar for bar in lower_bars if chart_bar.time <= bar.time and _bar_close_time(bar) <= chart_close]
+    return [
+        bar
+        for bar in lower_bars
+        if chart_bar.time <= bar.time and _bar_close_time(bar) <= chart_close
+    ]
 
 
 def security_lower_tf(
@@ -205,7 +219,9 @@ def security_lower_tf(
         if runtime.data_provider is None:
             if ignore_invalid_symbol:
                 return PineArray()
-            raise PineRequestError("request.security_lower_tf requires runtime.data_provider or runtime.intrabar_provider")
+            raise PineRequestError(
+                "request.security_lower_tf requires runtime.data_provider or runtime.intrabar_provider"  # noqa: E501
+            )
         query_start = runtime.chart_bars[0].time if runtime.chart_bars else runtime.current_bar.time
         query_end = _bar_close_time(runtime.current_bar)
         requested_bars = runtime.data_provider.get_bars(
@@ -241,12 +257,16 @@ def security_lower_tf(
     if isinstance(expression_callable, Sequence) and not callable(expression_callable):
         values = list(expression_callable)
         if len(values) != len(selected_bars):
-            raise PineRequestError("request.security_lower_tf precomputed values length must match selected intrabars")
+            raise PineRequestError(
+                "request.security_lower_tf precomputed values length must match selected intrabars"
+            )
         return PineArray(values)
 
     expression = expression_callable
     if not callable(expression):
-        raise PineRequestError("request.security_lower_tf expression must be callable or a value sequence")
+        raise PineRequestError(
+            "request.security_lower_tf expression must be callable or a value sequence"
+        )
 
     child = runtime.spawn_child_context(symbol=symbol, timeframe=timeframe, namespace=state_id)
     child.request_depth = runtime.request_depth + 1

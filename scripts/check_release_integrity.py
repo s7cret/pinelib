@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LEGACY_MANIFESTS_WITHOUT_PROVENANCE = {
-    "RELEASE_MANIFEST_v0_1_0.json": "v0.1.0 predates git_commit provenance; archive SHA is still enforced",
+    "RELEASE_MANIFEST_v0_1_0.json": "v0.1.0 predates git_commit provenance; archive SHA is still enforced",  # noqa: E501
 }
 
 
@@ -45,7 +45,7 @@ def check(manifest_path: Path, *, require_head: bool) -> None:
     actual_sha = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     if manifest.get("archive_sha256") != actual_sha:
         raise SystemExit(
-            f"Archive SHA mismatch for {archive_path.name}: manifest={manifest.get('archive_sha256')} actual={actual_sha}"
+            f"Archive SHA mismatch for {archive_path.name}: manifest={manifest.get('archive_sha256')} actual={actual_sha}"  # noqa: E501
         )
     commit = manifest.get("git_commit")
     if not isinstance(commit, str) or len(commit) < 7:
@@ -71,11 +71,15 @@ def check(manifest_path: Path, *, require_head: bool) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validate PineLib release manifest/archive integrity.")
+    parser = argparse.ArgumentParser(
+        description="Validate PineLib release manifest/archive integrity."
+    )
     parser.add_argument("manifest", nargs="?", default=None)
     parser.add_argument("--require-head", action="store_true")
     args = parser.parse_args()
-    manifests = [ROOT / args.manifest] if args.manifest else sorted(ROOT.glob("RELEASE_MANIFEST_v*.json"))
+    manifests = (
+        [ROOT / args.manifest] if args.manifest else sorted(ROOT.glob("RELEASE_MANIFEST_v*.json"))
+    )
     for manifest in manifests:
         check(manifest, require_head=args.require_head)
 

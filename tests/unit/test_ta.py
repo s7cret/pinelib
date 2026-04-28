@@ -60,13 +60,17 @@ def test_batch_and_runtime_ema_rma_rsi_macd_consistency() -> None:
         ema_runtime.append(ta.ema(runtime.close, 3, runtime=runtime, state_id="L1_C1_ema_1"))
         rma_runtime.append(ta.rma(runtime.close, 3, runtime=runtime, state_id="L1_C1_rma_1"))
         rsi_runtime.append(ta.rsi(runtime.close, 3, runtime=runtime, state_id="L1_C1_rsi_1"))
-        macd_runtime.append(ta.macd(runtime.close, 2, 4, 3, runtime=runtime, state_id="L1_C1_macd_1"))
+        macd_runtime.append(
+            ta.macd(runtime.close, 2, 4, 3, runtime=runtime, state_id="L1_C1_macd_1")
+        )
         runtime.end_bar()
 
     assert ema_runtime == ta.ema(values, 3)
     assert rma_runtime == ta.rma(values, 3)
     assert rsi_runtime == ta.rsi(values, 3)
-    assert tuple([row[index] for row in macd_runtime] for index in range(3)) == ta.macd(values, 2, 4, 3)
+    assert tuple([row[index] for row in macd_runtime] for index in range(3)) == ta.macd(
+        values, 2, 4, 3
+    )
 
 
 def test_tr_atr_runtime_and_batch_consistency() -> None:
@@ -91,7 +95,9 @@ def test_highest_lowest_change_cross_helpers() -> None:
     observed = []
     for index, value in enumerate([1.0, 3.0, 2.0, 4.0]):
         runtime.begin_bar(_bar(index, value))
-        observed.append((ta.highest(runtime.close, 3), ta.lowest(runtime.close, 3), ta.change(runtime.close)))
+        observed.append(
+            (ta.highest(runtime.close, 3), ta.lowest(runtime.close, 3), ta.change(runtime.close))
+        )
         runtime.end_bar()
 
     assert observed[0][0] == 1.0
