@@ -7,9 +7,9 @@ Stack train metadata: `pain-stack-pine-v6-2026.04-r1`, `pine_language_version=6`
 
 ## Release scope and stack boundaries
 
-`pinelib` is the runtime foundation used by AST2Python-generated modules. It owns Pine-style series/history behavior, runtime metadata, selected namespace helpers, visual recording scaffolds, data-provider protocols, and the current strategy-context broker emulator MVP documented below. It does **not** include an independent production Backtest Engine package, portfolio/research orchestration, parameter optimization, or TradingView-complete runtime parity.
+`pinelib` is the runtime foundation used by AST2Python-generated modules. It owns Pine-style series/history behavior, runtime metadata, selected namespace helpers, visual recording scaffolds, data-provider protocols, runtime diagnostics, and a strategy order-intent façade for generated/runtime-local code. It does **not** own final broker/fill/equity authority in the amended 6-package architecture.
 
-Future Backtest Engine and Optimizer work is intentionally separate from this v1.0.1 runtime package and from the current `pain-stack-pine-v6-2026.04-r1` claim. If those packages are introduced later, they should consume PineLib through explicit runtime/BacktestRunner contracts rather than being represented as implemented PineLib scope.
+Backtest Engine and Optimizer are separate packages in the current local stack. `backtest_engine` is the accepted broker/backtest authority; `optimizer` consumes backtest runners through protocol-style boundaries. See `docs/BROKER_BOUNDARY.md` for the explicit PineLib ↔ Backtest Engine split.
 
 Implemented through v1.0.1:
 
@@ -21,8 +21,8 @@ Implemented through v1.0.1:
 - `DataProvider` / `IntrabarDataProvider` protocols and in-memory provider
 - timezone/session-aware `time()` and `time_close()` helpers with IANA DST coverage and explicit unsupported diagnostics for non-chart timeframe aggregation
 - `request.security` foundation with merge modes, child runtime isolation, and explicit nested-request diagnostics
-- StrategyContext broker emulator MVP with market/limit/stop/stop-limit orders, exit reservations/OCA reduce, sizing, commission/slippage, strict Bar Magnifier intrabar validation/provenance, guarded `calc_on_order_fills`, and supplied realtime tick execution
-- bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext`
+- StrategyContext order-intent/runtime-local façade with market/limit/stop/stop-limit calls, exit/close/cancel APIs, diagnostics, and legacy local-fixture support; amended broker/equity acceptance belongs to `backtest_engine`
+- bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext` for local/runtime tests, not final broker authority
 - result snapshots, JSON-safe backtest report schema, golden-compare tolerance utility, strategy/equity compare reports, and optimizer-friendly params metadata capture
 - CSV OHLCV loader plus optional Parquet loader with graceful dependency errors
 - TradingView-exported indicator/trade CSV fixture loaders plus oracle-ready fixture scaffolding; no local fixture is claimed as TradingView-verified without exported evidence
@@ -104,6 +104,7 @@ v1.0.1 does **not** claim full TradingView parity. Unsupported or incomplete are
 
 Start here:
 
+- `docs/BROKER_BOUNDARY.md`
 - `docs/public_api_v1_0_0.md`
 - `docs/semantic_versioning_policy.md`
 - `docs/coverage_map_v1_0_1.md`
