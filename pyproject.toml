@@ -8,7 +8,7 @@ version = "1.0.1"
 description = "PineLib runtime foundation aligned to runtime contract v1.4."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "Proprietary"}
+license = {text = "MIT"}
 authors = [{name = "OpenAI Codex"}]
 dependencies = []
 
