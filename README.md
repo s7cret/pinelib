@@ -29,7 +29,7 @@ Implemented through v1.0.1:
 - visual recorder foundation and reference containers (`PineArray`, `PineMap`, `PineMatrix`)
 - TA helpers: `sma`, `ema`, `rma`, `rsi`, `macd`, `tr`, `atr`, `highest`, `lowest`, `change`, crosses, plus the v0.6 extended helper set
 - namespace helpers: expanded `pinelib.math`, basic `pinelib.string`, and basic `pinelib.color`
-- `py.typed`, mypy strict-ish package gate, CI workflow, release checklist, migration guide, final audit, and performance smoke tests
+- `py.typed`, mypy strict-ish package gate, release checklist, migration guide, final audit, and performance smoke tests
 
 ## Install
 
