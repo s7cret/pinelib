@@ -1,3 +1,8 @@
+from pinelib.strategy.backtest_engine import (
+    BROKER_BOUNDARY_STATUS,
+    broker_boundary,
+    make_backtest_engine_strategy_adapter,
+)
 from pinelib.strategy.context import (
     Direction,
     Fill,
@@ -11,6 +16,7 @@ from pinelib.strategy.context import (
 )
 
 __all__ = [
+    "BROKER_BOUNDARY_STATUS",
     "Direction",
     "Fill",
     "Order",
@@ -20,4 +26,6 @@ __all__ = [
     "StrategyContext",
     "StrategyDeclaration",
     "Trade",
+    "broker_boundary",
+    "make_backtest_engine_strategy_adapter",
 ]
