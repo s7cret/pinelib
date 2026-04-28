@@ -110,3 +110,7 @@ Start here:
 - `docs/migration_v0_9_to_v1_0.md`
 - `docs/release_checklist_v1_0_0.md`
 - `FINAL_AUDIT_v1.0.1.md`
+
+## Acknowledgements
+
+This project was developed with AI-assisted engineering workflows. The license and release obligations are defined only by `LICENSE` and the repository documentation above.
