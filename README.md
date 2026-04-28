@@ -3,6 +3,8 @@
 PineLib is a Python runtime foundation for AST2Python-generated Pine-compatible code.
 v1.0.1 is the current stable release for `runtime_contract_v1.4` / `TZ_01`: the public API surface is reviewed, packaging is typed, release artifacts are reproducible, and known parity limits are documented explicitly.
 
+Stack train metadata: `pain-stack-pine-v6-2026.04-r1`, `pine_language_version=6`, `pine_docs_baseline=2026-04`, `runtime_contract=1.4` (see `RELEASE_STACK_MANIFEST_2026_04_R1.json`). This stack supports a verified Pine v6 subset/oracle snapshot; it does **not** claim full Pine v6 runtime parity. April 2026 language-relevant scope note: UDT collection sorting via `sort_field` for `array.sort`, `array.sort_indices`, and `matrix.sort`; Pine Editor word-wrap is non-runtime UX.
+
 Implemented through v1.0.1:
 
 - contract/version metadata for `pinelib` and runtime contract `1.4`
