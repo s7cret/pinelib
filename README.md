@@ -5,6 +5,12 @@ v1.0.1 is the current stable release for `runtime_contract_v1.4` / `TZ_01`: the 
 
 Stack train metadata: `pain-stack-pine-v6-2026.04-r1`, `pine_language_version=6`, `pine_docs_baseline=2026-04`, `runtime_contract=1.4` (see `RELEASE_STACK_MANIFEST_2026_04_R1.json`). This stack supports a verified Pine v6 subset/oracle snapshot; it does **not** claim full Pine v6 runtime parity. April 2026 language-relevant scope note: UDT collection sorting via `sort_field` for `array.sort`, `array.sort_indices`, and `matrix.sort`; Pine Editor word-wrap is non-runtime UX.
 
+## Release scope and stack boundaries
+
+`pinelib` is the runtime foundation used by AST2Python-generated modules. It owns Pine-style series/history behavior, runtime metadata, selected namespace helpers, visual recording scaffolds, data-provider protocols, and the current strategy-context broker emulator MVP documented below. It does **not** include an independent production Backtest Engine package, portfolio/research orchestration, parameter optimization, or TradingView-complete runtime parity.
+
+Future Backtest Engine and Optimizer work is intentionally separate from this v1.0.1 runtime package and from the current `pain-stack-pine-v6-2026.04-r1` claim. If those packages are introduced later, they should consume PineLib through explicit runtime/BacktestRunner contracts rather than being represented as implemented PineLib scope.
+
 Implemented through v1.0.1:
 
 - contract/version metadata for `pinelib` and runtime contract `1.4`
@@ -87,6 +93,10 @@ python scripts/build_release.py
 python scripts/check_release_integrity.py RELEASE_MANIFEST_v1_0_1.json --require-head
 python scripts/check_release_artifact_selftest.py pinelib_runtime_v1_0_1.zip
 ```
+
+## License
+
+This repository is currently packaged with a proprietary/all-rights-reserved license. See `LICENSE`.
 
 ## Coverage and limitations
 
