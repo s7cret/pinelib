@@ -72,6 +72,8 @@ def security(
     calc_bars_count: int | None = None,
 ) -> Any:
     del currency
+    if calc_bars_count is not None and calc_bars_count < 0:
+        raise PineRequestError("request.security calc_bars_count must be non-negative")
     if runtime.request_depth > 0 and not runtime.config.supports_nested_security:
         runtime.config.emit_diagnostic(
             PL_UNSUPPORTED_NESTED_SECURITY,

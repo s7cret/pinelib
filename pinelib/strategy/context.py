@@ -155,6 +155,8 @@ class StrategyContext:
         self.eventrades = 0
         self.max_drawdown = 0.0
         self.max_runup = 0.0
+        self._equity_peak = self.initial_capital
+        self._equity_trough = self.initial_capital
         self.pending_orders: list[Order] = []
         self.fills: list[Fill] = []
         self.closed_trade_log: list[Trade] = []
@@ -524,6 +526,16 @@ class StrategyContext:
     def _mark_to_market(self, price: float) -> None:
         self.openprofit = sum(((price - l.entry_price) if l.direction == "long" else (l.entry_price - price)) * l.qty - l.commission for l in self._lots)
         self.equity = self.initial_capital + self.netprofit + self.openprofit
+        self._update_equity_extremes()
+
+    def _update_equity_extremes(self) -> None:
+        # Account-currency risk metrics using marked-to-market equity. max_drawdown is
+        # the largest drop from a prior equity peak; max_runup is the largest rise from
+        # a prior equity trough.
+        self.max_drawdown = max(self.max_drawdown, self._equity_peak - self.equity)
+        self.max_runup = max(self.max_runup, self.equity - self._equity_trough)
+        self._equity_peak = max(self._equity_peak, self.equity)
+        self._equity_trough = min(self._equity_trough, self.equity)
 
     def _diagnose_margin_risk(self, runtime: PineRuntime, mark_price: float) -> None:
         if not self._lots:

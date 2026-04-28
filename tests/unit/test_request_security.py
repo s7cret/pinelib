@@ -93,3 +93,12 @@ def test_precomputed_values_and_nested_security_diagnostic() -> None:
         security("TEST:BBB", "60", [42.0], runtime=rt, state_id="nested")
     assert excinfo.value.code == PL_UNSUPPORTED_NESTED_SECURITY
     assert rt.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_NESTED_SECURITY
+
+
+def test_request_security_negative_calc_bars_count_rejected() -> None:
+    chart = _bars([0], 3_600_000)
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): chart})
+    rt = _runtime(provider)
+    rt.begin_bar(chart[0])
+    with pytest.raises(Exception, match="calc_bars_count must be non-negative"):
+        security("TEST:BBB", "60", [1.0], runtime=rt, state_id="neg", calc_bars_count=-1)

@@ -106,3 +106,45 @@ def test_commission_slippage_and_percent_sizing() -> None:
     assert round(s.position_size, 6) == 1000.0
     assert s.position_avg_price == 10.5
     assert s.equity < s.initial_capital
+
+
+def test_max_runup_tracks_monotonic_mark_to_market_gain() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 10, 10, 10))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
+    runtime.end_bar()
+    process(runtime, s, bar(1, 15, 15, 15, 15))
+    assert s.max_runup == 5.0
+    assert s.max_drawdown == 0.0
+
+
+def test_max_drawdown_tracks_drop_from_prior_equity_peak() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 10, 10, 10))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
+    runtime.end_bar()
+    process(runtime, s, bar(1, 15, 15, 15, 15))
+    process(runtime, s, bar(2, 12, 12, 12, 12))
+    assert s.max_runup == 5.0
+    assert s.max_drawdown == 3.0
+
+
+def test_open_position_mark_to_market_updates_risk_metrics_and_report() -> None:
+    from pinelib.backtest import build_backtest_report
+
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 10, 10, 10))
+    s.entry("L", "long", qty=2)
+    s.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
+    runtime.end_bar()
+    process(runtime, s, bar(1, 13, 13, 13, 13))
+    assert s.openprofit == 6.0
+    assert s.max_runup == 6.0
+    report = build_backtest_report(runtime, s, object())
+    assert report.max_runup == s.max_runup
+    assert report.max_drawdown == s.max_drawdown
