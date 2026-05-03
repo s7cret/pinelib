@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -36,6 +37,7 @@ class PineRuntime:
     chart_bars: list[Bar] = field(init=False, default_factory=list)
     series_registry: dict[str, Series[Any]] = field(init=False, default_factory=dict)
     indicator_state: dict[str, object] = field(init=False, default_factory=dict)
+    varip_state: dict[str, object] = field(init=False, default_factory=dict)
     strategy: object | None = field(init=False, default=None)
     request_depth: int = field(init=False, default=0)
     lower_tf_metadata_log: list[LowerTfQueryMetadata] = field(init=False, default_factory=list)
@@ -163,6 +165,69 @@ class PineRuntime:
 
     def set_last_confirmed_history(self, value: bool = True) -> None:
         self.barstate = replace(self.barstate, islastconfirmedhistory=value)
+
+    def export_state(self, *, include_varip: bool = True) -> dict[str, object]:
+        """Export a detached runtime checkpoint.
+
+        Realtime rollback callers should use ``include_varip=False`` so normal
+        runtime state rolls back while ``varip`` storage survives between tick
+        attempts. Resume/export callers can keep the default and capture varip.
+        """
+
+        snapshot = {
+            "bar_index": self.bar_index,
+            "current_bar": copy.deepcopy(self.current_bar),
+            "chart_bars": copy.deepcopy(self.chart_bars),
+            "series": {
+                name: {
+                    "current": copy.deepcopy(series._current),
+                    "history": copy.deepcopy(series._history),
+                }
+                for name, series in self.series_registry.items()
+            },
+            "indicator_state": copy.deepcopy(self.indicator_state),
+            "barstate": copy.deepcopy(self.barstate),
+            "request_depth": self.request_depth,
+            "lower_tf_metadata_log": copy.deepcopy(self.lower_tf_metadata_log),
+            "visual": copy.deepcopy(self.visual),
+            "request_namespace": self.request_namespace,
+        }
+        if include_varip:
+            snapshot["varip_state"] = copy.deepcopy(self.varip_state)
+        return snapshot
+
+    def restore_state(self, state: object) -> None:
+        if not isinstance(state, dict):
+            raise PineRuntimeError("PineRuntime restore_state() expects a dict snapshot")
+        series_state = state.get("series", {})
+        if not isinstance(series_state, dict):
+            raise PineRuntimeError("PineRuntime snapshot is missing series state")
+        self.bar_index = int(state.get("bar_index", -1))
+        self.current_bar = copy.deepcopy(state.get("current_bar"))
+        self.chart_bars = copy.deepcopy(state.get("chart_bars", []))
+        for name, payload in series_state.items():
+            if name not in self.series_registry or not isinstance(payload, dict):
+                continue
+            series = self.series_registry[name]
+            series._current = copy.deepcopy(payload.get("current", na))
+            history = payload.get("history", [])
+            series._history = copy.deepcopy(history if isinstance(history, list) else [])
+        self.indicator_state = copy.deepcopy(state.get("indicator_state", {}))
+        if "varip_state" in state:
+            self.varip_state = copy.deepcopy(state.get("varip_state", {}))
+        self.barstate = copy.deepcopy(state.get("barstate", BarStateInfo()))
+        self.request_depth = int(state.get("request_depth", 0))
+        self.lower_tf_metadata_log = copy.deepcopy(state.get("lower_tf_metadata_log", []))
+        self.visual = copy.deepcopy(state.get("visual", self.visual))
+        self.request_namespace = state.get("request_namespace")
+
+    def get_varip_state(self, state_id: str, factory: Any) -> object:
+        if state_id not in self.varip_state:
+            self.varip_state[state_id] = factory()
+        return self.varip_state[state_id]
+
+    def reset_varip_state(self) -> None:
+        self.varip_state.clear()
 
     def _set_builtin_current(self, bar: Bar, current_index: int) -> None:
         self.open.set_current(bar.open)

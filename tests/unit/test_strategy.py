@@ -163,3 +163,15 @@ def test_open_position_mark_to_market_updates_risk_metrics_and_report() -> None:
     report = build_backtest_report(runtime, s, object())
     assert report.max_runup == s.max_runup
     assert report.max_drawdown == s.max_drawdown
+
+
+def test_daily_time_session_uses_bar_open_not_inferred_daily_close():
+    from pinelib.core import Bar, PineRuntime, SymbolInfo, TimeframeInfo
+
+    rt = PineRuntime(SymbolInfo("NASDAQ:AAPL", timezone="America/New_York"), TimeframeInfo.from_string("1D"))
+    # 2026-04-28 13:30 UTC / 09:30 New York, a regular US equity daily open.
+    rt.begin_bar(Bar(time=1777383000000, open=1, high=1, low=1, close=1))
+    try:
+        assert rt.timefunc.time("D", "0930-1600", "America/New_York", runtime=rt) == 1777383000000
+    finally:
+        rt.end_bar()

@@ -168,6 +168,12 @@ class TimeFunctions:
 
     def _bar_in_session(self, runtime: PineRuntime, session: str, timezone_name: str) -> bool:
         assert runtime.current_bar is not None
+        if getattr(runtime.timeframe, "isdaily", False):
+            # For daily TradingView stock bars, `time(tf, session, tz)` is keyed
+            # by the bar/session open. Requiring both daily bar open and inferred
+            # daily close to be inside an intraday session incorrectly filters
+            # every regular daily bar out.
+            return is_timestamp_in_session(runtime.current_bar.time, session, timezone_name)
         if runtime.current_bar.time_close is None:
             raise PineSessionError("Current bar is missing time_close")
         return is_timestamp_in_session(

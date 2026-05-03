@@ -570,17 +570,18 @@ class StrategyContext:
     def _find_fill_event(
         self, order: Order, path: list[float], bar: Bar, runtime: PineRuntime | None = None
     ) -> tuple[int, float] | None:
+        current_index = (
+            (self._runtime.bar_index + 1)
+            if self._runtime is not None
+            else order.created_bar_index
+        )
+        current_bar_close_activation = (
+            self.process_orders_on_close and order.created_bar_index == current_index
+        )
+        if current_bar_close_activation:
+            path = [bar.close]
         if order.type == "market":
-            current_index = (
-                (self._runtime.bar_index + 1)
-                if self._runtime is not None
-                else order.created_bar_index
-            )
-            return (
-                (len(path) - 1, bar.close)
-                if self.process_orders_on_close and order.created_bar_index == current_index
-                else (0, path[0])
-            )
+            return (len(path) - 1, bar.close) if current_bar_close_activation else (0, path[0])
         if order.trail_offset is not None and order.trail_activation is not None:
             return self._trailing_stop_event(order, path)
         level = order.limit if order.type == "limit" else order.stop

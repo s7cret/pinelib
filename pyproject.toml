@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinelib"
-version = "1.0.1"
+version = "2.17.0"
 description = "PineLib runtime foundation aligned to runtime contract v1.4."
 readme = "README.md"
 requires-python = ">=3.11"
