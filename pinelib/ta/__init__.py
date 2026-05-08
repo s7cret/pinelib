@@ -38,13 +38,72 @@ def _history(source: Any, offset: int, function_name: str) -> Any:
     elif offset == 0:
         value = source
     else:
-        value = na
+        # Scalar constants (e.g. 50) don't change between bars —
+        # return the value itself, not na
+        value = source
     _reject_bool(value, function_name)
     return value
 
 
+def _condition_history(source: Any, offset: int) -> Any:
+    if isinstance(source, SupportsSeriesLike):
+        return source[offset]
+    if offset == 0:
+        return source
+    return na
+
+
 def _series_values(source: Sequence[Any]) -> list[Any]:
     return list(source)
+
+
+class _RuntimeDerivedSeries:
+    def __init__(self, runtime: PineRuntime, name: str) -> None:
+        self.runtime = runtime
+        self.name = name
+
+    @property
+    def current(self) -> Any:
+        return self[0]
+
+    @property
+    def committed_length(self) -> int:
+        return self.runtime.close.committed_length
+
+    def __getitem__(self, offset: int) -> Any:
+        high = self.runtime.high[offset]
+        low = self.runtime.low[offset]
+        close = self.runtime.close[offset]
+        open_ = self.runtime.open[offset]
+        if any(is_na(value) for value in (high, low, close)):
+            return na
+        if self.name == "hl2":
+            return (float(high) + float(low)) / 2.0
+        if self.name == "hlc3":
+            return (float(high) + float(low) + float(close)) / 3.0
+        if self.name == "ohlc4":
+            if is_na(open_):
+                return na
+            return (float(open_) + float(high) + float(low) + float(close)) / 4.0
+        if self.name == "hlcc4":
+            return (float(high) + float(low) + float(close) + float(close)) / 4.0
+        return na
+
+
+def hl2_series(runtime: PineRuntime) -> _RuntimeDerivedSeries:
+    return _RuntimeDerivedSeries(runtime, "hl2")
+
+
+def hlc3_series(runtime: PineRuntime) -> _RuntimeDerivedSeries:
+    return _RuntimeDerivedSeries(runtime, "hlc3")
+
+
+def ohlc4_series(runtime: PineRuntime) -> _RuntimeDerivedSeries:
+    return _RuntimeDerivedSeries(runtime, "ohlc4")
+
+
+def hlcc4_series(runtime: PineRuntime) -> _RuntimeDerivedSeries:
+    return _RuntimeDerivedSeries(runtime, "hlcc4")
 
 
 @dataclass(slots=True)
@@ -97,7 +156,8 @@ class _RmaState:
             self.warmup.append(number)
             self.warmup_total += number
             if len(self.warmup) < self.length:
-                return na
+                # TradingView returns valid values from bar 0 using SMA until RMA is ready
+                return self.warmup_total / len(self.warmup)
             self.value = self.warmup_total / self.length
             return self.value
         self.value = (self.value * (self.length - 1) + number) / self.length
@@ -217,7 +277,7 @@ def rma(
 
 
 def tr(
-    *, runtime: PineRuntime | None = None, high: Any = None, low: Any = None, close: Any = None
+    *, runtime: PineRuntime | None = None, state_id: str | None = None, high: Any = None, low: Any = None, close: Any = None
 ) -> Any:
     if runtime is not None:
         high_value = runtime.high[0]
@@ -247,6 +307,341 @@ def tr_batch(high: Sequence[Any], low: Sequence[Any], close: Sequence[Any]) -> l
         out.append(tr(high=high_value, low=low_value, close=prev_close))
         prev_close = close_value
     return out
+
+
+
+# === Additional state classes for batch-only TA functions ===
+
+@dataclass(slots=True)
+class _SarState:
+    """State for SAR calculation."""
+    start: float
+    inc: float
+    max_val: float
+    long: bool = True
+    af: float = 0.02
+    ep: float = 0.0
+    sarv: float = 0.0
+    first_bar: bool = True
+    
+    def update(self, high: Any, low: Any) -> Any:
+        if is_na(high) or is_na(low):
+            return na
+        h = float(high)
+        l = float(low)
+        if self.first_bar:
+            self.ep = h
+            self.sarv = l
+            self.first_bar = False
+            self.af = self.start
+            return na
+        prev = self.sarv
+        self.sarv = prev + self.af * (self.ep - prev)
+        if self.long:
+            if l < self.sarv:
+                self.long = False
+                self.sarv = self.ep
+                self.ep = l
+                self.af = self.start
+            elif h > self.ep:
+                self.ep = h
+                self.af = min(self.af + self.inc, self.max_val)
+        else:
+            if h > self.sarv:
+                self.long = True
+                self.sarv = self.ep
+                self.ep = h
+                self.af = self.start
+            elif l < self.ep:
+                self.ep = l
+                self.af = min(self.af + self.inc, self.max_val)
+        return self.sarv
+
+
+@dataclass(slots=True)
+class _HighestState:
+    """State for highest() calculation."""
+    length: int
+    values: deque[float] = field(default_factory=deque)
+    
+    def update(self, value: Any) -> Any:
+        if is_na(value):
+            return na
+        number = float(value)
+        self.values.append(number)
+        if len(self.values) > self.length:
+            self.values.popleft()
+        if len(self.values) < self.length:
+            return na
+        return max(self.values)
+
+
+@dataclass(slots=True)
+class _LowestState:
+    """State for lowest() calculation."""
+    length: int
+    values: deque[float] = field(default_factory=deque)
+    
+    def update(self, value: Any) -> Any:
+        if is_na(value):
+            return na
+        number = float(value)
+        self.values.append(number)
+        if len(self.values) > self.length:
+            self.values.popleft()
+        if len(self.values) < self.length:
+            return na
+        return min(self.values)
+
+
+@dataclass(slots=True)
+class _CciState:
+    """State for CCI calculation."""
+    length: int
+    typical_prices: deque[float] = field(default_factory=deque)
+
+    def update(self, high: Any, low: Any, close: Any) -> Any:
+        if is_na(high) or is_na(low) or is_na(close):
+            return na
+        h = float(high)
+        l = float(low)
+        c = float(close)
+        tp = (h + l + c) / 3.0
+        self.typical_prices.append(tp)
+        if len(self.typical_prices) > self.length:
+            self.typical_prices.popleft()
+        if len(self.typical_prices) < self.length:
+            return na
+        sma_tp = sum(self.typical_prices) / self.length
+        mean_dev = sum(abs(tp - v) for v in self.typical_prices) / self.length
+        if mean_dev == 0:
+            return na
+        return (tp - sma_tp) / (0.015 * mean_dev)
+
+
+class _MfiState:
+    """State for MFI (Money Flow Index) calculation."""
+    __slots__ = ("length", "typical_prices", "raw_mfs", "pos_sum", "neg_sum")
+
+    def __init__(self, length: int) -> None:
+        self.length: int = length
+        self.typical_prices: deque[float] = deque()
+        self.raw_mfs: deque[float] = deque()
+        self.pos_sum: float = 0.0
+        self.neg_sum: float = 0.0
+
+    def update(self, high: Any, low: Any, close: Any, volume: Any) -> Any:
+        if is_na(high) or is_na(low) or is_na(close) or is_na(volume):
+            return na
+        tp = (float(high) + float(low) + float(close)) / 3.0
+        mf = tp * float(volume)
+        prev_tp = self.typical_prices[-1] if self.typical_prices else None
+        self.typical_prices.append(tp)
+        self.raw_mfs.append(mf)
+        if len(self.typical_prices) > self.length:
+            oldest_tp = self.typical_prices[0]
+            oldest_mf = self.raw_mfs[0]
+            self.typical_prices.popleft()
+            self.raw_mfs.popleft()
+            # Subtract oldest from cumulative sums
+            if oldest_tp is not None:
+                if len(self.typical_prices) >= 2 and oldest_tp < self.typical_prices[1]:
+                    self.pos_sum -= oldest_mf
+                elif len(self.typical_prices) >= 2 and oldest_tp > self.typical_prices[1]:
+                    self.neg_sum -= oldest_mf
+        # Add current to cumulative sums
+        if prev_tp is not None:
+            if tp > prev_tp:
+                self.pos_sum += mf
+            elif tp < prev_tp:
+                self.neg_sum += mf
+        if len(self.typical_prices) < self.length:
+            return na
+        if self.neg_sum == 0:
+            return 100.0
+        return 100.0 - 100.0 / (1.0 + self.pos_sum / self.neg_sum)
+
+
+@dataclass(slots=True)
+class _ObvState:
+    """State for OBV calculation."""
+    prev_close: float | None = None
+    obv: float = 0.0
+    
+    def update(self, close: Any, volume: Any) -> Any:
+        if is_na(close) or is_na(volume):
+            return na
+        c = float(close)
+        v = float(volume)
+        if self.prev_close is None:
+            self.prev_close = c
+            self.obv = v
+        else:
+            if c > self.prev_close:
+                self.obv += v
+            elif c < self.prev_close:
+                self.obv -= v
+            self.prev_close = c
+        return self.obv
+
+
+@dataclass(slots=True)
+class _HmaState:
+    """State for Hull MA calculation."""
+    length: int
+    half_length: int = field(init=False)
+    sqrt_length: int = field(init=False)
+    wma_half_vals: deque[float] = field(default_factory=deque)
+    wma_full_vals: deque[float] = field(default_factory=deque)
+    results: deque[float] = field(default_factory=deque)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, 'half_length', max(1, self.length // 2))
+        object.__setattr__(self, 'sqrt_length', max(1, int(_py_math.sqrt(self.length))))
+    
+    def update(self, value: Any) -> Any:
+        if is_na(value):
+            return na
+        number = float(value)
+        n = self.length
+        half_n = self.half_length
+        sqrt_n = self.sqrt_length
+        self.wma_half_vals.append(number)
+        if len(self.wma_half_vals) > half_n:
+            self.wma_half_vals.popleft()
+        self.wma_full_vals.append(number)
+        if len(self.wma_full_vals) > n:
+            self.wma_full_vals.popleft()
+        if len(self.wma_full_vals) < n:
+            return na
+        half_list = list(self.wma_half_vals)
+        full_list = list(self.wma_full_vals)
+        half_wts = list(range(1, len(half_list) + 1))
+        half_wma = sum(w * v for w, v in zip(half_wts, half_list)) / sum(half_wts) if half_wts else 0
+        full_wts = list(range(1, len(full_list) + 1))
+        full_wma = sum(w * v for w, v in zip(full_wts, full_list)) / sum(full_wts)
+        raw = 2 * half_wma - full_wma
+        self.results.append(raw)
+        if len(self.results) > sqrt_n:
+            self.results.popleft()
+        if len(self.results) < sqrt_n:
+            return na
+        results_list = list(self.results)
+        res_wts = list(range(1, len(results_list) + 1))
+        return sum(w * v for w, v in zip(res_wts, results_list)) / sum(res_wts)
+
+
+@dataclass(slots=True)
+class _WmaState:
+    """State for WMA calculation."""
+    length: int
+    values: deque[float] = field(default_factory=deque)
+    
+    def update(self, value: Any) -> Any:
+        if is_na(value):
+            return na
+        number = float(value)
+        self.values.append(number)
+        if len(self.values) > self.length:
+            self.values.popleft()
+        if len(self.values) < self.length:
+            return na
+        vals_list = list(self.values)
+        weights = list(range(1, len(vals_list) + 1))
+        return sum(w * v for w, v in zip(weights, vals_list)) / sum(weights)
+
+
+@dataclass(slots=True)
+class _VwmaState:
+    """State for VWMA calculation."""
+    length: int
+    values: deque[float] = field(default_factory=deque)
+    volumes: deque[float] = field(default_factory=deque)
+    
+    def update(self, value: Any, volume: Any) -> Any:
+        if is_na(value) or is_na(volume):
+            return na
+        number = float(value)
+        vol = float(volume)
+        self.values.append(number)
+        self.volumes.append(vol)
+        if len(self.values) > self.length:
+            self.values.popleft()
+            self.volumes.popleft()
+        if len(self.values) < self.length:
+            return na
+        vals = list(self.values)
+        vols = list(self.volumes)
+        return sum(v * w for v, w in zip(vals, vols)) / sum(vols)
+
+
+@dataclass(slots=True)
+class _ChangeState:
+    """State for change() calculation."""
+    length: int
+    prev_values: deque[float] = field(default_factory=deque)
+    
+    def update(self, value: Any) -> Any:
+        if is_na(value):
+            return na
+        number = float(value)
+        self.prev_values.append(number)
+        if len(self.prev_values) > self.length + 1:
+            self.prev_values.popleft()
+        if len(self.prev_values) < self.length + 1:
+            return na
+        return number - self.prev_values[0]
+
+
+@dataclass(slots=True)
+class _RocState:
+    """State for ROC calculation."""
+    length: int
+    prev_values: deque[float] = field(default_factory=deque)
+    
+    def update(self, value: Any) -> Any:
+        if is_na(value):
+            return na
+        number = float(value)
+        self.prev_values.append(number)
+        if len(self.prev_values) > self.length + 1:
+            self.prev_values.popleft()
+        if len(self.prev_values) < self.length + 1:
+            return na
+        prev = self.prev_values[0]
+        if prev == 0:
+            return na
+        return 100.0 * (number - prev) / prev
+
+
+class _VwapState:
+    """State for VWAP calculation."""
+    __slots__ = ("cumulative_volume", "cumulative_price_volume", "session_key")
+
+    def __init__(self) -> None:
+        self.cumulative_volume: float = 0.0
+        self.cumulative_price_volume: float = 0.0
+        self.session_key: int | None = None
+
+    def update(self, source: Any, volume: Any, time_value: Any = None) -> Any:
+        if is_na(source) or is_na(volume):
+            return na
+        if time_value is not None and not is_na(time_value):
+            key = int(time_value) // 86_400_000
+            if self.session_key is None:
+                self.session_key = key
+            elif key != self.session_key:
+                self.session_key = key
+                self.cumulative_volume = 0.0
+                self.cumulative_price_volume = 0.0
+        s = float(source)
+        v = float(volume)
+        self.cumulative_volume += v
+        self.cumulative_price_volume += s * v
+        if self.cumulative_volume == 0:
+            return na
+        return self.cumulative_price_volume / self.cumulative_volume
+
 
 
 def atr(
@@ -318,21 +713,51 @@ def macd(
     return state.update(_current(source, "macd"))
 
 
-def highest(source: Any, length: int) -> Any:
+def highest(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
     values = [_history(source, offset, "highest") for offset in range(length)]
     numbers = [float(value) for value in values if not is_na(value)]
     return max(numbers) if numbers else na
 
 
-def lowest(source: Any, length: int) -> Any:
+def lowest(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
     values = [_history(source, offset, "lowest") for offset in range(length)]
     numbers = [float(value) for value in values if not is_na(value)]
     return min(numbers) if numbers else na
 
 
-def change(source: Any, length: int = 1) -> Any:
+def highestbars(source: Any, length: int) -> Any:
+    length = _validate_length(length)
+    best_offset: int | None = None
+    best_value: float | None = None
+    for offset in range(length):
+        value = _history(source, offset, "highestbars")
+        if is_na(value):
+            continue
+        numeric = float(value)
+        if best_value is None or numeric > best_value:
+            best_value = numeric
+            best_offset = offset
+    return na if best_offset is None else -best_offset
+
+
+def lowestbars(source: Any, length: int) -> Any:
+    length = _validate_length(length)
+    best_offset: int | None = None
+    best_value: float | None = None
+    for offset in range(length):
+        value = _history(source, offset, "lowestbars")
+        if is_na(value):
+            continue
+        numeric = float(value)
+        if best_value is None or numeric < best_value:
+            best_value = numeric
+            best_offset = offset
+    return na if best_offset is None else -best_offset
+
+
+def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
     current_value = _history(source, 0, "change")
     previous_value = _history(source, length, "change")
@@ -372,6 +797,8 @@ __all__ = [
     "macd",
     "highest",
     "lowest",
+    "highestbars",
+    "lowestbars",
     "change",
     "cross",
     "crossover",
@@ -392,7 +819,7 @@ def _rolling(source: Sequence[Any], length: int, fn: Callable[[list[Any]], Any])
     return out
 
 
-def stdev(source: Any, length: int, biased: bool = True) -> Any:
+def stdev(source: Any, length: int, biased: bool = True, *, runtime: Any = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
 
     def calc(win: list[Any]) -> Any:
@@ -411,11 +838,22 @@ def stdev(source: Any, length: int, biased: bool = True) -> Any:
     return calc(win)
 
 
-def variance(source: Any, length: int, biased: bool = True) -> Any:
-    sd = stdev(source, length, biased)
-    if isinstance(sd, list):
-        return [na if is_na(v) else float(v) ** 2 for v in sd]
-    return na if is_na(sd) else float(sd) ** 2
+def variance(source: Any, length: int, biased: bool = True, *, runtime: Any = None, state_id: str | None = None) -> Any:
+    length = _validate_length(length)
+
+    def calc(win: list[Any]) -> Any:
+        if any(is_na(v) for v in win):
+            return na
+        nums = [float(v) for v in win]
+        if not biased and len(nums) <= 1:
+            return na
+        mean = sum(nums) / len(nums)
+        denom = len(nums) if biased else len(nums) - 1
+        return sum((x - mean) ** 2 for x in nums) / denom
+
+    if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
+        return _rolling(source, length, calc)
+    return calc([_history(source, offset, "variance") for offset in reversed(range(length))])
 
 
 def dev(source: Any, length: int) -> Any:
@@ -433,7 +871,7 @@ def dev(source: Any, length: int) -> Any:
     return calc([_history(source, o, "dev") for o in reversed(range(length))])
 
 
-def wma(source: Any, length: int) -> Any:
+def wma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
     weights = list(range(1, length + 1))
     denom = sum(weights)
@@ -443,13 +881,18 @@ def wma(source: Any, length: int) -> Any:
             return na
         return sum(float(v) * w for v, w in zip(win, weights, strict=True)) / denom
 
+    if runtime is not None:
+        if state_id is None:
+            raise PineRuntimeError("ta.wma() runtime mode requires state_id")
+        state = _state(runtime, state_id, lambda: _WmaState(length), _WmaState)
+        return state.update(_current(source, "wma"))
     if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
         return _rolling(source, length, calc)
     return calc([_history(source, o, "wma") for o in reversed(range(length))])
 
 
 def vwma(
-    source: Any, length: int, volume: Any | None = None, *, runtime: PineRuntime | None = None
+    source: Any, length: int, volume: Any | None = None, *, runtime: PineRuntime | None = None, state_id: str | None = None
 ) -> Any:
     length = _validate_length(length)
     if runtime is not None and volume is None:
@@ -487,20 +930,25 @@ def vwma(
     )
 
 
-def hma(source: Any, length: int) -> Any:
+def hma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
-    if not isinstance(source, Sequence) or isinstance(source, SupportsSeriesLike):
-        raise PineRuntimeError(
-            "ta.hma() scalar/runtime mode is unsupported; use batch series input"
-        )
-    half = max(1, length // 2)
-    sqrt_len = max(1, int(_py_math.sqrt(length)))
-    w1 = wma(source, half)
-    w2 = wma(source, length)
-    diff = [
-        na if is_na(a) or is_na(b) else 2 * float(a) - float(b) for a, b in zip(w1, w2, strict=True)
-    ]
-    return wma(diff, sqrt_len)
+    if runtime is None:
+        if not isinstance(source, Sequence) or isinstance(source, SupportsSeriesLike):
+            raise PineRuntimeError(
+                "ta.hma() scalar mode is unsupported; use batch series input"
+            )
+        half = max(1, length // 2)
+        sqrt_len = max(1, int(_py_math.sqrt(length)))
+        w1 = wma(source, half)
+        w2 = wma(source, length)
+        diff = [
+            na if is_na(a) or is_na(b) else 2 * float(a) - float(b) for a, b in zip(w1, w2, strict=True)
+        ]
+        return wma(diff, sqrt_len)
+    if state_id is None:
+        raise PineRuntimeError("ta.hma() runtime mode requires state_id")
+    state = _state(runtime, state_id, lambda: _HmaState(length), _HmaState)
+    return state.update(_current(source, "hma"))
 
 
 def swma(source: Any) -> Any:
@@ -565,7 +1013,7 @@ def bbw(source: Any, length: int, mult: float) -> Any:
     return na if is_na(basis) or float(basis) == 0 else (float(upper) - float(lower)) / float(basis)
 
 
-def stoch(source: Any, high: Any, low: Any, length: int) -> Any:
+def stoch(source: Any, high: Any, low: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
 
     def calc(src: Any, highs: list[Any], lows: list[Any]) -> Any:
@@ -598,7 +1046,56 @@ def stoch(source: Any, high: Any, low: Any, length: int) -> Any:
     )
 
 
-def dmi(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int) -> Any:
+@dataclass(slots=True)
+class _DmiState:
+    di_length: int
+    adx_smoothing: int
+    rma_tr: Any = field(default_factory=lambda: _RmaState(0))
+    rma_plus_dm: Any = field(default_factory=lambda: _RmaState(0))
+    rma_minus_dm: Any = field(default_factory=lambda: _RmaState(0))
+    rma_dx: Any = field(default_factory=lambda: _RmaState(0))
+    prev_h: Any = na
+    prev_l: Any = na
+    prev_c: Any = na
+    _initialized: bool = False
+
+    def __post_init__(self) -> None:
+        self.rma_tr = _RmaState(self.di_length)
+        self.rma_plus_dm = _RmaState(self.di_length)
+        self.rma_minus_dm = _RmaState(self.di_length)
+        self.rma_dx = _RmaState(self.adx_smoothing)
+
+    def update(self, high: Any, low: Any, close: Any) -> tuple[Any, Any, Any]:
+        h, l, c = float(high), float(low), float(close)
+        if is_na(self.prev_h):
+            plus_dm = 0.0
+            minus_dm = 0.0
+            tr_val = h - l
+        else:
+            up = h - float(self.prev_h)
+            down = float(self.prev_l) - l
+            plus_dm = up if up > down and up > 0 else 0.0
+            minus_dm = down if down > up and down > 0 else 0.0
+            tr_val = max(h - l, abs(h - float(self.prev_c)), abs(l - float(self.prev_c)))
+        self.prev_h, self.prev_l, self.prev_c = high, low, close
+        atr_val = self.rma_tr.update(tr_val)
+        plus_rma = self.rma_plus_dm.update(plus_dm)
+        minus_rma = self.rma_minus_dm.update(minus_dm)
+        if is_na(atr_val) or float(atr_val) == 0:
+            return na, na, na
+        di_plus = 100 * float(plus_rma) / float(atr_val)
+        di_minus = 100 * float(minus_rma) / float(atr_val)
+        dx = na if di_plus + di_minus == 0 else 100 * abs(di_plus - di_minus) / (di_plus + di_minus)
+        adx_val = self.rma_dx.update(dx)
+        return di_plus, di_minus, adx_val
+
+
+def dmi(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    if runtime is not None:
+        if state_id is None:
+            raise PineRuntimeError("ta.dmi() runtime mode requires state_id")
+        state = _state(runtime, state_id, lambda: _DmiState(di_length, adx_smoothing), _DmiState)
+        return state.update(high, low, close)
     if not (
         isinstance(high, Sequence) and isinstance(low, Sequence) and isinstance(close, Sequence)
     ) or isinstance(high, SupportsSeriesLike):
@@ -649,13 +1146,66 @@ def dmi(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int) -> 
     return plus, minus, rma(dx, adx_smoothing)
 
 
-def adx(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int) -> Any:
+def adx(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     return dmi(high, low, close, di_length, adx_smoothing)[2]
 
 
+@dataclass
+class _SupertrendState:
+    factor: float
+    atr_state_id: str
+    upper_band: Any = na
+    lower_band: Any = na
+    prev_st: Any = na
+    direction: int = 0
+    prev_close: Any = na
+
+    def update(self, high: Any, low: Any, close: Any, atr_val: Any) -> tuple[Any, int]:
+        if is_na(atr_val):
+            return na, 0
+        h = float(high)
+        l = float(low)
+        c = float(close)
+        hl2 = (h + l) / 2
+        bub = hl2 + self.factor * float(atr_val)
+        blb = hl2 - self.factor * float(atr_val)
+        prev_upper = self.upper_band
+        prev_lower = self.lower_band
+        prev_close = self.prev_close
+        prev_st = self.prev_st
+        pc = float(prev_close) if not is_na(prev_close) else c
+        upper = bub if is_na(prev_upper) or bub < float(prev_upper) or pc > float(prev_upper) else prev_upper
+        lower = blb if is_na(prev_lower) or blb > float(prev_lower) or pc < float(prev_lower) else prev_lower
+        if is_na(self.prev_st):
+            st = upper
+            d = 1
+        elif prev_st == prev_upper:
+            d = -1 if c > float(upper) else 1
+            st = lower if d == -1 else upper
+        else:
+            d = 1 if c < float(lower) else -1
+            st = upper if d == 1 else lower
+        self.upper_band = upper
+        self.lower_band = lower
+        self.prev_st = st
+        self.prev_close = close
+        return st, d
+
+
 def supertrend(
-    factor: float, atr_period: int, *, high: Sequence[Any], low: Sequence[Any], close: Sequence[Any]
-) -> tuple[list[Any], list[Any]]:
+    factor: float, atr_period: int, *,
+    runtime: PineRuntime | None = None, state_id: str | None = None,
+    high: Sequence[Any] | None = None, low: Sequence[Any] | None = None, close: Sequence[Any] | None = None
+) -> Any:
+    if runtime is not None:
+        if state_id is None:
+            raise PineRuntimeError("ta.supertrend() runtime mode requires state_id")
+        state = _state(runtime, state_id, lambda: _SupertrendState(factor, f"{state_id}:atr"), _SupertrendState)
+        atr_val = atr(atr_period, runtime=runtime, state_id=state.atr_state_id)
+        st, d = state.update(
+            runtime.high.current, runtime.low.current, runtime.close.current, atr_val
+        )
+        return st, d
     atrs = atr(atr_period, high=high, low=low, close=close)
     line: list[Any] = []
     direction: list[Any] = []
@@ -693,8 +1243,14 @@ def sar(
     low: Sequence[Any],
     start: float = 0.02,
     inc: float = 0.02,
-    max: float = 0.2,
-) -> list[Any]:
+    max_val: float = 0.2,
+    *, runtime: PineRuntime | None = None, state_id: str | None = None,
+) -> Any:
+    if runtime is not None:
+        if state_id is None:
+            raise PineRuntimeError("ta.sar() runtime mode requires state_id")
+        state = _state(runtime, state_id, lambda: _SarState(start, inc, max_val), _SarState)
+        return state.update(_current(high, "sar"), _current(low, "sar"))
     if len(high) != len(low):
         raise PineRuntimeError("ta.sar() high/low length mismatch")
     out: list[Any] = []
@@ -776,10 +1332,10 @@ def valuewhen(condition: Any, source: Any, occurrence: int) -> Any:
             out.append(hits[occurrence] if occurrence < len(hits) else na)
         return out
     for off in range(0, 10000):
-        cv = _history(condition, off, "valuewhen")
+        cv = _condition_history(condition, off)
         if is_na(cv) and off > 0:
             break
-        if bool(cv):
+        if (not is_na(cv)) and bool(cv):
             hits.append(_history(source, off, "valuewhen"))
             if len(hits) > occurrence:
                 return hits[occurrence]
@@ -798,8 +1354,8 @@ def barssince(condition: Any) -> Any:
                 out.append(na if last is None else i - last)
         return out
     for off in range(0, 10000):
-        cv = _history(condition, off, "barssince")
-        if bool(cv):
+        cv = _condition_history(condition, off)
+        if (not is_na(cv)) and bool(cv):
             return off
         if is_na(cv) and off > 0:
             break
@@ -876,12 +1432,14 @@ def percentrank(source: Any, length: int) -> Any:
     )
 
 
-def vwap(source: Any, volume: Any | None = None, *, runtime: PineRuntime | None = None) -> Any:
+def vwap(source: Any, volume: Any | None = None, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     if runtime is not None:
-        source = runtime.close if source is None else source
-        volume = runtime.volume if volume is None else volume
-    if volume is None:
-        raise PineRuntimeError("ta.vwap() requires volume or runtime")
+        if state_id is None:
+            raise PineRuntimeError("ta.vwap() runtime mode requires state_id")
+        source = _current(runtime.close if source is None else source, "vwap")
+        volume = _current(runtime.volume if volume is None else volume, "vwap")
+        state = _state(runtime, state_id, _VwapState, _VwapState)
+        return state.update(source, volume, runtime.time.current)
     if (
         isinstance(source, Sequence)
         and isinstance(volume, Sequence)
@@ -895,24 +1453,39 @@ def vwap(source: Any, volume: Any | None = None, *, runtime: PineRuntime | None 
                 den += float(v)
             out.append(na if den == 0 else num / den)
         return out
-    # runtime cumulative via implicit history scan is not possible without state; explicit unsupported  # noqa: E501
-    raise PineRuntimeError(
-        "ta.vwap() runtime mode requires anchored state and is unsupported in v0.6.0"
+    if volume is None:
+        raise PineRuntimeError("ta.vwap() requires volume or runtime")
+    return _VwapState().update(
+        _current(source, "vwap"), _current(volume, "vwap")
     )
 
 
-def mom(source: Any, length: int) -> Any:
-    return change(source, length)
+def mom(
+    source: Any, length: int,
+    *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    """momentum() with optional runtime state tracking."""
+    return change(source, length, runtime=runtime, state_id=state_id)
 
 
-def roc(source: Any, length: int) -> Any:
+def roc(
+    source: Any, length: int,
+    *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    """ROC (Rate of Change) with optional runtime state tracking."""
+    length = _validate_length(length)
+    if state_id is not None:
+        if runtime is None:
+            raise PineRuntimeError("ta.roc() runtime mode requires runtime")
+        state = _state(runtime, state_id, lambda: _RocState(length), _RocState)
+        return state.update(_current(source, "roc"))
+    if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
+        return _batch_roc(source, length)
     cur = _history(source, 0, "roc")
-    prev = _history(source, _validate_length(length), "roc")
-    return (
-        na
-        if is_na(cur) or is_na(prev) or float(prev) == 0
-        else 100.0 * (float(cur) - float(prev)) / float(prev)
-    )
+    prev = _history(source, length, "roc")
+    if is_na(cur) or is_na(prev) or float(prev) == 0:
+        return na
+    return 100.0 * (float(cur) - float(prev)) / float(prev)
 
 
 def correlation(source1: Any, source2: Any, length: int) -> Any:
@@ -936,60 +1509,100 @@ def correlation(source1: Any, source2: Any, length: int) -> Any:
 
 
 def rising(source: Any, length: int) -> bool:
-    cur = _history(source, 0, "rising")
-    vals = [_history(source, o, "rising") for o in range(1, _validate_length(length) + 1)]
-    return (
-        False
-        if is_na(cur) or any(is_na(v) for v in vals)
-        else all(float(cur) > float(v) for v in vals)
-    )
+    length = _validate_length(length)
+    values = [_history(source, offset, "rising") for offset in range(length + 1)]
+    if any(is_na(value) for value in values):
+        return False
+    return all(float(values[index]) > float(values[index + 1]) for index in range(length))
 
 
 def falling(source: Any, length: int) -> bool:
-    cur = _history(source, 0, "falling")
-    vals = [_history(source, o, "falling") for o in range(1, _validate_length(length) + 1)]
-    return (
-        False
-        if is_na(cur) or any(is_na(v) for v in vals)
-        else all(float(cur) < float(v) for v in vals)
+    length = _validate_length(length)
+    values = [_history(source, offset, "falling") for offset in range(length + 1)]
+    if any(is_na(value) for value in values):
+        return False
+    return all(float(values[index]) < float(values[index + 1]) for index in range(length))
+
+
+def cci(source: Any, length: int, *legacy_args: Any, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    if legacy_args:
+        low, close, legacy_length = length, legacy_args[0], legacy_args[1]
+        source = [(float(h) + float(l) + float(c)) / 3 for h, l, c in zip(source, low, close, strict=True)]
+        length = legacy_length
+    length = _validate_length(length)
+
+    def calc(win: list[Any]) -> Any:
+        if any(is_na(v) for v in win):
+            return na
+        nums = [float(v) for v in win]
+        mean = sum(nums) / length
+        mean_dev = sum(abs(v - mean) for v in nums) / length
+        return na if mean_dev == 0 else (nums[-1] - mean) / (0.015 * mean_dev)
+
+    if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
+        return _rolling(source, length, calc)
+    return calc([_history(source, o, "cci") for o in reversed(range(length))])
+
+
+def mfi(
+    source: Any,
+    length: int,
+    *legacy_args: Any,
+    volume: Any | None = None,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
+    if legacy_args:
+        low, close, legacy_volume, legacy_length = length, legacy_args[0], legacy_args[1], legacy_args[2]
+        source = [(float(h) + float(l) + float(c)) / 3 for h, l, c in zip(source, low, close, strict=True)]
+        volume = legacy_volume
+        length = legacy_length
+    length = _validate_length(length)
+    if runtime is not None and volume is None:
+        volume = runtime.volume
+    if volume is None:
+        raise PineRuntimeError("ta.mfi() requires volume or runtime")
+
+    def calc(src_win: list[Any], vol_win: list[Any]) -> Any:
+        if any(is_na(v) for v in src_win + vol_win):
+            return na
+        pos = neg = 0.0
+        for idx in range(length):
+            cur = float(src_win[idx])
+            prev = float(src_win[idx + 1])
+            flow = cur * float(vol_win[idx])
+            if cur > prev:
+                pos += flow
+            elif cur < prev:
+                neg += flow
+        if neg == 0:
+            return 100.0
+        return 100.0 - 100.0 / (1.0 + pos / neg)
+
+    if (
+        isinstance(source, Sequence)
+        and isinstance(volume, Sequence)
+        and not isinstance(source, SupportsSeriesLike)
+    ):
+        out: list[Any] = []
+        for i in range(len(source)):
+            if i < length:
+                out.append(na)
+            else:
+                out.append(
+                    calc(
+                        list(reversed(source[i - length : i + 1])),
+                        list(reversed(volume[i - length + 1 : i + 1])),
+                    )
+                )
+        return out
+    return calc(
+        [_history(source, o, "mfi") for o in range(length + 1)],
+        [_history(volume, o, "mfi") for o in range(length)],
     )
 
 
-def cci(high: Any, low: Any, close: Any, length: int) -> Any:
-    tp = [
-        (float(h) + float(low_value) + float(c)) / 3
-        for h, low_value, c in zip(high, low, close, strict=True)
-    ]
-    sm = sma(tp, length)
-    dv = dev(tp, length)
-    return [
-        na if is_na(s) or is_na(d) or float(d) == 0 else (t - float(s)) / (0.015 * float(d))
-        for t, s, d in zip(tp, sm, dv, strict=True)
-    ]
-
-
-def mfi(high: Any, low: Any, close: Any, volume: Any, length: int) -> Any:
-    tp = [
-        (float(h) + float(low_value) + float(c)) / 3
-        for h, low_value, c in zip(high, low, close, strict=True)
-    ]
-    pos = []
-    neg = []
-    for i, t in enumerate(tp):
-        mf = t * float(volume[i])
-        pos.append(mf if i > 0 and t > tp[i - 1] else 0.0)
-        neg.append(mf if i > 0 and t < tp[i - 1] else 0.0)
-    ps = _rolling(pos, _validate_length(length), lambda w: sum(float(x) for x in w))
-    ns = _rolling(neg, _validate_length(length), lambda w: sum(float(x) for x in w))
-    return [
-        na
-        if is_na(p) or is_na(n)
-        else (100.0 if float(n) == 0 else 100.0 - 100.0 / (1.0 + float(p) / float(n)))
-        for p, n in zip(ps, ns, strict=True)
-    ]
-
-
-def obv(close: Any, volume: Any) -> Any:
+def obv(close: Any, volume: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     out: list[float] = []
     total = 0.0
     prev: Any = na
