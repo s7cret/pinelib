@@ -34,23 +34,14 @@ def _current(source: Any, function_name: str) -> Any:
 
 def _history(source: Any, offset: int, function_name: str) -> Any:
     if isinstance(source, SupportsSeriesLike):
-        value = source[offset]
-    elif offset == 0:
-        value = source
-    else:
-        # Scalar constants (e.g. 50) don't change between bars —
-        # return the value itself, not na
-        value = source
-    _reject_bool(value, function_name)
-    return value
+        return source[offset]
+    return source
 
 
 def _condition_history(source: Any, offset: int) -> Any:
     if isinstance(source, SupportsSeriesLike):
         return source[offset]
-    if offset == 0:
-        return source
-    return na
+    return source
 
 
 def _series_values(source: Sequence[Any]) -> list[Any]:
