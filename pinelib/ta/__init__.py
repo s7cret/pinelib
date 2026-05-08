@@ -97,6 +97,27 @@ def hlcc4_series(runtime: PineRuntime) -> _RuntimeDerivedSeries:
     return _RuntimeDerivedSeries(runtime, "hlcc4")
 
 
+class _ShiftedSeries:
+    def __init__(self, source: SupportsSeriesLike, offset: int) -> None:
+        self.source = source
+        self.offset = offset
+
+    @property
+    def current(self) -> Any:
+        return self[0]
+
+    @property
+    def committed_length(self) -> int:
+        return self.source.committed_length
+
+    def __getitem__(self, offset: int) -> Any:
+        return self.source[offset + self.offset]
+
+
+def shifted_series(source: SupportsSeriesLike, offset: int) -> _ShiftedSeries:
+    return _ShiftedSeries(source, offset)
+
+
 @dataclass(slots=True)
 class _SmaState:
     length: int
@@ -761,7 +782,7 @@ def crossover(source1: Any, source2: Any) -> bool:
     current_left = _history(source1, 0, "crossover")
     current_right = _history(source2, 0, "crossover")
     previous_left = _history(source1, 1, "crossover")
-    previous_right = _history(source2, 1, "crossover")
+    previous_right = _condition_history(source2, 1)
     return pine_gt(current_left, current_right) and pine_lte(previous_left, previous_right)
 
 
@@ -769,7 +790,7 @@ def crossunder(source1: Any, source2: Any) -> bool:
     current_left = _history(source1, 0, "crossunder")
     current_right = _history(source2, 0, "crossunder")
     previous_left = _history(source1, 1, "crossunder")
-    previous_right = _history(source2, 1, "crossunder")
+    previous_right = _condition_history(source2, 1)
     return pine_lt(current_left, current_right) and pine_gte(previous_left, previous_right)
 
 
