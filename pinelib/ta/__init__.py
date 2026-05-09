@@ -15,10 +15,15 @@ Numeric: TypeAlias = int | float
 TAValue: TypeAlias = Numeric | object
 
 
-def _validate_length(length: int) -> int:
-    if isinstance(length, bool) or int(length) <= 0:
+def _validate_length(length: Any) -> int:
+    # Accept Pine input-backed Series (extract scalar from .current)
+    if hasattr(length, 'current'):
+        length = int(length.current)
+    else:
+        length = int(length)
+    if isinstance(length, bool) or length <= 0:
         raise PineRuntimeError("TA length must be a positive integer")
-    return int(length)
+    return length
 
 
 def _reject_bool(value: Any, function_name: str) -> None:
@@ -1663,4 +1668,125 @@ __all__ += [
     "correlation",
     "rising",
     "falling",
+    "cum",
+    "ta_range",
+    "cmo",
+    "tsi",
 ]
+
+
+class _CumState:
+    """State for ta.cum (cumulative sum)."""
+    total: float = 0.0
+
+    def update(self, value: Any) -> Any:
+        if not is_na(value):
+            self.total += float(value)
+        return self.total
+
+
+def cum(source: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    """Cumulative sum of source."""
+    is_iterable = hasattr(source, '__iter__') and not isinstance(source, (str, bytes))
+    if runtime is None and is_iterable:
+        out: list[float] = []
+        total = 0.0
+        for v in source:
+            if not is_na(v):
+                total += float(v)
+            out.append(total)
+        return out
+    if state_id is None:
+        state_id = "_cum_default"
+    state = _state(runtime, state_id, lambda: _CumState(), _CumState)
+    val = _current(source, "cum") if hasattr(source, 'current') else source
+    return state.update(val)
+
+
+def ta_range(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    """Range = highest(source, length) - lowest(source, length)."""
+    if runtime is None:
+        vals: list[float] = []
+        out: list[float] = []
+        for v in source:
+            if is_na(v):
+                vals.append(0.0)
+            else:
+                vals.append(float(v))
+            if len(vals) >= length:
+                window = vals[-length:]
+                numeric = [x for x in window if x != 0.0 or len(window) == length]
+                if numeric:
+                    out.append(max(numeric) - min(numeric))
+                else:
+                    out.append(na)
+            else:
+                out.append(na)
+        return out
+    hi = highest(source, length, runtime=runtime, state_id=f"{state_id}_h")
+    lo = lowest(source, length, runtime=runtime, state_id=f"{state_id}_l")
+    from pinelib.core.operators import pine_sub
+    return pine_sub(hi, lo)
+
+
+def cmo(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    """Chande Momentum Oscillator — batch mode only."""
+    length = _validate_length(length)
+    src_list = list(source) if hasattr(source, '__iter__') else [source]
+    n = len(src_list)
+    if n < length + 1:
+        return na
+    mom_series: list[float] = []
+    for i in range(n):
+        prev_idx = i - length
+        if prev_idx < 0:
+            mom_series.append(float('nan'))
+        else:
+            cur = src_list[i]
+            prev = src_list[prev_idx]
+            if is_na(cur) or is_na(prev):
+                mom_series.append(float('nan'))
+            else:
+                mom_series.append(float(cur) - float(prev))
+    sum_pos = 0.0
+    sum_neg = 0.0
+    for m in mom_series:
+        if not _py_math.isnan(m):
+            if m > 0:
+                sum_pos += m
+            elif m < 0:
+                sum_neg += abs(m)
+    denom = sum_pos + sum_neg
+    if denom == 0:
+        return na
+    return 100.0 * (sum_pos - sum_neg) / denom
+
+
+def tsi(source: Any, short_length: int, long_length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    """True Strength Index — batch mode only."""
+    short_length = _validate_length(short_length)
+    long_length = _validate_length(long_length)
+    src_list = list(source) if hasattr(source, '__iter__') else [source]
+    n = len(src_list)
+    if n < long_length + 1:
+        return na
+    changes = [float(src_list[i]) - float(src_list[i-1]) if i > 0 else float('nan') for i in range(n)]
+    alpha_s = 2.0 / (short_length + 1)
+    ema1 = changes[0] if n > 0 else 0.0
+    for i in range(1, n):
+        ema1 = alpha_s * changes[i] + (1 - alpha_s) * ema1
+    alpha_l = 2.0 / (long_length + 1)
+    ema2 = ema1
+    for i in range(1, n):
+        ema2 = alpha_l * ema1 + (1 - alpha_l) * ema2
+    abs_changes = [abs(c) if not _py_math.isnan(c) else 0.0 for c in changes]
+    ema1_abs = abs_changes[0] if n > 0 else 0.0
+    for i in range(1, n):
+        ema1_abs = alpha_s * abs_changes[i] + (1 - alpha_s) * ema1_abs
+    ema2_abs = ema1_abs
+    for i in range(1, n):
+        ema2_abs = alpha_l * ema1_abs + (1 - alpha_l) * ema2_abs
+    if ema2_abs == 0:
+        return na
+    return 100.0 * ema2 / ema2_abs
+
