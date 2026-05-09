@@ -70,6 +70,7 @@ class Order:
     fill_price: float | None = None
     fill_source: str | None = None
     source_map: object | None = None
+    comment: str | None = None
     immediate: bool = False
     trail_activation: float | None = None
     trail_offset: float | None = None
@@ -395,6 +396,7 @@ class StrategyContext:
         qty_percent: float | None = None,
         immediately: bool = False,
         *,
+        comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
         available = abs(sum(lot.qty for lot in self._lots if lot.entry_id == id))
@@ -414,11 +416,18 @@ class StrategyContext:
                 created_bar_index=created_bar_index,
                 created_time=created_time,
                 source_map=source_map,
+                comment=comment,
                 immediate=immediately,
             )
         )
 
-    def close_all(self, immediately: bool = False, *, source_map: object | None = None) -> None:
+    def close_all(
+        self,
+        immediately: bool = False,
+        *,
+        comment: str | None = None,
+        source_map: object | None = None,
+    ) -> None:
         if self.position_size == 0:
             return
         direction: Direction = "short" if self.position_size > 0 else "long"
@@ -433,6 +442,7 @@ class StrategyContext:
                 created_bar_index=created_bar_index,
                 created_time=created_time,
                 source_map=source_map,
+                comment=comment,
                 immediate=immediately,
             )
         )

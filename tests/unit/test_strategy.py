@@ -41,6 +41,17 @@ def test_market_entry_fills_next_bar_open() -> None:
     assert s.position_avg_price == 20
 
 
+def test_strategy_close_accepts_comment() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 12, 9, 11))
+    s.entry("L", "long")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    s.close("L", comment="P4_CLOSE_LONG")
+    assert s.pending_orders[-1].comment == "P4_CLOSE_LONG"
+    runtime.end_bar()
+
+
 def test_process_orders_on_close_market_fills_current_close() -> None:
     s = StrategyContext(process_orders_on_close=True)
     runtime = rt(s)
