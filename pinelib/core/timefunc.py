@@ -112,9 +112,11 @@ class TimeFunctions:
         *,
         runtime: PineRuntime,
     ) -> int | object:
-        self._validate_timeframe(timeframe, runtime)
         if runtime.current_bar is None:
             return na
+        if self._is_intraday_daily_request(timeframe, runtime):
+            return self._daily_bucket_open(runtime.current_bar.time)
+        self._validate_timeframe(timeframe, runtime)
         resolved_tz = timezone or runtime.syminfo.timezone
         session_value = session or runtime.syminfo.session
         return (
@@ -131,9 +133,11 @@ class TimeFunctions:
         *,
         runtime: PineRuntime,
     ) -> int | object:
-        self._validate_timeframe(timeframe, runtime)
         if runtime.current_bar is None:
             return na
+        if self._is_intraday_daily_request(timeframe, runtime):
+            return self._daily_bucket_open(runtime.current_bar.time) + 86_400_000
+        self._validate_timeframe(timeframe, runtime)
         resolved_tz = timezone or runtime.syminfo.timezone
         session_value = session or runtime.syminfo.session
         return (
@@ -183,6 +187,20 @@ class TimeFunctions:
             session,
             timezone_name,
         )
+
+    @staticmethod
+    def _daily_bucket_open(timestamp_ms: int) -> int:
+        return (timestamp_ms // 86_400_000) * 86_400_000
+
+    @staticmethod
+    def _is_intraday_daily_request(timeframe: str | None, runtime: PineRuntime) -> bool:
+        if timeframe is None:
+            return False
+        requested = timeframe.strip().upper()
+        if requested not in {"D", "1D"}:
+            return False
+        chart_ms = runtime.timeframe.interval_ms
+        return chart_ms is not None and chart_ms < 86_400_000
 
     def _validate_timeframe(self, timeframe: str | None, runtime: PineRuntime) -> None:
         if timeframe is None:
