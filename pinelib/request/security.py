@@ -17,6 +17,34 @@ GapsMode = Literal["barmerge.gaps_on", "barmerge.gaps_off"]
 LookaheadMode = Literal["barmerge.lookahead_on", "barmerge.lookahead_off"]
 
 
+def _effective_close_time(
+    requested_bar: Bar,
+    all_requested_bars: Sequence[Bar],
+    bar_index: int,
+) -> int:
+    """Compute effective close time for a requested HTF bar.
+
+    When a bar's time_close is None (e.g., aggregated D bars), infer the effective
+    close from the next bar's start time. This correctly implements lookahead_off
+    behavior where the current HTF bar's value is only exposed after the HTF period
+    closes (i.e., when the next HTF bar's start time is reached).
+
+    For D bars: next bar time = next midnight UTC = correct close boundary.
+    For weekly bars: next bar time = next Monday midnight = correct close boundary.
+    For intraday HTF bars: next bar time = correct close boundary.
+    For the last bar (no next): defaults to +1 day (safe for D; may need refinement
+    for other HTF timeframes).
+    """
+    if requested_bar.time_close is not None:
+        return requested_bar.time_close
+    # Infer from next bar's start time. For D bars: next_bar.time = midnight of
+    # the NEXT day = correct close boundary (e.g., May 5 D bar: next_bar.time =
+    # May 6 00:00 = correct close). For the last bar (no next), use bar.time + 1 day.
+    if bar_index + 1 < len(all_requested_bars):
+        return all_requested_bars[bar_index + 1].time
+    return requested_bar.time + 86400000
+
+
 def merge_requested_series_to_chart_bars(
     requested_values: Sequence[Any],
     *,
@@ -34,15 +62,19 @@ def merge_requested_series_to_chart_bars(
 
     merged: list[Any] = []
     last_value: Any = na
+    last_finalized_value: Any = na
     for chart_bar in chart_bars:
         value: Any = na
         chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
-        for requested_bar, requested_value in zip(requested_bars, requested_values, strict=True):
+        for i, (requested_bar, requested_value) in enumerate(
+            zip(requested_bars, requested_values, strict=True)
+        ):
             requested_close = (
                 requested_bar.time_close
                 if requested_bar.time_close is not None
                 else requested_bar.time
             )
+            effective_close = _effective_close_time(requested_bar, requested_bars, i)
             if lookahead == "barmerge.lookahead_on":
                 if gaps == "barmerge.gaps_on":
                     matches = chart_bar.time <= requested_bar.time <= chart_close
@@ -51,14 +83,23 @@ def merge_requested_series_to_chart_bars(
             elif gaps == "barmerge.gaps_on":
                 matches = chart_bar.time <= requested_close <= chart_close
             else:
-                matches = requested_close <= chart_close
+                # lookahead_off, gaps_off: use effective_close for finalization check
+                # A bar is "finalized" (its close value is confirmed) only after
+                # its period closes: chart_bar.time >= effective_close.
+                # Before finalization, use the previous finalized bar's value.
+                if chart_close >= effective_close:
+                    matches = True
+                    last_finalized_value = requested_value
+                else:
+                    matches = False
             if matches:
                 value = requested_value
         if value is na and gaps == "barmerge.gaps_off":
-            value = last_value
+            # Use last finalized value (last confirmed HTF bar close)
+            value = last_finalized_value
         elif value is not na:
             last_value = value
-        merged.append(value)
+        merged.append(value if value is not na else last_finalized_value)
     return merged
 
 
