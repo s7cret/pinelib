@@ -480,6 +480,98 @@ class _MfiState:
 
 
 @dataclass(slots=True)
+class _CmoState:
+    """State for Chande Momentum Oscillator (CMO) calculation."""
+    length: int
+    prev_value: float | None = None
+    changes: deque[float] = field(default_factory=deque)
+    pos_sum: float = 0.0
+    neg_sum: float = 0.0
+
+    def update(self, value: Any) -> Any:
+        _reject_bool(value, "cmo")
+        if is_na(value):
+            return na
+        number = float(value)
+        if self.prev_value is None:
+            self.prev_value = number
+            return na
+        change = number - self.prev_value
+        self.prev_value = number
+        # Add current change to rolling sums
+        if change > 0:
+            self.pos_sum += change
+        elif change < 0:
+            self.neg_sum += abs(change)
+        # Remove oldest change if window exceeded
+        if len(self.changes) >= self.length:
+            oldest = self.changes.popleft()
+            if oldest > 0:
+                self.pos_sum = max(0.0, self.pos_sum - oldest)
+            elif oldest < 0:
+                self.neg_sum = max(0.0, self.neg_sum - abs(oldest))
+        self.changes.append(change)
+        if len(self.changes) < self.length:
+            return na
+        denom = self.pos_sum + self.neg_sum
+        if denom == 0:
+            return na
+        return 100.0 * (self.pos_sum - self.neg_sum) / denom
+
+
+@dataclass(slots=True)
+class _TsiState:
+    """State for True Strength Index (TSI) calculation."""
+    short_length: int
+    long_length: int
+    prev_value: float | None = None
+    momentum: deque[float] = field(default_factory=deque)
+    abs_momentum: deque[float] = field(default_factory=deque)
+    ema1: float | None = None
+    ema1_abs: float | None = None
+    ema2: float | None = None
+    ema2_abs: float | None = None
+    warmup_count: int = 0
+
+    def update(self, value: Any) -> Any:
+        _reject_bool(value, "tsi")
+        if is_na(value):
+            return na
+        number = float(value)
+        if self.prev_value is None:
+            self.prev_value = number
+            self.warmup_count = 0
+            return na
+        momentum = number - self.prev_value
+        abs_momentum = abs(momentum)
+        self.prev_value = number
+        self.warmup_count += 1
+        # Remove oldest if window exceeded
+        if len(self.momentum) >= self.long_length:
+            self.momentum.popleft()
+            self.abs_momentum.popleft()
+        self.momentum.append(momentum)
+        self.abs_momentum.append(abs_momentum)
+        if self.warmup_count < self.long_length:
+            return na
+        # Double EMA smoothing: first EMA with short_length
+        alpha_s = 2.0 / (self.short_length + 1)
+        ema_val = momentum if self.ema1 is None else alpha_s * momentum + (1 - alpha_s) * self.ema1
+        ema_abs_val = abs_momentum if self.ema1_abs is None else alpha_s * abs_momentum + (1 - alpha_s) * self.ema1_abs
+        self.ema1 = ema_val
+        self.ema1_abs = ema_abs_val
+        # Second EMA with long_length
+        alpha_l = 2.0 / (self.long_length + 1)
+        ema2_val = self.ema1 if self.ema2 is None else alpha_l * self.ema1 + (1 - alpha_l) * self.ema2
+        ema2_abs_val = self.ema1_abs if self.ema2_abs is None else alpha_l * self.ema1_abs + (1 - alpha_l) * self.ema2_abs
+        self.ema2 = ema2_val
+        self.ema2_abs = ema2_abs_val
+        if self.ema2_abs == 0:
+            return na
+        return 100.0 * self.ema2 / self.ema2_abs
+
+
+@dataclass(slots=True)
 class _ObvState:
     """State for OBV calculation."""
     prev_close: float | None = None
@@ -1730,63 +1822,30 @@ def ta_range(source: Any, length: int, *, runtime: PineRuntime | None = None, st
 
 
 def cmo(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
-    """Chande Momentum Oscillator — batch mode only."""
+    """Chande Momentum Oscillator — rolling mode with runtime support."""
     length = _validate_length(length)
-    src_list = list(source) if hasattr(source, '__iter__') else [source]
-    n = len(src_list)
-    if n < length + 1:
-        return na
-    mom_series: list[float] = []
-    for i in range(n):
-        prev_idx = i - length
-        if prev_idx < 0:
-            mom_series.append(float('nan'))
-        else:
-            cur = src_list[i]
-            prev = src_list[prev_idx]
-            if is_na(cur) or is_na(prev):
-                mom_series.append(float('nan'))
-            else:
-                mom_series.append(float(cur) - float(prev))
-    sum_pos = 0.0
-    sum_neg = 0.0
-    for m in mom_series:
-        if not _py_math.isnan(m):
-            if m > 0:
-                sum_pos += m
-            elif m < 0:
-                sum_neg += abs(m)
-    denom = sum_pos + sum_neg
-    if denom == 0:
-        return na
-    return 100.0 * (sum_pos - sum_neg) / denom
+    if runtime is None:
+        state = _CmoState(length)
+        return _batch_unary(source, state.update)
+    if state_id is None:
+        raise PineRuntimeError("ta.cmo() runtime mode requires state_id")
+    state = _state(runtime, state_id, lambda: _CmoState(length), _CmoState)
+    if state.length != length:
+        raise PineRuntimeError("ta.cmo() length must remain stable for a state_id")
+    return state.update(_current(source, "cmo"))
 
 
 def tsi(source: Any, short_length: int, long_length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
-    """True Strength Index — batch mode only."""
+    """True Strength Index — rolling mode with runtime support."""
     short_length = _validate_length(short_length)
     long_length = _validate_length(long_length)
-    src_list = list(source) if hasattr(source, '__iter__') else [source]
-    n = len(src_list)
-    if n < long_length + 1:
-        return na
-    changes = [float(src_list[i]) - float(src_list[i-1]) if i > 0 else float('nan') for i in range(n)]
-    alpha_s = 2.0 / (short_length + 1)
-    ema1 = changes[0] if n > 0 else 0.0
-    for i in range(1, n):
-        ema1 = alpha_s * changes[i] + (1 - alpha_s) * ema1
-    alpha_l = 2.0 / (long_length + 1)
-    ema2 = ema1
-    for i in range(1, n):
-        ema2 = alpha_l * ema1 + (1 - alpha_l) * ema2
-    abs_changes = [abs(c) if not _py_math.isnan(c) else 0.0 for c in changes]
-    ema1_abs = abs_changes[0] if n > 0 else 0.0
-    for i in range(1, n):
-        ema1_abs = alpha_s * abs_changes[i] + (1 - alpha_s) * ema1_abs
-    ema2_abs = ema1_abs
-    for i in range(1, n):
-        ema2_abs = alpha_l * ema1_abs + (1 - alpha_l) * ema2_abs
-    if ema2_abs == 0:
-        return na
-    return 100.0 * ema2 / ema2_abs
+    if runtime is None:
+        state = _TsiState(short_length, long_length)
+        return _batch_unary(source, state.update)
+    if state_id is None:
+        raise PineRuntimeError("ta.tsi() runtime mode requires state_id")
+    state = _state(runtime, state_id, lambda: _TsiState(short_length, long_length), _TsiState)
+    if state.short_length != short_length or state.long_length != long_length:
+        raise PineRuntimeError("ta.tsi() lengths must remain stable for a state_id")
+    return state.update(_current(source, "tsi"))
 
