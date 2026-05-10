@@ -52,6 +52,57 @@ def test_strategy_close_accepts_comment() -> None:
     runtime.end_bar()
 
 
+def test_strategy_entry_accepts_comment() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 12, 9, 11))
+    s.entry("L", "long", comment="P4_LONG_SuperTrend")
+    assert s.pending_orders[-1].comment == "P4_LONG_SuperTrend"
+    runtime.end_bar()
+
+
+def test_strategy_entry_accepts_dynamic_comment() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 12, 9, 11))
+    engine = "MACD"
+    s.entry("L", "long", comment=f"P4_LONG_{engine}")
+    assert s.pending_orders[-1].comment == "P4_LONG_MACD"
+    runtime.end_bar()
+
+
+def test_strategy_exit_accepts_comment() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 12, 9, 11))
+    runtime.begin_bar(bar(1, 10, 12, 9, 11))
+    s.entry("L", "long", qty=1.0)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    s.exit("XL", from_entry="L", comment="TP_hit", limit=12.0)
+    assert s.pending_orders[-1].comment == "TP_hit"
+    runtime.end_bar()
+
+
+def test_strategy_exit_accepts_comment_and_order_model_has_comment() -> None:
+    from pinelib.strategy.context import Order
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 12, 9, 11))
+    runtime.begin_bar(bar(1, 10, 12, 9, 11))
+    s.entry("L", "long", qty=1.0)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    s.exit("XL", from_entry="L", comment="stop_loss", stop=9.0)
+    last = s.pending_orders[-1]
+    assert last.comment == "stop_loss"
+    runtime.end_bar()
+
+
+def test_order_model_accepts_comment_field() -> None:
+    from pinelib.strategy.context import Order
+    o = Order(id="test", direction="long", qty=1.0, type="market", kind="entry", comment="test_comment")
+    assert o.comment == "test_comment"
+
+
 def test_process_orders_on_close_market_fills_current_close() -> None:
     s = StrategyContext(process_orders_on_close=True)
     runtime = rt(s)

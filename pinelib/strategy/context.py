@@ -224,9 +224,10 @@ class StrategyContext:
         limit: float | None = None,
         stop: float | None = None,
         *,
+        comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        self._add_order(id, direction, qty, limit, stop, "entry", source_map=source_map)
+        self._add_order(id, direction, qty, limit, stop, "entry", comment=comment, source_map=source_map)
 
     def order(
         self,
@@ -240,7 +241,7 @@ class StrategyContext:
         *,
         source_map: object | None = None,
     ) -> None:
-        order = self._make_order(id, direction, qty, limit, stop, "order", source_map)
+        order = self._make_order(id, direction, qty, limit, stop, "order", comment=None, source_map=source_map)
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
@@ -259,6 +260,7 @@ class StrategyContext:
         trail_points: float | None = None,
         trail_offset: float | None = None,
         *,
+        comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
         if trail_offset is not None and (trail_price is not None or trail_points is not None):
@@ -295,6 +297,7 @@ class StrategyContext:
                     oca_type="reduce",
                     created_bar_index=created_bar_index,
                     created_time=created_time,
+                    comment=comment,
                     source_map=source_map,
                     trail_activation=float(activation),
                     trail_offset=float(trail_offset),
@@ -350,6 +353,7 @@ class StrategyContext:
                     oca_type="reduce",
                     created_bar_index=created_bar_index,
                     created_time=created_time,
+                    comment=comment,
                     source_map=source_map,
                 )
             )
@@ -368,6 +372,7 @@ class StrategyContext:
                     oca_type="reduce",
                     created_bar_index=created_bar_index,
                     created_time=created_time,
+                    comment=comment,
                     source_map=source_map,
                 )
             )
@@ -385,6 +390,7 @@ class StrategyContext:
                     oca_type="reduce",
                     created_bar_index=created_bar_index,
                     created_time=created_time,
+                    comment=comment,
                     source_map=source_map,
                 )
             )
@@ -516,10 +522,11 @@ class StrategyContext:
         stop: float | None,
         kind: OrderKind,
         *,
-        source_map: object | None,
+        comment: str | None = None,
+        source_map: object | None = None,
     ) -> None:
         self.pending_orders.append(
-            self._make_order(id, direction, qty, limit, stop, kind, source_map)
+            self._make_order(id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map)
         )
 
     def _make_order(
@@ -530,7 +537,9 @@ class StrategyContext:
         limit: float | None,
         stop: float | None,
         kind: OrderKind,
-        source_map: object | None,
+        *,
+        comment: str | None = None,
+        source_map: object | None = None,
     ) -> Order:
         typ: OrderType = "market"
         if limit is not None and stop is not None:
@@ -550,6 +559,7 @@ class StrategyContext:
             stop=stop,
             created_bar_index=created_bar_index,
             created_time=created_time,
+            comment=comment,
             source_map=source_map,
         )
 
