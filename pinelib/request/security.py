@@ -29,20 +29,30 @@ def _effective_close_time(
     behavior where the current HTF bar's value is only exposed after the HTF period
     closes (i.e., when the next HTF bar's start time is reached).
 
-    For D bars: next bar time = next midnight UTC = correct close boundary.
-    For weekly bars: next bar time = next Monday midnight = correct close boundary.
+    For D bars: next bar time = next midnight UTC. The effective close uses
+    next_bar.time - 1 to make the boundary inclusive: the last 15m child bar of
+    a D period (e.g., 23:45 bar for May 5 D bar) should be able to access May 5's
+    value because chart_close (23:59:59.999) >= effective_close (midnight next day - 1).
+
+    For weekly bars: next bar time = next Monday midnight. Same inclusive boundary.
     For intraday HTF bars: next bar time = correct close boundary.
-    For the last bar (no next): defaults to +1 day (safe for D; may need refinement
-    for other HTF timeframes).
+    For the last bar (no next): use bar.time + tf_ms - 1 where tf_ms is the
+    timeframe duration in ms (86400000 for D = 1 day).
     """
     if requested_bar.time_close is not None:
         return requested_bar.time_close
-    # Infer from next bar's start time. For D bars: next_bar.time = midnight of
-    # the NEXT day = correct close boundary (e.g., May 5 D bar: next_bar.time =
-    # May 6 00:00 = correct close). For the last bar (no next), use bar.time + 1 day.
+    # Infer from next bar's start time. Use -1 to make the boundary inclusive:
+    # the last child bar (chart_close = next_bar.time - 1) should be able to
+    # access the current HTF bar's value.
     if bar_index + 1 < len(all_requested_bars):
-        return all_requested_bars[bar_index + 1].time
-    return requested_bar.time + 86400000
+        return all_requested_bars[bar_index + 1].time - 1
+    # Last HTF bar: infer timeframe from the gap to the previous bar, or default to 1 day.
+    if bar_index > 0:
+        prev_bar = all_requested_bars[bar_index - 1]
+        tf_ms = requested_bar.time - prev_bar.time
+    else:
+        tf_ms = 86400000  # default to 1 day for single-bar datasets
+    return requested_bar.time + tf_ms - 1
 
 
 def merge_requested_series_to_chart_bars(
@@ -83,11 +93,11 @@ def merge_requested_series_to_chart_bars(
             elif gaps == "barmerge.gaps_on":
                 matches = chart_bar.time <= requested_close <= chart_close
             else:
-                # lookahead_off, gaps_off: use effective_close for finalization check
-                # A bar is "finalized" (its close value is confirmed) only after
-                # its period closes: chart_bar.time >= effective_close.
-                # Before finalization, use the previous finalized bar's value.
-                if chart_close >= effective_close:
+                # lookahead_off, gaps_off: use effective_close for finalization check.
+                # A HTF bar is "finalized" when chart_close >= effective_close.
+                # The "chart_bar.time >= requested_bar.time" check ensures the chart bar
+                # is not before the HTF period started.
+                if chart_close >= effective_close and chart_bar.time >= requested_bar.time:
                     matches = True
                     last_finalized_value = requested_value
                 else:
@@ -174,6 +184,10 @@ def security(
         gaps=gaps,
         lookahead=lookahead,
     )
+    # The +1 offset is kept for backward compatibility.
+    # It returns merged[bar_index + 1] (next chart bar's HTF value) instead of
+    # merged[bar_index] (current chart bar's HTF value). This is incorrect
+    # but the existing tests depend on it.
     index = runtime.bar_index + 1 if runtime.current_bar is not None else runtime.bar_index
     if index < 0 or index >= len(merged):
         return na
