@@ -24,6 +24,10 @@ class Series(Generic[T]):
     runtime_config: RuntimeConfig | None = None
     _current: T | object = field(init=False, default=na)
     _history: list[T | object] = field(init=False, default_factory=list)
+    # After end_bar(), this is True. After begin_bar() / set_current(), this is False.
+    # Distinguishes "between bars" (after end_bar, before next begin_bar) from
+    # "during bar execution".
+    _between_bars: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
         self._current = self.initial
@@ -40,9 +44,14 @@ class Series(Generic[T]):
         if self.dtype == "bool" and value is na:
             raise PineTypeError("Bool series cannot take na values in Pine v6")
         self._current = value
+        self._between_bars = False
 
     def commit_current(self) -> None:
         self._history.append(self._current)
+
+    def mark_between_bars(self) -> None:
+        """Called by PineRuntime.end_bar() to mark we're between bars."""
+        self._between_bars = True
 
     def __getitem__(self, offset: int) -> T | object:
         if offset < 0:
@@ -63,7 +72,19 @@ class Series(Generic[T]):
                     "Reference history is unsupported",
                     code=PL_REFERENCE_HISTORY_UNSUPPORTED,
                 )
-        index = len(self._history) - offset
+        history_len = len(self._history)
+        if history_len == 0:
+            return False if self.dtype == "bool" else na
+
+        if self._between_bars:
+            # Between bars: _history has the just-committed value as the last element.
+            # _current == _history[-1] (same value, not yet overwritten by next begin_bar).
+            # Use -1 offset to skip the committed value.
+            index = history_len - offset - 1
+        else:
+            # During bar: _history has previous bars. _current is for the current bar.
+            index = history_len - offset
+
         if index < 0:
             return False if self.dtype == "bool" else na
         return self._history[index]

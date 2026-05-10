@@ -87,6 +87,8 @@ class PineRuntime:
             isconfirmed=False,
             islastconfirmedhistory=False,
         )
+        for series in self.series_registry.values():
+            series._between_bars = False
         self._set_builtin_current(effective_bar, current_index)
 
     def begin_realtime_bar(self, bar: Bar) -> None:
@@ -110,6 +112,8 @@ class PineRuntime:
             isconfirmed=False,
             islastconfirmedhistory=False,
         )
+        for series in self.series_registry.values():
+            series._between_bars = False
         self._set_builtin_current(effective_bar, current_index)
 
     def update_realtime_tick(self, tick: TickUpdate) -> Bar:
@@ -150,7 +154,12 @@ class PineRuntime:
         if self.current_bar is None:
             raise PineRuntimeError("end_bar() called without an active bar")
         for name in self.commit_order:
-            self.series_registry[name].commit_current()
+            series = self.series_registry[name]
+            series.commit_current()
+            # Only mark between_bars for historical bars. Realtime bars
+            # stay 'during bar' (between_bars=False) since the bar is still live.
+            if not self.barstate.isrealtime:
+                series.mark_between_bars()
         self.bar_index += 1
         was_realtime = self.barstate.isrealtime
         self.barstate = BarStateInfo(
