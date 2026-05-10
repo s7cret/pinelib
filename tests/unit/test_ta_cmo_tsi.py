@@ -144,3 +144,33 @@ class TestTsiRollingMode:
             results.append(r)
         # Last bar should be non-na (enough bars for EMA warmup)
         assert not is_na(results[-1]), f"Last bar should be non-na, got {results[-1]}"
+
+    def test_tsi_returns_raw_ratio_not_percent(self):
+        """TSI should return raw ratio (~0.xx), not percent-scaled (~xx)."""
+        # Simple trending series: close rises consistently
+        close_vals = [100.0 + i * 0.5 for i in range(50)]
+        result = tsi(close_vals, 13, 25)
+        non_na = [r for r in result if not is_na(r)]
+        assert non_na, "Should have non-na TSI values"
+        # Raw ratio should be between -1 and 1 typically, definitely < 10
+        for r in non_na:
+            assert abs(r) < 10, f"TSI raw ratio should be < 10 (got {r}) — likely still multiplied by 100"
+
+    def test_tsi_runtime_matches_batch_raw_ratio(self):
+        """Runtime TSI should return same raw ratio as batch."""
+        close_vals = [100.0 + i * 0.5 for i in range(50)]
+        batch_result = tsi(close_vals, 13, 25)
+        runtime = PineRuntime(
+            SymbolInfo("TEST", mintick=0.01),
+            TimeframeInfo.from_string("15"),
+            config=RuntimeConfig(strict_tv_parity=False)
+        )
+        for c in close_vals:
+            bar = Bar(time=0, open=c, high=c, low=c, close=c, volume=1000.0)
+            runtime.begin_bar(bar)
+            runtime.end_bar()
+            tsi(runtime.close, 13, 25, runtime=runtime, state_id="test_tsi_ratio")
+        rolling_result = tsi(runtime.close, 13, 25, runtime=runtime, state_id="test_tsi_ratio")
+        batch_non_na = [r for r in batch_result if not is_na(r)]
+        assert batch_non_na, "Batch should have non-na values"
+        assert abs(rolling_result - batch_non_na[-1]) < 1e-4

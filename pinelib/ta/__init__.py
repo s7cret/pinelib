@@ -568,7 +568,7 @@ class _TsiState:
         self.ema2_abs = ema2_abs_val
         if self.ema2_abs == 0:
             return na
-        return 100.0 * self.ema2 / self.ema2_abs
+        return self.ema2 / self.ema2_abs
 
 
 @dataclass(slots=True)
