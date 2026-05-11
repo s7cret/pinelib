@@ -879,7 +879,13 @@ def crossover(source1: Any, source2: Any) -> bool:
     current_left = _history(source1, 0, "crossover")
     current_right = _history(source2, 0, "crossover")
     previous_left = _history(source1, 1, "crossover")
-    previous_right = _condition_history(source2, 1)
+    # For _ShiftedSeries, source2[1] = original[shift+1] but we need original[shift]
+    # (the value of the shifted series at the previous bar = current_right at prev bar)
+    # For non-shifted series, source2[1] correctly gives the previous bar's value
+    if hasattr(source2, "source"):  # _ShiftedSeries
+        previous_right = _history(source2, 0, "crossover")
+    else:
+        previous_right = _condition_history(source2, 1)
     return pine_gt(current_left, current_right) and pine_lte(previous_left, previous_right)
 
 
@@ -887,7 +893,11 @@ def crossunder(source1: Any, source2: Any) -> bool:
     current_left = _history(source1, 0, "crossunder")
     current_right = _history(source2, 0, "crossunder")
     previous_left = _history(source1, 1, "crossunder")
-    previous_right = _condition_history(source2, 1)
+    # Same shifted-series fix as crossover
+    if hasattr(source2, "source"):  # _ShiftedSeries
+        previous_right = _history(source2, 0, "crossunder")
+    else:
+        previous_right = _condition_history(source2, 1)
     return pine_lt(current_left, current_right) and pine_gte(previous_left, previous_right)
 
 
