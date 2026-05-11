@@ -145,17 +145,22 @@ def security(
             return na
         raise PineRequestError("request.security requires runtime.data_provider")
 
-    start = runtime.chart_bars[0].time if runtime.chart_bars else None
-    end = (
+    chart_start = runtime.chart_bars[0].time if runtime.chart_bars else None
+    chart_end = (
         runtime.chart_bars[-1].time_close
         if runtime.chart_bars and runtime.chart_bars[-1].time_close is not None
         else None
     )
+    # For HTF bars, use start=None to include all HTF bars that could overlap
+    # with the chart period. The merge logic (effective_close + lookahead_off)
+    # determines which bar's value to return based on finalization status.
+    # Previously, start=chart_bars[0].time excluded the HTF bar that started
+    # before chart_start (e.g., May 5 D bar at 00:00 when chart starts at 20:00).
     requested_bars = runtime.data_provider.get_bars(
         symbol,
         timeframe,
-        start,
-        end,
+        None,  # Don't filter by start - include HTF bars from before chart_start
+        chart_end,
         max_bars=calc_bars_count,
     )
     if not requested_bars and ignore_invalid_symbol:
