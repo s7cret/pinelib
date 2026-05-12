@@ -248,6 +248,18 @@ class PineRuntime:
         self.time_close.set_current(bar.time_close)
         self.bar_index_series.set_current(current_index)
 
+    def history(self, src: Any, offset: int) -> Any:
+        """Pine Script history() built-in.
+
+        Returns the value of ``src`` ``offset`` bars ago.
+        For Series: returns Series[offset].
+        For scalars: returns the scalar unchanged.
+        """
+        if isinstance(src, Series):
+            return src[offset]
+        # Scalar/constant — return as-is
+        return src
+
     def series(
         self,
         name: str,
