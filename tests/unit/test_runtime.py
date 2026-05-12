@@ -79,3 +79,49 @@ def test_series_history_allowed_metadata_is_enforced() -> None:
         "flag", "bool", type_info=TypeInfo("bool", "series", is_history_allowed=True)
     )
     assert allowed_bool[1] is False
+
+
+def test_runtime_history_series_offset() -> None:
+    """PineRuntime.history() returns src[offset] for Series."""
+    runtime = _runtime()
+
+    # Bar 1
+    b1 = Bar(time=1_700_000_000_000, open=1.0, high=2.0, low=0.5, close=1.5, volume=3.0)
+    runtime.begin_bar(b1)
+    s = runtime.series("test_val", "float")
+    s.set_current(100.0)
+    runtime.end_bar()
+
+    # Bar 2
+    b2 = Bar(time=1_700_000_060_000, open=1.5, high=3.0, low=1.0, close=2.5, volume=5.0)
+    runtime.begin_bar(b2)
+    s.set_current(200.0)
+    runtime.end_bar()
+
+    # Bar 3 — test history
+    b3 = Bar(time=1_700_000_120_000, open=2.0, high=3.5, low=1.5, close=3.0, volume=7.0)
+    runtime.begin_bar(b3)
+    s.set_current(300.0)
+
+    # history(s, 1) should return s[1] = value from 1 bar ago
+    hist1 = runtime.history(s, 1)
+    assert hist1 is not None
+    assert float(hist1) == 200.0
+
+    # history(s, 2) should return s[2] = value from 2 bars ago
+    hist2 = runtime.history(s, 2)
+    assert float(hist2) == 100.0
+
+    # history(s, 0) returns current
+    hist0 = runtime.history(s, 0)
+    assert float(hist0) == 300.0
+
+
+def test_runtime_history_scalar_passthrough() -> None:
+    """PineRuntime.history() returns scalars unchanged."""
+    runtime = _runtime()
+    # Scalar constant — should pass through
+    result = runtime.history(42.5, 10)
+    assert result == 42.5
+    result2 = runtime.history(0.0, 5)
+    assert result2 == 0.0
