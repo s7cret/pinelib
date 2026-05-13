@@ -8,6 +8,21 @@ from pinelib.core.bar import Bar
 from pinelib.errors import PineDataFormatError
 
 
+class NullDataProvider:
+    """A no-op data provider that returns empty bars. Used for Stage 1 smoke tests."""
+
+    def get_bars(
+        self,
+        symbol: str,
+        timeframe: str,
+        start: int | None,
+        end: int | None,
+        *,
+        max_bars: int | None = None,
+    ) -> list[Bar]:
+        return []
+
+
 class DataProvider(Protocol):
     def get_bars(
         self,

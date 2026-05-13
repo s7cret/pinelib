@@ -17,6 +17,83 @@ class PineArray(Generic[T]):
     def __init__(self, values: Iterable[T] | None = None) -> None:
         self._values = list(values or [])
 
+    # Factory methods for array.new_float, array.new_int, etc.
+    @classmethod
+    def new_float(cls, initial: float | None = None, max_size: int | None = None) -> PineArray[float]:
+        arr = cls()
+        if initial is not None:
+            arr._values = [initial]
+        if max_size is not None:
+            arr._max_size = max_size
+        return arr
+
+    @classmethod
+    def new_int(cls, initial: int | None = None, max_size: int | None = None) -> PineArray[int]:
+        arr = cls()
+        if initial is not None:
+            arr._values = [initial]
+        if max_size is not None:
+            arr._max_size = max_size
+        return arr
+
+    @classmethod
+    def new_bool(cls, initial: bool | None = None, max_size: int | None = None) -> PineArray[bool]:
+        arr = cls()
+        if initial is not None:
+            arr._values = [initial]
+        if max_size is not None:
+            arr._max_size = max_size
+        return arr
+
+    @classmethod
+    def new_string(cls, initial: str | None = None, max_size: int | None = None) -> PineArray[str]:
+        arr = cls()
+        if initial is not None:
+            arr._values = [initial]
+        if max_size is not None:
+            arr._max_size = max_size
+        return arr
+
+    @classmethod
+    def new_color(cls, initial: int | None = None, max_size: int | None = None) -> PineArray[int]:
+        arr = cls()
+        if initial is not None:
+            arr._values = [initial]
+        if max_size is not None:
+            arr._max_size = max_size
+        return arr
+
+    @property
+    def size(self) -> int:
+        return len(self._values)
+
+    def shift(self, index: int = 0) -> T:
+        if index >= len(self._values):
+            from pinelib.core.na import NA
+            return NA  # type: ignore[return-value]
+        return self._values[index]
+
+    def avg(self) -> float:
+        if not self._values:
+            return float("nan")
+        return sum(self._values) / len(self._values)
+
+    def sum(self) -> float:
+        return sum(self._values)
+
+    def min(self) -> float:
+        if not self._values:
+            return float("nan")
+        return min(self._values)
+
+    def max(self) -> float:
+        if not self._values:
+            return float("nan")
+        return max(self._values)
+
+    def sort(self, order: str = "asc") -> None:
+        self._values.sort(reverse=(order == "desc"))
+
     def push(self, value: T) -> None:
         self._values.append(value)
 

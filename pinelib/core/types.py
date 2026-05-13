@@ -25,6 +25,10 @@ class SymbolInfo:
     exchange: str | None = None
     prefix: str | None = None
     description: str | None = None
+    type: str = "stock"  # security type: stock, futures, index, forex, crypto, cfd, loan, fund, warrant, struct, bond, right, fund_managed
+    basecurrency: str | None = None
+    currency: str | None = None
+    pointvalue: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,20 +39,36 @@ class TimeframeInfo:
     isminutes: bool = False
     isdaily: bool = False
     isweekly: bool = False
+    ismonthly: bool = False
     multiplier: int | None = None
+
+    @property
+    def period(self) -> str:
+        """Alias for value, the timeframe period string."""
+        return self.value
+
+    @property
+    def isintraday(self) -> bool:
+        """True if timeframe is intraday (seconds or minutes)."""
+        return self.isseconds or self.isminutes
 
     @classmethod
     def from_string(cls, value: str) -> TimeframeInfo:
         normalized = value.strip().upper()
         interval_ms = parse_timeframe_to_ms(value)
         multiplier: int | None = None
-        isseconds = normalized.endswith("S")
-        isdaily = normalized.endswith("D") or normalized == "D"
-        isweekly = normalized.endswith("W") or normalized == "W"
-        isminutes = normalized.isdigit() or normalized.endswith("M") or normalized.endswith("H")
+        # Monthly: "M" alone or "3MO", "12MO" etc. Also "3M" means 3 months (not 3 minutes in Pine)
+        ismonthly = normalized == "M" or normalized.endswith("MO") or (
+            normalized.endswith("M") and len(normalized) > 1 and normalized[:-1].isdigit()
+        )
+        isseconds = normalized.endswith("S") and not normalized.endswith("MS")
+        isdaily = normalized.endswith("D") and not normalized.endswith("WD")
+        isweekly = normalized.endswith("W") and not normalized.endswith("MW")
+        # Intraday: digit-only ("60"), or ends with H ("1H"), or ends with M for minutes ("15M") but NOT monthly
+        isminutes = (normalized.isdigit()) or (normalized.endswith("M") and not ismonthly)
         if normalized.isdigit():
             multiplier = int(normalized)
-        elif normalized in {"S", "D", "W"}:
+        elif normalized in {"S", "D", "W", "M"}:
             multiplier = 1
         elif len(normalized) > 1 and normalized[:-1].isdigit():
             multiplier = int(normalized[:-1])
@@ -59,6 +79,7 @@ class TimeframeInfo:
             isminutes=isminutes,
             isdaily=isdaily,
             isweekly=isweekly,
+            ismonthly=ismonthly,
             multiplier=multiplier,
         )
 
@@ -120,9 +141,15 @@ def parse_timeframe_to_ms(value: str) -> int | None:
         "S": 1_000,
         "D": 86_400_000,
         "W": 7 * 86_400_000,
+        "MO": 30 * 86_400_000,  # monthly (approximate as 30 days)
+        "M": 60_000,  # minutes (intraday)
     }
     if normalized in mapping:
         return mapping[normalized]
+    # Handle "3MO", "12MO" etc: monthly with explicit multiplier
+    if normalized.endswith("MO") and len(normalized) > 2 and normalized[:-2].isdigit():
+        amount = int(normalized[:-2])
+        return amount * 30 * 86_400_000
     suffix = normalized[-1]
     prefix = normalized[:-1]
     if not prefix.isdigit():
@@ -130,7 +157,7 @@ def parse_timeframe_to_ms(value: str) -> int | None:
     amount = int(prefix)
     unit_ms = {
         "S": 1_000,
-        "M": 60_000,
+        "M": 60_000,  # minutes (intraday)
         "H": 3_600_000,
         "D": 86_400_000,
         "W": 7 * 86_400_000,

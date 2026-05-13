@@ -1481,7 +1481,7 @@ def barssince(condition: Any) -> Any:
     return na
 
 
-def linreg(source: Any, length: int, offset: int) -> Any:
+def linreg(source: Any, length: int, offset: int = 0) -> Any:
     length = _validate_length(length)
 
     def calc(win: list[Any]) -> Any:
