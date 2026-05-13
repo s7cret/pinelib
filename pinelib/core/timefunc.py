@@ -251,3 +251,26 @@ class TimeFunctions:
         if field_name == "second":
             return localized.second
         raise PineSessionError(f"Unsupported calendar field: {field_name}")
+
+    def timestamp_components(
+        self,
+        timezone_str: str,
+        year: int,
+        month: int,
+        day: int,
+        hour: int,
+        minute: int,
+        second: int = 0,
+    ) -> int:
+        """Convert timestamp components (per-bar runtime values) to Unix milliseconds."""
+        from datetime import timezone as tz_module
+
+        tz_map = {"UTC": tz_module.utc}
+        tz = tz_map.get(timezone_str)
+        if tz is None:
+            try:
+                tz = ZoneInfo(timezone_str)
+            except (KeyError, ZoneInfoNotFoundError):
+                tz = tz_module.utc
+        dt = datetime(year, month, day, hour, minute, second, tzinfo=tz)
+        return int(dt.timestamp() * 1000)
