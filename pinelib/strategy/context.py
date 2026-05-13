@@ -236,12 +236,13 @@ class StrategyContext:
         qty: float | None = None,
         limit: float | None = None,
         stop: float | None = None,
+        comment: str | None = None,
         oca_name: str | None = None,
         oca_type: str | None = None,
         *,
         source_map: object | None = None,
     ) -> None:
-        order = self._make_order(id, direction, qty, limit, stop, "order", comment=None, source_map=source_map)
+        order = self._make_order(id, direction, qty, limit, stop, "order", comment=comment, source_map=source_map)
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
