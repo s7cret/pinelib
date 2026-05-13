@@ -88,3 +88,66 @@ class Series(Generic[T]):
         if index < 0:
             return False if self.dtype == "bool" else na
         return self._history[index]
+
+    # ── Arithmetic operators ─────────────────────────────────────────────────────
+    # TradingView Pine semantics: series in arithmetic means the current-value of that
+    # series at the current bar.  All operators return a scalar (float / bool).
+
+    def _scalar(self, other: object) -> tuple[object, object]:
+        """Convert both operands to scalar values (extract Series.current)."""
+        left = self._current
+        right = getattr(other, "_current", other)  # other.Series → other.current
+        return left, right
+
+    def __add__(self, other: object) -> object:
+        l, r = self._scalar(other)
+        return l + r
+
+    def __radd__(self, other: object) -> object:
+        return self.__add__(other)
+
+    def __sub__(self, other: object) -> object:
+        l, r = self._scalar(other)
+        return l - r
+
+    def __rsub__(self, other: object) -> object:
+        l, r = self._scalar(other)
+        return r - l
+
+    def __mul__(self, other: object) -> object:
+        l, r = self._scalar(other)
+        return l * r
+
+    def __rmul__(self, other: object) -> object:
+        return self.__mul__(other)
+
+    def __truediv__(self, other: object) -> object:
+        l, r = self._scalar(other)
+        return l / r
+
+    def __rtruediv__(self, other: object) -> object:
+        l, r = self._scalar(other)
+        return r / l
+
+    def __neg__(self) -> object:
+        return -self._current
+
+    def __lt__(self, other: object) -> bool:
+        l, r = self._scalar(other)
+        return l < r
+
+    def __le__(self, other: object) -> bool:
+        l, r = self._scalar(other)
+        return l <= r
+
+    def __gt__(self, other: object) -> bool:
+        l, r = self._scalar(other)
+        return l > r
+
+    def __ge__(self, other: object) -> bool:
+        l, r = self._scalar(other)
+        return l >= r
+
+    def __eq__(self, other: object) -> bool:
+        l, r = self._scalar(other)
+        return l == r
