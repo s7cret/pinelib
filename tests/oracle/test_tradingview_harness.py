@@ -204,7 +204,10 @@ def test_request_security_gaps_and_lookahead_matches_tradingview_expected_csv() 
         for row in expected_rows
     ]
 
-    weekly_closes: list[tuple[int, float]] = []
+    # TradingView weekly chart export: time_W is the weekly bar's CLOSE time (end of week),
+    # time_close_W is the weekly bar's OPEN time (start of week). All rows: time_W > time_close_W.
+    # Use time_close_W for Bar.time (bar open) and time_W for Bar.time_close (bar close).
+    weekly_closes: list[tuple[int, int, float]] = []  # (open_time, close_time, value)
     seen_close_times: set[int] = set()
     for row in expected_rows:
         value = row["sec_w_gaps_on_la_off"]
@@ -214,34 +217,48 @@ def test_request_security_gaps_and_lookahead_matches_tradingview_expected_csv() 
         if close_time in seen_close_times:
             continue
         seen_close_times.add(close_time)
-        weekly_closes.append((close_time, float(value)))
+        open_time = int(row["time_close_W"])
+        weekly_closes.append((open_time, close_time, float(value)))
 
     off_gaps_on_bars = [
-        Bar(time=close_time, open=value, high=value, low=value, close=value, time_close=close_time)
-        for close_time, value in weekly_closes
+        Bar(time=open_time, open=value, high=value, low=value, close=value, time_close=close_time)
+        for open_time, close_time, value in weekly_closes
     ]
     off_gaps_on_values = [bar.close for bar in off_gaps_on_bars]
-    off_gaps_off_points: list[tuple[int, float]] = []
+    # Build time_W -> time_close_W lookup from expected_rows
+    time_w_to_time_close_w: dict[int, int] = {}
+    for row in expected_rows:
+        tw = int(row["time_W"])
+        if tw not in time_w_to_time_close_w:
+            time_w_to_time_close_w[tw] = int(row["time_close_W"])
+
+    off_gaps_off_points: list[tuple[int, int, float]] = []  # (open_time, close_time, value)
     last_off_value: str | None = None
     for row in expected_rows:
         value = row["sec_w_gaps_off_la_off"]
         if value == "" or value == last_off_value:
             continue
-        off_gaps_off_points.append((int(row["time_W"]), float(value)))
+        close_time = int(row["time_W"])
+        open_time = time_w_to_time_close_w[close_time]
+        off_gaps_off_points.append((open_time, close_time, float(value)))
         last_off_value = value
     off_gaps_off_bars = [
-        Bar(time=close_time, open=value, high=value, low=value, close=value, time_close=close_time)
-        for close_time, value in off_gaps_off_points
+        Bar(time=open_time, open=value, high=value, low=value, close=value, time_close=close_time)
+        for open_time, close_time, value in off_gaps_off_points
     ]
     off_gaps_off_values = [bar.close for bar in off_gaps_off_bars]
-    lookahead_on_points: list[tuple[int, float]] = []
+    # For lookahead_on, use the weekly bar's open/close times (time_close_W / time_W)
+    # rather than chart_time, since we are requesting a weekly timeframe.
+    lookahead_on_points: list[tuple[int, int, float]] = []  # (open_time, close_time, value)
     for row in expected_rows:
         if row["sec_w_gaps_on_la_on"] == "":
             continue
-        lookahead_on_points.append((int(row["time"]) * 1000, float(row["sec_w_gaps_on_la_on"])))
+        open_time = int(row["time_close_W"])
+        close_time = int(row["time_W"])
+        lookahead_on_points.append((open_time, close_time, float(row["sec_w_gaps_on_la_on"])))
     on_bars = [
-        Bar(time=chart_time, open=value, high=value, low=value, close=value, time_close=chart_time)
-        for chart_time, value in lookahead_on_points
+        Bar(time=open_time, open=value, high=value, low=value, close=value, time_close=close_time)
+        for open_time, close_time, value in lookahead_on_points
     ]
     on_values = [bar.close for bar in on_bars]
 
