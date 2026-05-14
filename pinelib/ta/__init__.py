@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, TypeAlias, cast
 
-from pinelib.core.na import SupportsSeriesLike, is_na, na
+from pinelib.core.na import PineNASentinel, SupportsSeriesLike, is_na, na
 from pinelib.core.precision import pine_gt, pine_gte, pine_lt, pine_lte
 from pinelib.core.runtime import PineRuntime
 from pinelib.errors import PineRuntimeError, PineTypeError
@@ -50,6 +50,10 @@ def _condition_history(source: Any, offset: int) -> Any:
 
 
 def _series_values(source: Sequence[Any]) -> list[Any]:
+    if isinstance(source, (int, float)):
+        return [source]
+    if isinstance(source, PineNASentinel):
+        return [source]
     return list(source)
 
 
@@ -954,7 +958,9 @@ def stdev(source: Any, length: int, biased: bool = True, *, runtime: Any = None,
     if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
         return _rolling(source, length, calc)
     win = [_history(source, offset, "stdev") for offset in reversed(range(length))]
-    return calc(win)
+    result = calc(win)
+    # Match sma batch-mode contract: always return list so callers like bb() can zip
+    return [result]
 
 
 def variance(source: Any, length: int, biased: bool = True, *, runtime: Any = None, state_id: str | None = None) -> Any:
@@ -972,7 +978,10 @@ def variance(source: Any, length: int, biased: bool = True, *, runtime: Any = No
 
     if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
         return _rolling(source, length, calc)
-    return calc([_history(source, offset, "variance") for offset in reversed(range(length))])
+    win = [_history(source, offset, "variance") for offset in reversed(range(length))]
+    result = calc(win)
+    # Match sma batch-mode contract: always return list so callers can zip
+    return [result]
 
 
 def dev(source: Any, length: int) -> Any:
@@ -987,7 +996,9 @@ def dev(source: Any, length: int) -> Any:
 
     if isinstance(source, Sequence) and not isinstance(source, SupportsSeriesLike):
         return _rolling(source, length, calc)
-    return calc([_history(source, o, "dev") for o in reversed(range(length))])
+    win = [_history(source, o, "dev") for o in reversed(range(length))]
+    result = calc(win)
+    return [result]
 
 
 def wma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
@@ -1105,6 +1116,18 @@ def alma(source: Any, length: int, offset: float, sigma: float, floor: bool = Fa
 def bb(source: Any, length: int, mult: float) -> Any:
     basis = sma(source, length)
     sd = stdev(source, length)
+    # If both are single-element lists, input was a scalar — use scalar path
+    if (
+        isinstance(basis, list)
+        and len(basis) == 1
+        and isinstance(sd, list)
+        and len(sd) == 1
+    ):
+        b = basis[0]
+        s = sd[0]
+        if is_na(b) or is_na(s):
+            return na, na, na
+        return b, float(b) + float(mult) * float(s), float(b) - float(mult) * float(s)
     if isinstance(basis, list):
         upper = [
             na if is_na(b) or is_na(s) else float(b) + float(mult) * float(s)

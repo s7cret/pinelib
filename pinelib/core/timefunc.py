@@ -70,8 +70,30 @@ def _resolve_timezone(timezone_name: str) -> ZoneInfo:
         raise PineSessionError(f"Unknown timezone: {timezone_name}") from exc
 
 
+def _bar_time_ms(runtime: PineRuntime) -> int:
+    """Return bar.time in milliseconds.
+
+    Bar.time may be stored in microseconds (runner multiplies CSV ms × 1000).
+    Detect and convert to milliseconds for consistency with the rest of the code.
+    """
+    bar_time = runtime.current_bar.time
+    # If > 10^15, bar_time is in microseconds — convert to milliseconds
+    return bar_time // 1000 if bar_time > 10**15 else bar_time
+
+
+def _bar_time_close_ms(runtime: PineRuntime) -> int:
+    """Return bar.time_close in milliseconds, with same microsecond normalization."""
+    tc = runtime.current_bar.time_close
+    if tc is None:
+        return 0
+    return tc // 1000 if tc > 10**15 else tc
+
+
 def _localize(timestamp_ms: int, timezone_name: str) -> datetime:
     zone = _resolve_timezone(timezone_name)
+    # bar.time may be in microseconds; normalize to milliseconds
+    if timestamp_ms > 10**15:
+        timestamp_ms = timestamp_ms // 1000
     return datetime.fromtimestamp(timestamp_ms / 1000, tz=zone)
 
 
@@ -115,12 +137,13 @@ class TimeFunctions:
         if runtime.current_bar is None:
             return na
         if self._is_intraday_daily_request(timeframe, runtime):
-            return self._daily_bucket_open(runtime.current_bar.time)
-        self._validate_timeframe(timeframe, runtime)
+            return self._daily_bucket_open(_bar_time_ms(runtime))
+        if not self._validate_timeframe(timeframe, runtime):
+            return na
         resolved_tz = timezone or runtime.syminfo.timezone
         session_value = session or runtime.syminfo.session
         return (
-            runtime.current_bar.time
+            _bar_time_ms(runtime)
             if self._bar_in_session(runtime, session_value, resolved_tz)
             else na
         )
@@ -136,12 +159,13 @@ class TimeFunctions:
         if runtime.current_bar is None:
             return na
         if self._is_intraday_daily_request(timeframe, runtime):
-            return self._daily_bucket_open(runtime.current_bar.time) + 86_400_000
-        self._validate_timeframe(timeframe, runtime)
+            return self._daily_bucket_open(_bar_time_ms(runtime)) + 86_400_000
+        if not self._validate_timeframe(timeframe, runtime):
+            return na
         resolved_tz = timezone or runtime.syminfo.timezone
         session_value = session or runtime.syminfo.session
         return (
-            runtime.current_bar.time_close
+            _bar_time_close_ms(runtime)
             if self._bar_in_session(runtime, session_value, resolved_tz)
             else na
         )
@@ -177,13 +201,13 @@ class TimeFunctions:
             # by the bar/session open. Requiring both daily bar open and inferred
             # daily close to be inside an intraday session incorrectly filters
             # every regular daily bar out.
-            return is_timestamp_in_session(runtime.current_bar.time, session, timezone_name)
+            return is_timestamp_in_session(_bar_time_ms(runtime), session, timezone_name)
         if runtime.current_bar.time_close is None:
             raise PineSessionError("Current bar is missing time_close")
         return is_timestamp_in_session(
-            runtime.current_bar.time, session, timezone_name
+            _bar_time_ms(runtime), session, timezone_name
         ) and is_timestamp_in_session(
-            runtime.current_bar.time_close,
+            _bar_time_close_ms(runtime),
             session,
             timezone_name,
         )
@@ -202,9 +226,11 @@ class TimeFunctions:
         chart_ms = runtime.timeframe.interval_ms
         return chart_ms is not None and chart_ms < 86_400_000
 
-    def _validate_timeframe(self, timeframe: str | None, runtime: PineRuntime) -> None:
+    def _validate_timeframe(self, timeframe: str | None, runtime: PineRuntime) -> bool:
+        """Validate timeframe. Returns True if valid, False if unsupported.
+        Does NOT raise — caller should return na on False."""
         if timeframe is None:
-            return
+            return True
         requested = timeframe.strip().upper()
         chart = runtime.timeframe.value.strip().upper()
         requested_ms = parse_timeframe_to_ms(timeframe)
@@ -212,9 +238,9 @@ class TimeFunctions:
         if requested == chart or (
             requested_ms is not None and chart_ms is not None and requested_ms == chart_ms
         ):
-            return
+            return True
         message = (
-            f"time()/time_close() requested timeframe {timeframe!r}, but PineLib v1.0.1 only supports "  # noqa: E501
+            f"time()/time_close() requested timeframe {timeframe!r}, but PineLib v1.0.1 only supports "
             "None or the active chart timeframe; non-chart timeframe aggregation is unsupported"
         )
         runtime.config.emit_diagnostic(
@@ -223,7 +249,7 @@ class TimeFunctions:
             requested_timeframe=timeframe,
             chart_timeframe=runtime.timeframe.value,
         )
-        raise PineUnsupportedFeatureError(message, code=PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC)
+        return False
 
     def _calendar_value(
         self,
@@ -233,7 +259,7 @@ class TimeFunctions:
     ) -> int:
         if runtime.current_bar is None:
             raise PineSessionError("No current bar is active")
-        localized = _localize(runtime.current_bar.time, timezone_name or runtime.syminfo.timezone)
+        localized = _localize(_bar_time_ms(runtime), timezone_name or runtime.syminfo.timezone)
         if field_name == "year":
             return localized.year
         if field_name == "month":
@@ -264,7 +290,10 @@ class TimeFunctions:
     ) -> int:
         """Convert timestamp components (per-bar runtime values) to Unix milliseconds."""
         from datetime import timezone as tz_module
-
+        # Clamp year to valid datetime range; out-of-range year would crash datetime()
+        if not (1 <= year <= 9999):
+            from pinelib.core.na import na as NA
+            return NA
         tz_map = {"UTC": tz_module.utc}
         tz = tz_map.get(timezone_str)
         if tz is None:
