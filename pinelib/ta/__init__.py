@@ -57,6 +57,13 @@ def _series_values(source: Sequence[Any]) -> list[Any]:
     return list(source)
 
 
+def _unwrap_singleton(x: Any) -> Any:
+    """Unwrap singleton list to scalar for single-bar TA results."""
+    if isinstance(x, list) and len(x) == 1:
+        return x[0]
+    return x
+
+
 class _RuntimeDerivedSeries:
     def __init__(self, runtime: PineRuntime, name: str) -> None:
         self.runtime = runtime
@@ -959,8 +966,9 @@ def stdev(source: Any, length: int, biased: bool = True, *, runtime: Any = None,
         return _rolling(source, length, calc)
     win = [_history(source, offset, "stdev") for offset in reversed(range(length))]
     result = calc(win)
-    # Match sma batch-mode contract: always return list so callers like bb() can zip
-    return [result]
+    # Always return scalar for single-bar context (runtime/generated execution).
+    # _rolling batch path already returns list for batch callers.
+    return result
 
 
 def variance(source: Any, length: int, biased: bool = True, *, runtime: Any = None, state_id: str | None = None) -> Any:
@@ -980,8 +988,9 @@ def variance(source: Any, length: int, biased: bool = True, *, runtime: Any = No
         return _rolling(source, length, calc)
     win = [_history(source, offset, "variance") for offset in reversed(range(length))]
     result = calc(win)
-    # Match sma batch-mode contract: always return list so callers can zip
-    return [result]
+    # Always return scalar for single-bar context (runtime/generated execution).
+    # _rolling batch path already returns list for batch callers.
+    return result
 
 
 def dev(source: Any, length: int) -> Any:
@@ -998,7 +1007,9 @@ def dev(source: Any, length: int) -> Any:
         return _rolling(source, length, calc)
     win = [_history(source, o, "dev") for o in reversed(range(length))]
     result = calc(win)
-    return [result]
+    # Always return scalar for single-bar context (runtime/generated execution).
+    # _rolling batch path already returns list for batch callers.
+    return result
 
 
 def wma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
@@ -1113,22 +1124,21 @@ def alma(source: Any, length: int, offset: float, sigma: float, floor: bool = Fa
     return calc([_history(source, o, "alma") for o in reversed(range(length))])
 
 
-def bb(source: Any, length: int, mult: float) -> Any:
-    basis = sma(source, length)
-    sd = stdev(source, length)
-    # If both are single-element lists, input was a scalar — use scalar path
-    if (
-        isinstance(basis, list)
-        and len(basis) == 1
-        and isinstance(sd, list)
-        and len(sd) == 1
-    ):
-        b = basis[0]
-        s = sd[0]
-        if is_na(b) or is_na(s):
+def bb(source: Any, length: int, mult: float, *, runtime: Any = None, state_id: str | None = None) -> Any:
+    # Use runtime path for both sma and stdev so they return scalars consistently.
+    # Without runtime: sma/stdev return lists, which breaks generated execution.
+    basis = sma(source, length, runtime=runtime, state_id=f"{state_id}_bb_sma" if state_id else None)
+    sd = stdev(source, length, runtime=runtime, state_id=f"{state_id}_bb_sd" if state_id else None)
+    # Unwrap singleton lists that may come from batch paths when runtime is None.
+    basis = _unwrap_singleton(basis)
+    sd = _unwrap_singleton(sd)
+    # Scalar path: both basis and sd are scalars (or na)
+    if not isinstance(basis, list) and not isinstance(sd, list):
+        if is_na(basis) or is_na(sd):
             return na, na, na
-        return b, float(b) + float(mult) * float(s), float(b) - float(mult) * float(s)
-    if isinstance(basis, list):
+        return float(basis), float(basis) + float(mult) * float(sd), float(basis) - float(mult) * float(sd)
+    # Series/list path
+    if isinstance(basis, list) and isinstance(sd, list):
         upper = [
             na if is_na(b) or is_na(s) else float(b) + float(mult) * float(s)
             for b, s in zip(basis, sd, strict=True)
@@ -1138,21 +1148,21 @@ def bb(source: Any, length: int, mult: float) -> Any:
             for b, s in zip(basis, sd, strict=True)
         ]
         return basis, upper, lower
-    if is_na(basis) or is_na(sd):
-        return na, na, na
-    return basis, float(basis) + float(mult) * float(sd), float(basis) - float(mult) * float(sd)
+    # Mixed: one is list, one is scalar (shouldn't happen, but handle gracefully)
+    return na, na, na
 
 
-def bbw(source: Any, length: int, mult: float) -> Any:
-    basis, upper, lower = bb(source, length, mult)
+def bbw(source: Any, length: int, mult: float, *, runtime: Any = None, state_id: str | None = None) -> Any:
+    basis, upper, lower = bb(source, length, mult, runtime=runtime, state_id=state_id)
     if isinstance(basis, list):
         return [
-            na
-            if is_na(b) or float(b) == 0 or is_na(u) or is_na(lower_band)
-            else (float(u) - float(lower_band)) / float(b)
-            for b, u, lower_band in zip(basis, upper, lower, strict=True)
+            na if is_na(b) or float(b) == 0 or is_na(u) or is_na(l)
+            else (float(u) - float(l)) / float(b)
+            for b, u, l in zip(basis, upper, lower, strict=True)
         ]
-    return na if is_na(basis) or float(basis) == 0 else (float(upper) - float(lower)) / float(basis)
+    if is_na(basis) or float(basis) == 0 or is_na(upper) or is_na(lower):
+        return na
+    return (float(upper) - float(lower)) / float(basis)
 
 
 def stoch(source: Any, high: Any, low: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:

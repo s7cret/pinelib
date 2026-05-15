@@ -1117,6 +1117,28 @@ class StrategyContext:
             return na
         return 0.0  # stub
 
+    def opentrades_entry_bar_index(self, index: int | float) -> int | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return self._lots[idx].entry_bar_index
+
+    def closedtrades_entry_bar_index(self, index: int | float) -> int | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].entry_bar_index
+
+    def closedtrades_exit_bar_index(self, index: int | float) -> int | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        exit_bar = self.closed_trade_log[idx].exit_bar_index
+        return exit_bar if exit_bar is not None else na
+
     # ------------------------------------------------------------------
     # strategy.risk namespace
     def risk_allow_entry_in(self, direction: str) -> None:
@@ -1132,8 +1154,12 @@ class StrategyContext:
         # Stub: does not enforce intraday loss limit
         pass
 
-    def risk_max_position_size(self, value: float, type: str) -> None:
+    def risk_max_position_size(self, value: float, type: str = "fixed") -> None:
         # Stub: does not enforce max position size
+        pass
+
+    def risk_max_intraday_filled_orders(self, value: float, type: str = "fixed") -> None:
+        # Stub: does not enforce max intraday filled orders
         pass
 
     def _emit(self, runtime: PineRuntime | None, code: str, message: str, **extra: object) -> None:
