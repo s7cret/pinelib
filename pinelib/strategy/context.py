@@ -1016,6 +1016,126 @@ class StrategyContext:
             path.extend(self.ohlc_path(bar))
         return path
 
+    # ------------------------------------------------------------------
+    # strategy.closedtrades namespace — index-based trade history accessor
+    # Pine: strategy.closedtrades.entry_price(n) → float
+    # Returns na if index is out of range.
+    def closedtrades_entry_price(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].entry_price
+
+    def closedtrades_exit_price(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        trade = self.closed_trade_log[idx]
+        return trade.exit_price if trade.exit_price is not None else na
+
+    def closedtrades_entry_time(self, index: int | float) -> int | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].entry_time
+
+    def closedtrades_exit_time(self, index: int | float) -> int | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        trade = self.closed_trade_log[idx]
+        return trade.exit_time if trade.exit_time is not None else na
+
+    def closedtrades_profit(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].profit
+
+    def closedtrades_size(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].qty
+
+    def closedtrades_max_runup(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].profit_percent  # stub: use profit_percent as runup proxy
+
+    def closedtrades_max_drawdown(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        # Stub: return negated profit_percent as drawdown proxy
+        return -abs(self.closed_trade_log[idx].profit_percent)
+
+    # ------------------------------------------------------------------
+    # strategy.opentrades namespace
+    def opentrades_entry_price(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return self._lots[idx].entry_price
+
+    def opentrades_profit(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        lot = self._lots[idx]
+        return (self.equity - self.initial_capital) * (1 if lot.direction == "long" else -1)
+
+    def opentrades_size(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return self._lots[idx].qty
+
+    def opentrades_max_runup(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return 0.0  # stub
+
+    def opentrades_max_drawdown(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return 0.0  # stub
+
+    # ------------------------------------------------------------------
+    # strategy.risk namespace
+    def risk_allow_entry_in(self, direction: str) -> None:
+        # Pine risk rule: restrict entries to long/short/both.
+        # pinelib backtester does not enforce risk rules yet — no-op stub.
+        pass
+
+    def risk_max_drawdown(self, value: float, type: str) -> None:
+        # Stub: does not enforce max drawdown limit in backtester
+        pass
+
+    def risk_max_intraday_loss(self, value: float, type: str) -> None:
+        # Stub: does not enforce intraday loss limit
+        pass
+
+    def risk_max_position_size(self, value: float, type: str) -> None:
+        # Stub: does not enforce max position size
+        pass
+
     def _emit(self, runtime: PineRuntime | None, code: str, message: str, **extra: object) -> None:
         target = runtime.config if runtime is not None else self._diagnostics_target
         if target is not None and hasattr(target, "emit_diagnostic"):
