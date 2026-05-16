@@ -274,6 +274,74 @@ def sma(
     return state.update(_current(source, "sma"))
 
 
+@dataclass(slots=True)
+class _MedianState:
+    length: int
+    values: deque[float] = field(default_factory=deque)
+
+    def update(self, value: Any) -> Any:
+        _reject_bool(value, "median")
+        if not is_na(value):
+            self.values.append(float(value))
+            if len(self.values) > self.length:
+                self.values.popleft()
+        if len(self.values) < self.length:
+            return na
+        sorted_vals = sorted(self.values)
+        mid = len(sorted_vals) // 2
+        if len(sorted_vals) % 2 == 0:
+            return (sorted_vals[mid - 1] + sorted_vals[mid]) / 2.0
+        return sorted_vals[mid]
+
+
+def median(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    length = _validate_length(length)
+    if runtime is None:
+        state = _MedianState(length)
+        return _batch_unary(source, state.update)
+    if state_id is None:
+        raise PineRuntimeError("ta.median() runtime mode requires state_id")
+    state = _state(runtime, state_id, lambda: _MedianState(length), _MedianState)
+    if state.length != length:
+        raise PineRuntimeError("ta.median() length must remain stable for a state_id")
+    return state.update(_current(source, "median"))
+
+
+@dataclass(slots=True)
+class _ModeState:
+    length: int
+    values: deque[float] = field(default_factory=deque)
+
+    def update(self, value: Any) -> Any:
+        _reject_bool(value, "mode")
+        if not is_na(value):
+            self.values.append(float(value))
+            if len(self.values) > self.length:
+                self.values.popleft()
+        if len(self.values) < self.length:
+            return na
+        from collections import Counter
+        counts = Counter(self.values)
+        return counts.most_common(1)[0][0]
+
+
+def mode(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    length = _validate_length(length)
+    if runtime is None:
+        state = _ModeState(length)
+        return _batch_unary(source, state.update)
+    if state_id is None:
+        raise PineRuntimeError("ta.mode() runtime mode requires state_id")
+    state = _state(runtime, state_id, lambda: _ModeState(length), _ModeState)
+    if state.length != length:
+        raise PineRuntimeError("ta.mode() length must remain stable for a state_id")
+    return state.update(_current(source, "mode"))
+
+
 def ema(
     source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
 ) -> Any:
