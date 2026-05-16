@@ -337,6 +337,18 @@ def tr_batch(high: Sequence[Any], low: Sequence[Any], close: Sequence[Any]) -> l
     return out
 
 
+def _tr_batch_from_close(close: Sequence[Any]) -> list[Any]:
+    """True Range batch from close-only series (close[0] = current bar close)."""
+    out: list[Any] = []
+    prev_close: Any = na
+    for close_value in close:
+        # tr(high=close, low=close, close=prev_close) = abs(close - prev_close)
+        tr_val = abs(float(close_value) - float(prev_close)) if not is_na(prev_close) and not is_na(close_value) else 0.0
+        out.append(tr_val if tr_val >= 0 else 0.0)
+        prev_close = close_value
+    return out
+
+
 
 # === Additional state classes for batch-only TA functions ===
 
@@ -1891,4 +1903,119 @@ def tsi(source: Any, short_length: int, long_length: int, *, runtime: PineRuntim
     if state.short_length != short_length or state.long_length != long_length:
         raise PineRuntimeError("ta.tsi() lengths must remain stable for a state_id")
     return state.update(_current(source, "tsi"))
+
+
+def kc(
+    source: Any,
+    length: int,
+    mult: float = 1.0,
+    *,
+    usesource: int | None = None,
+    scaletype: int | None = None,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> tuple[Any, Any, Any]:
+    """
+    Keltner Channels: (basis, upper, lower)
+
+    basis  = ema(source, length)
+    range  = ema(tr, length)  — True Range EMA
+    upper  = basis + range * mult
+    lower  = basis - range * mult
+
+    scaletype and usesource are accepted for compatibility but not used
+    (Pine Keltner uses high/low ATR variant; our implementation uses close-based TR).
+    """
+    length = _validate_length(length)
+    mult = float(mult)
+
+    if runtime is None:
+        # Batch mode: process full series
+        close_vals = list(source)
+        tr_vals = _tr_batch_from_close(close_vals)
+        basis_vals = ema(source, length)
+        range_vals = ema(tr_vals, length)
+        out_basis, out_upper, out_lower = [], [], []
+        for b, r in zip(basis_vals, range_vals):
+            if is_na(b) or is_na(r):
+                out_basis.append(na)
+                out_upper.append(na)
+                out_lower.append(na)
+            else:
+                u = float(b) + float(r) * mult
+                l = float(b) - float(r) * mult
+                out_basis.append(b)
+                out_upper.append(u)
+                out_lower.append(l)
+        return (out_basis, out_upper, out_lower)
+
+    if state_id is None:
+        raise PineRuntimeError("ta.kc() runtime mode requires state_id")
+
+    # Runtime mode: stateful EMA chains
+    basis_state = _state(runtime, f"{state_id}_basis", lambda: _EmaState(length), _EmaState)
+    range_state = _state(runtime, f"{state_id}_range", lambda: _EmaState(length), _EmaState)
+
+    current_tr = tr(runtime=runtime)
+    b = basis_state.update(_current(source, "kc:source"))
+    r = range_state.update(current_tr)
+    if is_na(b) or is_na(r):
+        return (na, na, na)
+    u = float(b) + float(r) * mult
+    l = float(b) - float(r) * mult
+    return (b, u, l)
+
+
+def kcw(
+    source: Any,
+    length: int,
+    mult: float = 1.0,
+    *,
+    usesource: int | None = None,
+    scaletype: int | None = None,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
+    """
+    Keltner Channel Width: (upper - lower) / basis
+
+    Returns the normalised width of Keltner Channels as a percentage.
+    """
+    kc_basis, kc_upper, kc_lower = kc(
+        source, length, mult,
+        usesource=usesource, scaletype=scaletype,
+        runtime=runtime, state_id=state_id,
+    )
+    if is_na(kc_basis) or is_na(kc_upper) or is_na(kc_lower):
+        return na
+    b = float(kc_basis)
+    if b == 0:
+        return na
+    return (float(kc_upper) - float(kc_lower)) / b
+
+
+def wpr(length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+    """
+    Williams %%R: 100 * (close - highest(high, length)) / (highest(high,length) - lowest(low,length))
+
+    Simplified form (used in corpus files with just length arg):
+    100 * (close - highest(high, length)) / (highest(high, length) - lowest(low, length))
+    """
+    length = _validate_length(length)
+
+    if runtime is None:
+        raise PineRuntimeError("ta.wpr() requires runtime (used as stateful builtin)")
+
+    if state_id is None:
+        raise PineRuntimeError("ta.wpr() runtime mode requires state_id")
+
+    hi = highest(runtime.high, length, runtime=runtime, state_id=f"{state_id}_hi")
+    lo = lowest(runtime.low, length, runtime=runtime, state_id=f"{state_id}_lo")
+    close = runtime.close.current
+
+    if is_na(hi) or is_na(lo) or is_na(close):
+        return na
+    if hi == lo:
+        return na
+    return 100.0 * (float(close) - float(hi)) / (float(hi) - float(lo))
 
