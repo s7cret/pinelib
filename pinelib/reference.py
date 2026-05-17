@@ -126,6 +126,10 @@ class PineMap(Generic[K, V]):
     def get(self, key: K, default: V | None = None) -> V | None:
         return self._values.get(key, default)
 
+    def contains(self, key: K) -> bool:
+        """Returns True if key exists in the map."""
+        return key in self._values
+
     def remove(self, key: K) -> V:
         return self._values.pop(key)
 
