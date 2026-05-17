@@ -16,7 +16,6 @@ from pinelib.core.bar import Bar
 from pinelib.core.na import is_na, na
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.types import SymbolInfo, TimeframeInfo
-from pinelib.errors import PineUnsupportedFeatureError
 from pinelib.request.providers import InMemoryDataProvider
 from pinelib.request.security import merge_requested_series_to_chart_bars, security_lower_tf
 
@@ -176,10 +175,8 @@ def test_session_time_time_close_timeframe_guard_matches_tradingview_daily_time_
             "bar_time": float(bar_time) / 1000.0,
             "bar_time_close": runtime.timefunc.time_close(runtime=runtime),
         }
-        with pytest.raises(PineUnsupportedFeatureError):
-            runtime.timefunc.time("W", runtime=runtime)
-        with pytest.raises(PineUnsupportedFeatureError):
-            runtime.timefunc.time_close("W", runtime=runtime)
+        assert is_na(runtime.timefunc.time("W", runtime=runtime))
+        assert is_na(runtime.timefunc.time_close("W", runtime=runtime))
         runtime.end_bar()
 
     _assert_columns_close(actual, expected_by_index.values(), ["bar_time", "bar_time_close"])

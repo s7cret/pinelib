@@ -961,6 +961,8 @@ def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, 
     length = _validate_length(length)
     current_value = _history(source, 0, "change")
     previous_value = _history(source, length, "change")
+    _reject_bool(current_value, "change")
+    _reject_bool(previous_value, "change")
     if is_na(current_value) or is_na(previous_value):
         return na
     return float(current_value) - float(previous_value)
@@ -2086,4 +2088,3 @@ def wpr(length: int, *, runtime: PineRuntime | None = None, state_id: str | None
     if hi == lo:
         return na
     return 100.0 * (float(close) - float(hi)) / (float(hi) - float(lo))
-

@@ -227,8 +227,7 @@ class TimeFunctions:
         return chart_ms is not None and chart_ms < 86_400_000
 
     def _validate_timeframe(self, timeframe: str | None, runtime: PineRuntime) -> bool:
-        """Validate timeframe. Returns True if valid, False if unsupported.
-        Does NOT raise — caller should return na on False."""
+        """Validate timeframe. Unsupported aggregation returns na after diagnostics."""
         if timeframe is None:
             return True
         requested = timeframe.strip().upper()

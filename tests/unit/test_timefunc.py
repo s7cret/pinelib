@@ -77,10 +77,7 @@ def test_overnight_session_is_supported() -> None:
 
 import pytest  # noqa: E402
 
-from pinelib.errors import (  # noqa: E402
-    PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC,
-    PineUnsupportedFeatureError,
-)
+from pinelib.errors import PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC  # noqa: E402
 
 
 def test_time_and_time_close_accept_chart_timeframe() -> None:
@@ -111,9 +108,7 @@ def test_time_and_time_close_other_non_chart_timeframe_is_explicit_unsupported()
     runtime = _runtime("0000-2359:1234567", "UTC")
     bar = Bar(time=1_700_000_000_000, time_close=1_700_003_599_999, open=1, high=1, low=1, close=1)
     runtime.begin_bar(bar)
-    with pytest.raises(PineUnsupportedFeatureError) as exc:
-        runtime.timefunc.time("W", runtime=runtime)
-    assert exc.value.code == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
+    assert is_na(runtime.timefunc.time("W", runtime=runtime))
     assert runtime.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
-    with pytest.raises(PineUnsupportedFeatureError):
-        runtime.timefunc.time_close("W", runtime=runtime)
+    assert is_na(runtime.timefunc.time_close("W", runtime=runtime))
+    assert runtime.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
