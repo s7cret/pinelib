@@ -5,6 +5,7 @@ from copy import copy as shallow_copy
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
+from pinelib.core.na import na as NA
 from pinelib.core.types import RuntimeConfig
 from pinelib.errors import PL_REFERENCE_HISTORY_UNSUPPORTED, PineUnsupportedFeatureError
 
@@ -98,6 +99,8 @@ class PineArray(Generic[T]):
         self._values.append(value)
 
     def get(self, index: int) -> T:
+        if index < 0 or index >= len(self._values):
+            return NA  # type: ignore[return-value]
         return self._values[index]
 
     def set(self, index: int, value: T) -> None:
