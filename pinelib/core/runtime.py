@@ -20,6 +20,7 @@ from pinelib.core.types import (
 from pinelib.errors import PineRuntimeError
 from pinelib.request.providers import DataProvider, IntrabarDataProvider, LowerTfQueryMetadata
 from pinelib.version import RUNTIME_CONTRACT_VERSION
+from pinelib.plot import PlotRecorder
 from pinelib.visual import VisualRecorder
 
 
@@ -46,6 +47,7 @@ class PineRuntime:
     commit_order: list[str] = field(init=False, default_factory=list)
     inputs: InputRegistry = field(init=False)
     barstate: BarStateInfo = field(init=False, default_factory=BarStateInfo)
+    plot_recorder: PlotRecorder = field(init=False)
     visual: VisualRecorder = field(init=False)
     request_namespace: str | None = field(init=False, default=None)
 
@@ -63,6 +65,7 @@ class PineRuntime:
         if isinstance(self.timeframe, str):
             self.timeframe = TimeframeInfo.from_string(self.timeframe)
         self.inputs = InputRegistry(self.config)
+        self.plot_recorder = PlotRecorder()
         self.visual = VisualRecorder(self.config)
         self.open = self.series("open", "float")
         self.high = self.series("high", "float")
@@ -198,6 +201,7 @@ class PineRuntime:
             "barstate": copy.deepcopy(self.barstate),
             "request_depth": self.request_depth,
             "lower_tf_metadata_log": copy.deepcopy(self.lower_tf_metadata_log),
+            "plot_recorder": copy.deepcopy(self.plot_recorder),
             "visual": copy.deepcopy(self.visual),
             "request_namespace": self.request_namespace,
         }
@@ -227,6 +231,7 @@ class PineRuntime:
         self.barstate = copy.deepcopy(state.get("barstate", BarStateInfo()))
         self.request_depth = int(state.get("request_depth", 0))
         self.lower_tf_metadata_log = copy.deepcopy(state.get("lower_tf_metadata_log", []))
+        self.plot_recorder = copy.deepcopy(state.get("plot_recorder", PlotRecorder()))
         self.visual = copy.deepcopy(state.get("visual", self.visual))
         self.request_namespace = state.get("request_namespace")
 
