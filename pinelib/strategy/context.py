@@ -267,7 +267,8 @@ class StrategyContext:
         if trail_offset is not None and (trail_price is not None or trail_points is not None):
             available = abs(self._available_exit_qty(from_entry))
             requested = self._resolve_exit_qty(qty, qty_percent, available)
-            actual = max(0.0, min(requested, available))
+            reserved = self._reserved_exit_qty(from_entry, exclude_parent_exit_id=id)
+            actual = max(0.0, min(requested, max(0.0, available - reserved)))
             if actual <= 0:
                 return
             exit_direction: Direction = "short" if self.position_size > 0 else "long"
@@ -284,6 +285,7 @@ class StrategyContext:
                     order_id=id,
                 )
                 return
+            self._cancel_pending_exit_group(id, from_entry)
             created_bar_index, created_time = self._created_order_location()
             self.pending_orders.append(
                 Order(
@@ -319,11 +321,7 @@ class StrategyContext:
             stop = self.position_avg_price - (loss if self.position_size >= 0 else -loss)
         available = abs(self._available_exit_qty(from_entry))
         requested = self._resolve_exit_qty(qty, qty_percent, available)
-        reserved = sum(
-            o.qty or 0.0
-            for o in self.pending_orders
-            if o.kind == "exit" and o.status == "pending" and o.from_entry == from_entry
-        )
+        reserved = self._reserved_exit_qty(from_entry, exclude_parent_exit_id=id)
         actual = max(0.0, min(requested, max(0.0, available - reserved)))
         if actual < requested or (qty_percent is not None and qty_percent > 100):
             self._emit(
@@ -338,6 +336,7 @@ class StrategyContext:
             return
         direction: Direction = "short" if self.position_size > 0 else "long"
         group = f"exit:{id}:{from_entry or '*'}"
+        self._cancel_pending_exit_group(id, from_entry)
         created_bar_index, created_time = self._created_order_location()
         if limit is not None:
             self.pending_orders.append(
@@ -695,8 +694,13 @@ class StrategyContext:
             if qty <= 0:
                 order.status = "cancelled"
                 return
-        if order.kind in {"exit", "close"}:
+        if order.kind == "exit":
             qty = min(qty, abs(self._available_exit_qty(order.from_entry)))
+            if qty <= 0:
+                order.status = "cancelled"
+                return
+        if order.kind == "close":
+            qty = min(qty, abs(self._available_entry_qty(order.from_entry)))
             if qty <= 0:
                 order.status = "cancelled"
                 return
@@ -729,6 +733,7 @@ class StrategyContext:
                             other.status = "cancelled"
                     else:
                         other.status = "cancelled"
+        self._cancel_unavailable_exit_orders()
         self._diagnose_margin_risk(runtime, bar.close)
 
     def _apply_position_fill(
@@ -822,10 +827,13 @@ class StrategyContext:
 
     def _lots_for_close(self, order: Order) -> list[_OpenLot]:
         lots = list(self._lots)
-        if self.close_entries_rule == "ANY" and order.from_entry:
+        if order.from_entry:
             matching = [lot for lot in lots if lot.entry_id == order.from_entry]
             others = [lot for lot in lots if lot.entry_id != order.from_entry]
-            return [*matching, *others]
+            if order.kind == "close":
+                return matching
+            if self.close_entries_rule == "ANY":
+                return [*matching, *others]
         return lots
 
     def _recompute_position(self, mark_price: float) -> None:
@@ -940,6 +948,46 @@ class StrategyContext:
             lots = self._lots
         sign = 1.0 if self.position_size >= 0 else -1.0
         return sign * sum(lot.qty for lot in lots)
+
+    def _available_entry_qty(self, entry_id: str | None) -> float:
+        if entry_id is None:
+            lots = self._lots
+        else:
+            lots = [lot for lot in self._lots if lot.entry_id == entry_id]
+        if not lots:
+            return 0.0
+        sign = 1.0 if lots[0].direction == "long" else -1.0
+        return sign * sum(lot.qty for lot in lots)
+
+    def _cancel_pending_exit_group(self, parent_exit_id: str, from_entry: str | None) -> None:
+        for order in self.pending_orders:
+            if (
+                order.kind == "exit"
+                and order.status == "pending"
+                and order.parent_exit_id == parent_exit_id
+                and order.from_entry == from_entry
+            ):
+                order.status = "cancelled"
+
+    def _cancel_unavailable_exit_orders(self) -> None:
+        for order in self.pending_orders:
+            if order.kind != "exit" or order.status != "pending":
+                continue
+            if abs(self._available_entry_qty(order.from_entry)) <= 1e-12:
+                order.status = "cancelled"
+
+    def _reserved_exit_qty(
+        self, from_entry: str | None, *, exclude_parent_exit_id: str | None = None
+    ) -> float:
+        reserved_by_group: dict[tuple[str | None, str | None], float] = {}
+        for order in self.pending_orders:
+            if order.kind != "exit" or order.status != "pending" or order.from_entry != from_entry:
+                continue
+            if exclude_parent_exit_id is not None and order.parent_exit_id == exclude_parent_exit_id:
+                continue
+            key = (order.parent_exit_id or order.id, order.oca_name)
+            reserved_by_group[key] = max(reserved_by_group.get(key, 0.0), order.qty or 0.0)
+        return sum(reserved_by_group.values())
 
     def _apply_slippage(self, price: float, direction: Direction) -> float:
         return price + self.slippage if direction == "long" else price - self.slippage

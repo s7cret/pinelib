@@ -166,6 +166,93 @@ def test_exit_reservation_reduction_and_bracket_oca() -> None:
     assert all(o.parent_exit_id != "x1" for o in s.pending_orders)
 
 
+def test_repeated_same_id_exit_replaces_existing_bracket() -> None:
+    s = StrategyContext()
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 100, 101, 99, 100))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+    process(runtime, s, bar(1, 100, 101, 99, 100))
+
+    runtime.begin_bar(bar(2, 100, 101, 99, 100))
+    s.exit("XL", from_entry="L", limit=110, stop=90)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    runtime.begin_bar(bar(3, 100, 101, 99, 100))
+    s.exit("XL", from_entry="L", limit=105, stop=95)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    active = [(o.id, o.qty, o.limit, o.stop) for o in s.pending_orders if o.status == "pending"]
+    assert active == [("XL:limit", 1.0, 105, None), ("XL:stop", 1.0, None, 95)]
+    process(runtime, s, bar(4, 100, 106, 99, 100))
+    assert s.closedtrades == 1
+    assert s.position_size == 0
+    assert s.fills[-1].order_id == "XL:limit"
+
+
+def test_bracket_reservation_counts_oca_siblings_once() -> None:
+    s = StrategyContext()
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 11, 9, 10))
+    s.entry("L", "long", qty=3)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+    process(runtime, s, bar(1, 10, 11, 9, 10))
+
+    runtime.begin_bar(bar(2, 10, 11, 9, 10))
+    s.exit("x1", "L", qty=2, limit=12, stop=8)
+    s.exit("x2", "L", qty=2, limit=13)
+
+    active = [(o.parent_exit_id, o.id, o.qty) for o in s.pending_orders if o.status == "pending"]
+    assert active == [("x1", "x1:limit", 2.0), ("x1", "x1:stop", 2.0), ("x2", "x2:limit", 1.0)]
+    assert any(d["code"] == PL_WARNING_EXIT_QTY_REDUCED for d in runtime.config.diagnostics)
+
+
+def test_close_fill_cancels_exit_orders_for_closed_entry() -> None:
+    s = StrategyContext()
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 100, 101, 99, 100))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+    process(runtime, s, bar(1, 100, 101, 99, 100))
+
+    runtime.begin_bar(bar(2, 100, 101, 99, 100))
+    s.exit("XL", from_entry="L", limit=110, stop=90)
+    s.close("L")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+    process(runtime, s, bar(3, 100, 101, 99, 100))
+
+    assert s.closedtrades == 1
+    assert s.position_size == 0
+    assert [o for o in s.pending_orders if o.kind == "exit"] == []
+
+
+def test_close_id_does_not_close_opposite_entry_after_reversal_entry_fills_first() -> None:
+    s = StrategyContext(pyramiding=1)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 100, 101, 99, 100))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+    process(runtime, s, bar(1, 100, 101, 99, 100))
+
+    runtime.begin_bar(bar(2, 100, 101, 99, 100))
+    s.entry("S", "short", qty=1)
+    s.close("L")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+    process(runtime, s, bar(3, 100, 101, 99, 100))
+
+    assert s.closedtrades == 1
+    assert s.position_size == -1
+    assert s.position_entry_name == "S"
+
+
 def test_commission_slippage_and_percent_sizing() -> None:
     s = StrategyContext(
         default_qty_type="percent_of_equity",

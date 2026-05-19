@@ -265,6 +265,19 @@ class PineRuntime:
         # Scalar/constant — return as-is
         return src
 
+    def expr_history(self, value: Any, offset: int, state_id: str) -> Any:
+        """History for generated scalar expression outputs.
+
+        Pine treats a runtime expression call result as a series over bars, so
+        generated code must materialize that scalar under a stable identity
+        before applying the history offset.
+        """
+        dtype = "bool" if isinstance(value, bool) else "float"
+        safe_id = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in state_id)
+        series = self.series(f"__expr_history_{safe_id}", dtype=dtype)
+        series.set_current(value)
+        return series[offset]
+
     def series(
         self,
         name: str,

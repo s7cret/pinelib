@@ -125,3 +125,22 @@ def test_runtime_history_scalar_passthrough() -> None:
     assert result == 42.5
     result2 = runtime.history(0.0, 5)
     assert result2 == 0.0
+
+
+def test_runtime_expr_history_materializes_scalar_expression_series() -> None:
+    runtime = _runtime()
+
+    b1 = Bar(time=1_700_000_000_000, open=1.0, high=2.0, low=0.5, close=1.5, volume=3.0)
+    runtime.begin_bar(b1)
+    assert runtime.expr_history(10.0, 1, state_id="expr:rsi") is na
+    runtime.end_bar()
+
+    b2 = Bar(time=1_700_000_060_000, open=1.5, high=3.0, low=1.0, close=2.5, volume=5.0)
+    runtime.begin_bar(b2)
+    assert runtime.expr_history(20.0, 1, state_id="expr:rsi") == 10.0
+    runtime.end_bar()
+
+    b3 = Bar(time=1_700_000_120_000, open=2.0, high=3.5, low=1.5, close=3.0, volume=7.0)
+    runtime.begin_bar(b3)
+    assert runtime.expr_history(30.0, 1, state_id="expr:rsi") == 20.0
+    assert runtime.expr_history(30.0, 2, state_id="expr:rsi") == 10.0
