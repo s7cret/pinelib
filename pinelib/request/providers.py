@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import bisect
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Sequence
 
 from pinelib.core.bar import Bar
 from pinelib.errors import PineDataFormatError
@@ -136,3 +137,51 @@ class InMemoryDataProvider:
                     raise PineDataFormatError("Duplicate bar time is not allowed")
             last_time = bar.time
         return bars
+
+    def get_intrabar_bars(
+        self,
+        symbol: str,
+        chart_bar: Bar,
+        lower_timeframe: str | None = None,
+        *,
+        max_bars: int | None = None,
+    ) -> list[Bar]:
+        """Return lower-timeframe bars inside a parent chart bar using O(log N) lookup.
+
+        Uses LowerTimeframeIndex for O(log N) binary search instead of O(N) scan.
+        Returns bars where:
+          - bar.time >= chart_bar.time  (bar started at or after parent open)
+          - bar_close_time(bar) <= chart_bar_close  (bar fully closed within parent)
+
+        Bars must be pre-loaded under the (symbol, lower_timeframe) key.
+        """
+        if lower_timeframe is None:
+            return []
+
+        normalized_symbol = self.normalize_symbol(symbol)
+        normalized_tf = self.normalize_timeframe(lower_timeframe)
+        key = (normalized_symbol, normalized_tf)
+        bars = self._bars_by_key.get(key)
+        if not bars:
+            return []
+
+        chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
+
+        # Binary search for first bar with time >= chart_bar.time
+        i = bisect.bisect_left(bars, chart_bar.time, key=lambda b: b.time)
+
+        selected: list[Bar] = []
+        while i < len(bars):
+            bar = bars[i]
+            if bar.time > chart_close:
+                break
+            # Check bar fully closes within chart bar
+            bar_close = bar.time_close if bar.time_close is not None else bar.time
+            if bar_close <= chart_close:
+                selected.append(bar)
+            i += 1
+
+        if max_bars is not None and len(selected) > max_bars:
+            selected = selected[:max_bars]
+
+        return selected

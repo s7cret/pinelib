@@ -208,14 +208,38 @@ def _bar_close_time(bar: Bar) -> int:
 
 
 def _bars_inside_chart_bar(lower_bars: Sequence[Bar], chart_bar: Bar) -> list[Bar]:
-    """Return fully closed intrabars for a chart bar, ordered oldest to newest."""
+    """Return fully closed intrabars for a chart bar, ordered oldest to newest.
 
+    Uses binary search for O(log K + M) when bars are sorted by time.
+    For non-overlapping bars (standard OHLCV), this finds the contiguous
+    range in one probe, avoiding scan of pre-chart bars.
+    """
+    if not lower_bars:
+        return []
+
+    chart_time = chart_bar.time
     chart_close = _bar_close_time(chart_bar)
-    return [
-        bar
-        for bar in lower_bars
-        if chart_bar.time <= bar.time and _bar_close_time(bar) <= chart_close
-    ]
+
+    import bisect
+
+    # Find first bar with time >= chart_bar.time using bisect with key
+    i = bisect.bisect_left(lower_bars, chart_time, key=lambda b: b.time)
+
+    # Linear scan from found position; stop when bar.time passes chart_close
+    # (for non-overlapping bars, this means we've left the chart bar's range)
+    selected: list[Bar] = []
+    while i < len(lower_bars):
+        bar = lower_bars[i]
+        bar_time = bar.time
+        if bar_time > chart_close:
+            break
+        bar_close = _bar_close_time(bar)
+        # Verify bar is fully inside chart bar (handles edge cases)
+        if bar_time >= chart_time and bar_close <= chart_close:
+            selected.append(bar)
+        i += 1
+
+    return selected
 
 
 def security_lower_tf(
