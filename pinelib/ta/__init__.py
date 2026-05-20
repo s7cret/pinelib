@@ -957,6 +957,35 @@ def lowestbars(source: Any, length: int) -> Any:
     return na if best_offset is None else -best_offset
 
 
+@dataclass(slots=True)
+class _CrossState:
+    previous_left: Any = na
+    previous_right: Any = na
+    initialized: bool = False
+
+    def crossover(self, current_left: Any, current_right: Any) -> bool:
+        result = (
+            self.initialized
+            and pine_gt(current_left, current_right)
+            and pine_lte(self.previous_left, self.previous_right)
+        )
+        self.previous_left = current_left
+        self.previous_right = current_right
+        self.initialized = True
+        return bool(result)
+
+    def crossunder(self, current_left: Any, current_right: Any) -> bool:
+        result = (
+            self.initialized
+            and pine_lt(current_left, current_right)
+            and pine_gte(self.previous_left, self.previous_right)
+        )
+        self.previous_left = current_left
+        self.previous_right = current_right
+        self.initialized = True
+        return bool(result)
+
+
 def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
     current_value = _history(source, 0, "change")
@@ -968,9 +997,12 @@ def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, 
     return float(current_value) - float(previous_value)
 
 
-def crossover(source1: Any, source2: Any) -> bool:
+def crossover(source1: Any, source2: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> bool:
     current_left = _history(source1, 0, "crossover")
     current_right = _history(source2, 0, "crossover")
+    if runtime is not None and state_id is not None:
+        state = _state(runtime, state_id, _CrossState, _CrossState)
+        return state.crossover(current_left, current_right)
     previous_left = _history(source1, 1, "crossover")
     # For _ShiftedSeries, source2[1] = original[shift+1] but we need original[shift]
     # (the value of the shifted series at the previous bar = current_right at prev bar)
@@ -982,9 +1014,12 @@ def crossover(source1: Any, source2: Any) -> bool:
     return pine_gt(current_left, current_right) and pine_lte(previous_left, previous_right)
 
 
-def crossunder(source1: Any, source2: Any) -> bool:
+def crossunder(source1: Any, source2: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> bool:
     current_left = _history(source1, 0, "crossunder")
     current_right = _history(source2, 0, "crossunder")
+    if runtime is not None and state_id is not None:
+        state = _state(runtime, state_id, _CrossState, _CrossState)
+        return state.crossunder(current_left, current_right)
     previous_left = _history(source1, 1, "crossunder")
     # Same shifted-series fix as crossover
     if hasattr(source2, "source"):  # _ShiftedSeries
