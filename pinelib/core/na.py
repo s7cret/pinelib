@@ -30,14 +30,21 @@ class SupportsSeriesLike(Protocol):
     def committed_length(self) -> int: ...
 
 
+_NA_SENTINEL_TYPE = type(na)
+
+
 def is_na(value: Any) -> bool:
-    if value is None or value is na:
+    # Fast path for None (most common in hot loops): O(1) pointer comparison
+    if value is None:
         return True
-    if isinstance(value, PineNASentinel):
-        return True
-    if isinstance(value, float):
-        return math.isnan(value)
-    return False
+    # Fast path for float (second most common): avoid isinstance overhead
+    # Use type() comparison which is faster than isinstance()
+    t = type(value)
+    if t is float:
+        # NaN check: a float NaN is not equal to itself
+        return value != value
+    # Remaining cases (na singleton, series objects, etc.)
+    return value is na
 
 
 def _reject_bool_argument(value: Any, *, function_name: str) -> None:

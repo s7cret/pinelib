@@ -28,8 +28,10 @@ class PlotRecorder:
     for the data window / exported chart data.
     """
 
+    __slots__ = ('_records',)
+
     def __init__(self) -> None:
-        self._records: list[PlotRecord] = []
+        object.__setattr__(self, '_records', [])
 
     def record(
         self,

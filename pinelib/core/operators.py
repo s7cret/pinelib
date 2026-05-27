@@ -2,37 +2,58 @@ from __future__ import annotations
 
 from typing import Any
 
-from pinelib.core.na import is_na
+from pinelib.core.na import is_na, na
 from pinelib.errors import PineNAError
 
 
 def pine_bool(value: Any) -> bool:
-    if is_na(value):
+    # Fast path: pointer comparison for na singleton (O(1))
+    if value is na:
         raise PineNAError("Boolean context for na is not allowed")
+    # type() is faster than isinstance for exact type match
+    t = type(value)
+    if t is bool:
+        return value
+    if t is int:
+        return bool(value)
+    if t is float:
+        # NaN floats are NOT na — they are valid True values in Pine
+        return bool(value)
+    if value is None:
+        raise PineNAError("Boolean context for na is not allowed")
+    # Series objects, etc. — use default bool conversion
     return bool(value)
 
 
 def pine_add(left: Any, right: Any) -> Any:
-    if is_na(left) or is_na(right):
-        return left if is_na(left) else right
+    if left is na or left is None:
+        return left
+    if right is na or right is None:
+        return right
     return left + right
 
 
 def pine_sub(left: Any, right: Any) -> Any:
-    if is_na(left) or is_na(right):
-        return left if is_na(left) else right
+    if left is na or left is None:
+        return left
+    if right is na or right is None:
+        return right
     return left - right
 
 
 def pine_mul(left: Any, right: Any) -> Any:
-    if is_na(left) or is_na(right):
-        return left if is_na(left) else right
+    if left is na or left is None:
+        return left
+    if right is na or right is None:
+        return right
     return left * right
 
 
 def pine_div(left: Any, right: Any) -> Any:
-    if is_na(left) or is_na(right):
-        return left if is_na(left) else right
+    if left is na or left is None:
+        return left
+    if right is na or right is None:
+        return right
     return left / right
 
 

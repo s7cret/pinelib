@@ -26,14 +26,15 @@ def _validate_length(length: Any) -> int:
     return length
 
 
-def _reject_bool(value: Any, function_name: str) -> None:
-    if isinstance(value, bool):
-        raise PineTypeError(f"ta.{function_name}() does not accept bool source values")
-
-
 def _current(source: Any, function_name: str) -> Any:
-    value = source[0] if isinstance(source, SupportsSeriesLike) else source
-    _reject_bool(value, function_name)
+    # Inlined bool rejection: faster than isinstance + function call
+    if isinstance(source, SupportsSeriesLike):
+        value = source[0]
+    else:
+        value = source
+    # type() is faster than isinstance for exact type check
+    if type(value) is bool:
+        raise PineTypeError(f"ta.{function_name}() does not accept bool source values")
     return value
 
 
@@ -141,7 +142,6 @@ class _SmaState:
     total: float = 0.0
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "sma")
         if not is_na(value):
             number = float(value)
             self.values.append(number)
@@ -159,7 +159,6 @@ class _EmaState:
     value: float | None = None
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "ema")
         if is_na(value):
             return na if self.value is None else self.value
         number = float(value)
@@ -176,7 +175,6 @@ class _RmaState:
     warmup_total: float = 0.0
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "rma")
         if is_na(value):
             return na if self.value is None else self.value
         number = float(value)
@@ -202,7 +200,6 @@ class _RsiState:
     avg_loss: float | None = None
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "rsi")
         if is_na(value):
             return na
         number = float(value)
@@ -280,7 +277,6 @@ class _MedianState:
     values: deque[float] = field(default_factory=deque)
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "median")
         if not is_na(value):
             self.values.append(float(value))
             if len(self.values) > self.length:
@@ -315,7 +311,6 @@ class _ModeState:
     values: deque[float] = field(default_factory=deque)
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "mode")
         if not is_na(value):
             self.values.append(float(value))
             if len(self.values) > self.length:
@@ -384,14 +379,16 @@ def tr(
         low_value = low
         prev_close = close
     for value in (high_value, low_value):
-        _reject_bool(value, "tr")
+        if type(value) is bool:
+            raise PineTypeError("ta.tr() does not accept bool source values")
     if is_na(high_value) or is_na(low_value):
         return na
     high_number = float(cast(Numeric, high_value))
     low_number = float(cast(Numeric, low_value))
     if is_na(prev_close):
         return high_number - low_number
-    _reject_bool(prev_close, "tr")
+    if type(prev_close) is bool:
+        raise PineTypeError("ta.tr() does not accept bool source values")
     previous = float(cast(Numeric, prev_close))
     return max(high_number - low_number, abs(high_number - previous), abs(low_number - previous))
 
@@ -580,7 +577,6 @@ class _CmoState:
     neg_sum: float = 0.0
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "cmo")
         if is_na(value):
             return na
         number = float(value)
@@ -625,7 +621,6 @@ class _TsiState:
     warmup_count: int = 0
 
     def update(self, value: Any) -> Any:
-        _reject_bool(value, "tsi")
         if is_na(value):
             return na
         number = float(value)
@@ -990,8 +985,10 @@ def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, 
     length = _validate_length(length)
     current_value = _history(source, 0, "change")
     previous_value = _history(source, length, "change")
-    _reject_bool(current_value, "change")
-    _reject_bool(previous_value, "change")
+    if type(current_value) is bool:
+        raise PineTypeError("ta.change() does not accept bool source values")
+    if type(previous_value) is bool:
+        raise PineTypeError("ta.change() does not accept bool source values")
     if is_na(current_value) or is_na(previous_value):
         return na
     return float(current_value) - float(previous_value)
