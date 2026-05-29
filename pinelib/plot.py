@@ -32,10 +32,22 @@ class PlotRecorder:
     for the data window / exported chart data.
     """
 
-    __slots__ = ('_records',)
+    __slots__ = ('_records', '_from_time', '_to_time')
 
     def __init__(self) -> None:
         object.__setattr__(self, '_records', [])
+        object.__setattr__(self, '_from_time', None)
+        object.__setattr__(self, '_to_time', None)
+
+    def set_time_window(self, from_time: int | None = None, to_time: int | None = None) -> None:
+        """Restrict recorded plot calls to an inclusive timestamp window."""
+        object.__setattr__(self, '_from_time', from_time)
+        object.__setattr__(self, '_to_time', to_time)
+
+    def _in_time_window(self, bar_time: int) -> bool:
+        from_time = self._from_time
+        to_time = self._to_time
+        return (from_time is None or bar_time >= from_time) and (to_time is None or bar_time <= to_time)
 
     def record(
         self,
@@ -46,6 +58,8 @@ class PlotRecorder:
         title: str,
         kwargs: dict[str, Any] | None = None,
     ) -> None:
+        if not self._in_time_window(bar_time):
+            return
         self._records.append(PlotRecord(
             bar_time=bar_time,
             bar_index=bar_index,
@@ -67,6 +81,8 @@ class PlotRecorder:
         Format: (bar_time, bar_index, value, title)
         This saves ~2.8μs per call vs PlotRecord dataclass.
         """
+        if not self._in_time_window(bar_time):
+            return
         self._records.append((bar_time, bar_index, value, title))
 
     def get_records(self) -> list[PlotRecord]:
