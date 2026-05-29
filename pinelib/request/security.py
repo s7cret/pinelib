@@ -278,6 +278,8 @@ def security(
             request_end,
             max_bars=calc_bars_count,
         )
+        if _filters_synthetic_empty_bars(runtime):
+            requested_bars = [bar for bar in requested_bars if bar.volume != 0]
         cache["requested_bars"] = requested_bars
     if not requested_bars and ignore_invalid_symbol:
         return na
