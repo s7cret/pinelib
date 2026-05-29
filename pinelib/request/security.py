@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pinelib.core.bar import Bar
 from pinelib.core.na import na
+from pinelib.core.types import parse_timeframe_to_ms
 from pinelib.errors import (
     PL_UNSUPPORTED_NESTED_SECURITY,
     PineRequestError,
@@ -39,6 +40,31 @@ def _provider_get_bars(
     if "market" in params:
         kwargs["market"] = extra.get("market_type") or extra.get("market") or "spot"
     return get_bars(symbol, timeframe, start, end, **kwargs)
+
+
+def _request_start_for_security(runtime: Any, requested_timeframe: str) -> int | None:
+    """Choose a bounded request start while preserving HTF overlap.
+
+    Live exchange adapters intentionally default open-ended requests to a small
+    latest-bar window. TradingView request.security, however, has access across
+    the chart history. Use a bounded start for same/lower TF requests and two
+    requested periods of pre-roll for higher TF requests so a chart that starts
+    mid-period can still see the previous finalized HTF bar.
+    """
+    if not runtime.chart_bars:
+        return None
+    chart_start = runtime.chart_bars[0].time
+    requested_ms = parse_timeframe_to_ms(requested_timeframe)
+    chart_ms = getattr(getattr(runtime, "timeframe", None), "interval_ms", None)
+    if requested_ms is None or chart_ms is None or requested_ms <= chart_ms:
+        return chart_start
+    return max(0, chart_start - (requested_ms * 2))
+
+
+def _filters_synthetic_empty_bars(runtime: Any) -> bool:
+    provider = getattr(runtime, "data_provider", None)
+    module = provider.__class__.__module__ if provider is not None else ""
+    return module.startswith("marketdata_provider")
 
 
 def _effective_close_time(
@@ -223,18 +249,13 @@ def security(
         from pinelib.request.providers import NullDataProvider
         runtime.data_provider = NullDataProvider()
 
-    chart_start = runtime.chart_bars[0].time if runtime.chart_bars else None
     chart_end = (
         runtime.chart_bars[-1].time_close
         if runtime.chart_bars and runtime.chart_bars[-1].time_close is not None
         else None
     )
     request_end = getattr(runtime, "request_data_end_ms", None) or chart_end
-    # For HTF bars, use start=None to include all HTF bars that could overlap
-    # with the chart period. The merge logic (effective_close + lookahead_off)
-    # determines which bar's value to return based on finalization status.
-    # Previously, start=chart_bars[0].time excluded the HTF bar that started
-    # before chart_start (e.g., May 5 D bar at 00:00 when chart starts at 20:00).
+    request_start = _request_start_for_security(runtime, timeframe)
     cache_key = (
         "security",
         state_id,
@@ -243,6 +264,7 @@ def security(
         gaps,
         lookahead,
         calc_bars_count,
+        request_start,
         request_end,
     )
     cache = runtime.request_security_cache.setdefault(cache_key, {})
@@ -252,7 +274,7 @@ def security(
             runtime,
             symbol,
             timeframe,
-            None,  # Don't filter by start - include HTF bars from before chart_start
+            request_start,
             request_end,
             max_bars=calc_bars_count,
         )
@@ -432,6 +454,8 @@ def security_lower_tf(
             )
             runtime.request_lower_tf_cache[cache_key] = requested_bars
         selected_bars = _bars_inside_chart_bar(requested_bars, runtime.current_bar)
+        if _filters_synthetic_empty_bars(runtime):
+            selected_bars = [bar for bar in selected_bars if bar.volume != 0]
 
     metadata = LowerTfQueryMetadata(
         requested_symbol=symbol,
