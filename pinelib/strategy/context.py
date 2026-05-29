@@ -1045,7 +1045,11 @@ class StrategyContext:
         if self.default_qty_type == "cash":
             return self.default_qty_value / price
         if self.default_qty_type == "percent_of_equity":
-            return sizing_equity * self.default_qty_value / 100.0 / price
+            notional = sizing_equity * self.default_qty_value / 100.0
+            denom = price
+            if self.commission_type == "percent":
+                denom = price * (1.0 + self.commission_value / 100.0)
+            return notional / denom
         raise PineStrategyError(
             f"Unsupported default_qty_type {self.default_qty_type!r}",
             code=PL_UNSUPPORTED_STRATEGY_SETTING,

@@ -267,7 +267,7 @@ def test_commission_slippage_and_percent_sizing() -> None:
     s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
     runtime.end_bar()
     process(runtime, s, bar(1, 10, 11, 9, 10))
-    assert round(s.position_size, 6) == 1000.0
+    assert round(s.position_size, 6) == round(10000.0 / (10.0 * 1.01), 6)
     assert s.position_avg_price == 10.5
     assert s.equity < s.initial_capital
 
@@ -287,7 +287,7 @@ def test_default_percent_market_entry_sizes_from_creation_close_not_next_open() 
 
     process(runtime, s, bar(1, 110, 110, 110, 110))
 
-    assert round(s.position_size, 9) == round(10000.0 / 100.0, 9)
+    assert round(s.position_size, 9) == round(10000.0 / (100.0 * 1.01), 9)
     assert s.position_avg_price == 110
 
 
