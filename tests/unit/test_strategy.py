@@ -272,6 +272,25 @@ def test_commission_slippage_and_percent_sizing() -> None:
     assert s.equity < s.initial_capital
 
 
+def test_default_percent_market_entry_sizes_from_creation_close_not_next_open() -> None:
+    s = StrategyContext(
+        default_qty_type="percent_of_equity",
+        default_qty_value=10,
+        commission_type="percent",
+        commission_value=1,
+    )
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 100, 100, 100, 100))
+    s.entry("L", "long")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    process(runtime, s, bar(1, 110, 110, 110, 110))
+
+    assert round(s.position_size, 9) == round(10000.0 / 100.0, 9)
+    assert s.position_avg_price == 110
+
+
 def test_max_runup_tracks_monotonic_mark_to_market_gain() -> None:
     s = StrategyContext(process_orders_on_close=True)
     runtime = rt(s)

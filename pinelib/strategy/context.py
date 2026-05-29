@@ -74,6 +74,8 @@ class Order:
     source_map: object | None = None
     comment: str | None = None
     immediate: bool = False
+    default_qty_price: float | None = None
+    default_qty_equity: float | None = None
     trail_activation: float | None = None
     trail_offset: float | None = None
     trail_stop: float | None = None
@@ -663,6 +665,8 @@ class StrategyContext:
             created_time=created_time,
             comment=comment,
             source_map=source_map,
+            default_qty_price=self._default_qty_price() if qty is None else None,
+            default_qty_equity=float(self.equity) if qty is None else None,
         )
 
     def _created_order_location(self) -> tuple[int, int | None]:
@@ -676,6 +680,11 @@ class StrategyContext:
         if self._runtime is not None:
             return self._runtime.bar_index, None
         return -1, None
+
+    def _default_qty_price(self) -> float | None:
+        if self._runtime is not None and self._runtime.current_bar is not None:
+            return float(self._runtime.current_bar.close)
+        return None
 
     def _eligible(self, order: Order, current_bar_index: int, recalc_phase: bool) -> bool:
         if order.immediate or recalc_phase:
@@ -1025,15 +1034,18 @@ class StrategyContext:
     def _resolved_order_qty(self, order: Order, price: float) -> float:
         if order.qty is not None:
             return float(order.qty)
-        return self._resolved_default_qty(price)
+        sizing_price = order.default_qty_price if order.default_qty_price is not None else price
+        sizing_equity = order.default_qty_equity if order.default_qty_equity is not None else self.equity
+        return self._resolved_default_qty(sizing_price, equity=sizing_equity)
 
-    def _resolved_default_qty(self, price: float) -> float:
+    def _resolved_default_qty(self, price: float, *, equity: float | None = None) -> float:
+        sizing_equity = self.equity if equity is None else equity
         if self.default_qty_type == "fixed":
             return self.default_qty_value
         if self.default_qty_type == "cash":
             return self.default_qty_value / price
         if self.default_qty_type == "percent_of_equity":
-            return self.equity * self.default_qty_value / 100.0 / price
+            return sizing_equity * self.default_qty_value / 100.0 / price
         raise PineStrategyError(
             f"Unsupported default_qty_type {self.default_qty_type!r}",
             code=PL_UNSUPPORTED_STRATEGY_SETTING,
