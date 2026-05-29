@@ -98,6 +98,7 @@ def run_generated_strategy(
     *,
     schedule: StrategySchedule | None = None,
     realtime_ticks: Iterable[Iterable[TickUpdate]] | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> BacktestResult:
     """Run generated-like code bar-by-bar using PineRuntime + StrategyContext.
 
@@ -162,6 +163,8 @@ def run_generated_strategy(
             _run_strategy_pass(callback, runtime, strategy, active_bar, schedule, max_recalcs)
         runtime.end_bar()
         snapshots.append(snapshot_from_state(runtime, strategy))
+        if progress_callback is not None:
+            progress_callback(idx + 1, len(bars_list))
 
     report = build_backtest_report(runtime, strategy, strategy_instance, snapshots)
     return BacktestResult(runtime, strategy, strategy_instance, snapshots, report)
