@@ -77,6 +77,36 @@ def test_process_orders_on_close_integrated_with_runtime_loop() -> None:
     assert strategy.position_avg_price == 10
 
 
+def test_next_bar_market_fill_is_visible_to_strategy_pass() -> None:
+    from pinelib.ta import change
+
+    class CloseSeesClosedTrades:
+        def __init__(self) -> None:
+            self.closed_seen: list[tuple[int, int]] = []
+            self.closed_changes: list[tuple[int, float]] = []
+
+        def on_bar(self, rt: PineRuntime, strategy: StrategyContext) -> None:
+            idx = rt.bar_index_series.current
+            self.closed_seen.append((idx, int(strategy.closedtrades)))
+            delta = change(strategy.closedtrades)
+            if delta == 1:
+                self.closed_changes.append((idx, delta))
+            if idx == 0:
+                strategy.entry("L", "long", qty=1)
+            if idx == 2:
+                strategy.close("L")
+
+    generated = CloseSeesClosedTrades()
+    strategy = StrategyContext(process_orders_on_close=False)
+    run_generated_strategy(generated, runtime(), strategy, bars() + [
+        Bar(BASE + 10_800_000, 16, 17, 15, 16, 100, BASE + 14_399_999),
+    ])
+
+    assert generated.closed_seen[-1] == (3, 1)
+    assert generated.closed_changes == [(3, 1.0)]
+    assert strategy.closedtrades == 1
+
+
 def test_calc_on_order_fills_guarded_loop() -> None:
     class RecalcAddsSecondOrder:
         def __init__(self) -> None:

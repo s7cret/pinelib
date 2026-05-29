@@ -15,3 +15,21 @@ def test_plot_recorder_time_window_filters_records():
     assert records[0] == (100, 1, 2.0, "A")
     assert records[1].bar_time == 200
     assert records[1].value == 3.0
+
+
+def test_plot_recorder_snapshots_mutable_scalar_values():
+    class Scalar:
+        def __init__(self, value):
+            self._current = value
+
+    value = Scalar(1)
+    recorder = PlotRecorder()
+
+    recorder.record_plot(100, 1, value, "A")
+    value._current = 2
+    recorder.record(200, 2, "plot", value, "B")
+    value._current = 3
+
+    records = recorder.get_records()
+    assert records[0] == (100, 1, 1, "A")
+    assert records[1].value == 2

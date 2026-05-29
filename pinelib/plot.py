@@ -14,6 +14,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _snapshot_plot_value(value: Any) -> Any:
+    return getattr(value, "_current", value)
+
+
 @dataclass(slots=True)
 class PlotRecord:
     """A single plot() call recorded for one bar."""
@@ -64,7 +68,7 @@ class PlotRecorder:
             bar_time=bar_time,
             bar_index=bar_index,
             name=name,
-            value=value,
+            value=_snapshot_plot_value(value),
             title=title,
             kwargs=kwargs or {},
         ))
@@ -83,7 +87,7 @@ class PlotRecorder:
         """
         if not self._in_time_window(bar_time):
             return
-        self._records.append((bar_time, bar_index, value, title))
+        self._records.append((bar_time, bar_index, _snapshot_plot_value(value), title))
 
     def get_records(self) -> list[PlotRecord]:
         """Return all recorded plot calls in order.

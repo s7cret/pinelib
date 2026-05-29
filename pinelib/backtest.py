@@ -163,6 +163,7 @@ def run_generated_strategy(
             _run_strategy_pass(callback, runtime, strategy, active_bar, schedule, max_recalcs)
         runtime.end_bar()
         snapshots.append(snapshot_from_state(runtime, strategy))
+        strategy.commit_scalar_history()
         if progress_callback is not None:
             progress_callback(idx + 1, len(bars_list))
 
@@ -178,6 +179,9 @@ def _run_strategy_pass(
     schedule: StrategySchedule,
     max_recalcs: int,
 ) -> None:
+    if schedule.process_orders:
+        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar)
+        strategy.update_position_equity_trades_after_fill()
     callback(runtime, strategy)
     if schedule.process_orders:
         strategy.process_orders_for_bar(runtime=runtime, bar=active_bar)

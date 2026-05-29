@@ -122,6 +122,87 @@ class _OpenLot:
     commission: float = 0.0
 
 
+class _StrategyScalarSeries:
+    def __init__(self, value: int | float = 0) -> None:
+        self._current: int | float = value
+        self._history: list[int | float] = []
+
+    @property
+    def current(self) -> int | float:
+        return self._current
+
+    @property
+    def committed_length(self) -> int:
+        return len(self._history)
+
+    def set_current(self, value: int | float) -> None:
+        self._current = value
+
+    def commit_current(self) -> None:
+        self._history.append(self._current)
+
+    def __getitem__(self, offset: int) -> int | float:
+        if offset < 0:
+            raise IndexError("negative history offsets are not supported")
+        if offset == 0:
+            return self._current
+        if offset <= len(self._history):
+            return self._history[-offset]
+        return 0
+
+    def __float__(self) -> float:
+        return float(self._current)
+
+    def __int__(self) -> int:
+        return int(self._current)
+
+    def __bool__(self) -> bool:
+        return bool(self._current)
+
+    def __add__(self, other: Any) -> Any:
+        return self._current + _unwrap_strategy_scalar(other)
+
+    def __radd__(self, other: Any) -> Any:
+        return _unwrap_strategy_scalar(other) + self._current
+
+    def __sub__(self, other: Any) -> Any:
+        return self._current - _unwrap_strategy_scalar(other)
+
+    def __rsub__(self, other: Any) -> Any:
+        return _unwrap_strategy_scalar(other) - self._current
+
+    def __mul__(self, other: Any) -> Any:
+        return self._current * _unwrap_strategy_scalar(other)
+
+    def __rmul__(self, other: Any) -> Any:
+        return _unwrap_strategy_scalar(other) * self._current
+
+    def __truediv__(self, other: Any) -> Any:
+        return self._current / _unwrap_strategy_scalar(other)
+
+    def __rtruediv__(self, other: Any) -> Any:
+        return _unwrap_strategy_scalar(other) / self._current
+
+    def __eq__(self, other: object) -> bool:
+        return self._current == _unwrap_strategy_scalar(other)
+
+    def __lt__(self, other: Any) -> bool:
+        return self._current < _unwrap_strategy_scalar(other)
+
+    def __le__(self, other: Any) -> bool:
+        return self._current <= _unwrap_strategy_scalar(other)
+
+    def __gt__(self, other: Any) -> bool:
+        return self._current > _unwrap_strategy_scalar(other)
+
+    def __ge__(self, other: Any) -> bool:
+        return self._current >= _unwrap_strategy_scalar(other)
+
+
+def _unwrap_strategy_scalar(value: Any) -> Any:
+    return getattr(value, "_current", value)
+
+
 class StrategyContext:
     def __init__(self, **kwargs: Any) -> None:
         self.declaration = StrategyDeclaration(**kwargs)
@@ -153,6 +234,7 @@ class StrategyContext:
         self.position_size = 0.0
         self.position_avg_price = 0.0
         self.position_entry_name: str | None = None
+        self._closedtrades = _StrategyScalarSeries(0)
         self.opentrades = 0
         self.closedtrades = 0
         self.wintrades = 0
@@ -171,6 +253,20 @@ class StrategyContext:
         self._calc_every_tick_warned = False
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
+
+    @property
+    def closedtrades(self) -> _StrategyScalarSeries:
+        return self._closedtrades
+
+    @closedtrades.setter
+    def closedtrades(self, value: int | float | _StrategyScalarSeries) -> None:
+        if isinstance(value, _StrategyScalarSeries):
+            self._closedtrades = value
+        else:
+            self._closedtrades.set_current(value)
+
+    def commit_scalar_history(self) -> None:
+        self._closedtrades.commit_current()
 
     def attach_runtime(self, runtime: PineRuntime) -> None:
         runtime.strategy = self
@@ -1139,13 +1235,13 @@ class StrategyContext:
         return trade.exit_time if trade.exit_time is not None else na
 
     def closedtrades_profit(self, index: int | float) -> float | type(na):
-        """Gross profit (profit before commission deduction)."""
+        """Closed trade profit after commission, matching TradingView exports."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self.closed_trade_log):
             return na
         trade = self.closed_trade_log[idx]
-        return trade.profit + trade.commission
+        return trade.profit
 
     def closedtrades_profit_percent(self, index: int | float) -> float | type(na):
         from pinelib.core.na import na
@@ -1155,7 +1251,7 @@ class StrategyContext:
         return self.closed_trade_log[idx].profit_percent
 
     def closedtrades_net_profit(self, index: int | float) -> float | type(na):
-        """Net profit (after commission deduction)."""
+        """Alias for closed trade profit after commission."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self.closed_trade_log):
