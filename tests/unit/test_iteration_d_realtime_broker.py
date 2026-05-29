@@ -77,7 +77,7 @@ def test_calc_on_every_tick_runs_each_supplied_tick_and_fills_deterministically(
 def test_runtime_strategy_flag_conflict_fails_closed() -> None:
     rt = _rt(RuntimeConfig(calc_on_every_tick=False))
     with pytest.raises(PineStrategyError):
-        StrategyContext(calc_on_every_tick=True).attach_runtime(rt)
+        StrategyContext(calc_on_every_tick=True, strict_tv_parity=True).attach_runtime(rt)
 
 
 def test_fill_orders_on_standard_ohlc_is_captured_but_diagnosed() -> None:

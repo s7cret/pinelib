@@ -25,6 +25,24 @@ def pine_bool(value: Any) -> bool:
     return bool(value)
 
 
+def pine_int(value: Any) -> int | type(na):
+    if value is na or value is None:
+        return na
+    return int(value)
+
+
+def pine_float(value: Any) -> float | type(na):
+    if value is na or value is None:
+        return na
+    return float(value)
+
+
+def pine_str(value: Any) -> str | type(na):
+    if value is na or value is None:
+        return na
+    return str(value)
+
+
 def pine_add(left: Any, right: Any) -> Any:
     if left is na or left is None:
         return left

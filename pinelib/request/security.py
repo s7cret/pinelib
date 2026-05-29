@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
@@ -15,6 +16,29 @@ from pinelib.request.providers import LowerTfQueryMetadata
 
 GapsMode = Literal["barmerge.gaps_on", "barmerge.gaps_off"]
 LookaheadMode = Literal["barmerge.lookahead_on", "barmerge.lookahead_off"]
+
+
+def _provider_get_bars(
+    runtime: Any,
+    symbol: str,
+    timeframe: str,
+    start: int | None,
+    end: int | None,
+    *,
+    max_bars: int | None = None,
+) -> list[Bar]:
+    get_bars = runtime.data_provider.get_bars
+    kwargs: dict[str, Any] = {"max_bars": max_bars}
+    try:
+        params = inspect.signature(get_bars).parameters
+    except (TypeError, ValueError):
+        params = {}
+    extra = getattr(getattr(runtime, "config", None), "extra", {}) or {}
+    if "exchange" in params:
+        kwargs["exchange"] = extra.get("exchange") or getattr(runtime.syminfo, "exchange", None) or "binance"
+    if "market" in params:
+        kwargs["market"] = extra.get("market_type") or extra.get("market") or "spot"
+    return get_bars(symbol, timeframe, start, end, **kwargs)
 
 
 def _effective_close_time(
@@ -224,7 +248,8 @@ def security(
     cache = runtime.request_security_cache.setdefault(cache_key, {})
     requested_bars = cache.get("requested_bars")
     if not isinstance(requested_bars, list):
-        requested_bars = runtime.data_provider.get_bars(
+        requested_bars = _provider_get_bars(
+            runtime,
             symbol,
             timeframe,
             None,  # Don't filter by start - include HTF bars from before chart_start
@@ -275,6 +300,7 @@ def security(
     return merged[index]
 
 
+
 def _bar_close_time(bar: Bar) -> int:
     return bar.time_close if bar.time_close is not None else bar.time
 
@@ -321,6 +347,7 @@ def security_lower_tf(
     *,
     runtime: Any,
     state_id: str,
+    expression_hint: str | None = None,
     ignore_invalid_symbol: bool = False,
     currency: str | None = None,
     calc_bars_count: int | None = None,
@@ -395,7 +422,8 @@ def security_lower_tf(
         )
         requested_bars = runtime.request_lower_tf_cache.get(cache_key)
         if requested_bars is None:
-            requested_bars = runtime.data_provider.get_bars(
+            requested_bars = _provider_get_bars(
+                runtime,
                 symbol,
                 timeframe,
                 query_start,
@@ -425,6 +453,13 @@ def security_lower_tf(
 
     if not selected_bars:
         return PineArray()
+
+    if expression_hint is not None:
+        if expression_hint == "time_close":
+            return PineArray([_bar_close_time(bar) for bar in selected_bars])
+        direct_fields = {"open", "high", "low", "close", "volume", "time"}
+        if expression_hint in direct_fields:
+            return PineArray([getattr(bar, expression_hint) for bar in selected_bars])
 
     if isinstance(expression_callable, Sequence) and not callable(expression_callable):
         values = list(expression_callable)

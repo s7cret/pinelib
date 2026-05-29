@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import cast
 
 import pytest
@@ -32,5 +33,16 @@ class _GeneratedStrategy:
 
 
 def test_backtest_engine_adapter_shim_fails_explicitly_when_package_absent() -> None:
+    class _BlockBacktestEngine:
+        def find_spec(self, fullname: str, path: object | None = None, target: object | None = None) -> object | None:
+            if fullname == "backtest_engine":
+                raise ModuleNotFoundError("No module named 'backtest_engine'", name="backtest_engine")
+            return None
+
+    sys.meta_path.insert(0, _BlockBacktestEngine())
+    sys.modules.pop("backtest_engine", None)
     with pytest.raises(RuntimeError, match="Backtest Engine is a separate package"):
-        make_backtest_engine_strategy_adapter(_GeneratedStrategy)
+        try:
+            make_backtest_engine_strategy_adapter(_GeneratedStrategy)
+        finally:
+            sys.meta_path.pop(0)

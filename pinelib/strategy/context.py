@@ -192,11 +192,13 @@ class StrategyContext:
             configured = getattr(runtime.config, name)
             if configured is None:
                 setattr(runtime.config, name, value)
-            elif bool(configured) != bool(value):
+            elif bool(configured) != bool(value) and self.declaration.strict_tv_parity:
                 raise PineStrategyError(
                     f"RuntimeConfig.{name} conflicts with StrategyContext.{name}",
                     code=PL_UNSUPPORTED_STRATEGY_SETTING,
                 )
+            else:
+                setattr(runtime.config, name, value)
 
     def _validate_settings(self, runtime: PineRuntime) -> None:
         unsupported: list[str] = []
@@ -1145,6 +1147,13 @@ class StrategyContext:
         trade = self.closed_trade_log[idx]
         return trade.profit + trade.commission
 
+    def closedtrades_profit_percent(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].profit_percent
+
     def closedtrades_net_profit(self, index: int | float) -> float | type(na):
         """Net profit (after commission deduction)."""
         from pinelib.core.na import na
@@ -1253,6 +1262,18 @@ class StrategyContext:
         current_price = self._runtime.current_bar.close if self._runtime and self._runtime.current_bar else lot.entry_price
         direction_sign = 1 if lot.direction == "long" else -1
         return (current_price - lot.entry_price) * lot.qty * direction_sign
+
+    def opentrades_profit_percent(self, index: int | float) -> float | type(na):
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        lot = self._lots[idx]
+        profit = self.opentrades_profit(idx)
+        if profit is na:
+            return na
+        basis = abs(lot.entry_price * lot.qty)
+        return na if basis == 0 else float(profit) / basis * 100.0
 
     def opentrades_commission(self, index: int | float) -> float | type(na):
         """Commission paid for the entry of this open trade."""

@@ -67,6 +67,41 @@ def test_security_lower_tf_reuses_data_provider_window_cache() -> None:
     assert len(lower_tf_queries) == 1
 
 
+def test_security_lower_tf_expression_hint_reads_bar_fields_without_child_runtime() -> None:
+    chart = _bars([0], 3_600_000)
+    ltf = [
+        Bar(time=0, time_close=59_999, open=10.0, high=11.0, low=9.0, close=10.5, volume=100.0),
+        Bar(time=60_000, time_close=119_999, open=20.0, high=21.0, low=19.0, close=20.5, volume=200.0),
+    ]
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "1"): ltf})
+    rt = _runtime(provider)
+
+    def fail_if_called(child: object) -> float:
+        raise AssertionError("expression callable should not be evaluated for direct bar hints")
+
+    rt.begin_bar(chart[0])
+    assert list(
+        security_lower_tf(
+            "TEST:BBB",
+            "1",
+            fail_if_called,
+            runtime=rt,
+            state_id="ltf-open",
+            expression_hint="open",
+        )
+    ) == [10.0, 20.0]
+    assert list(
+        security_lower_tf(
+            "TEST:BBB",
+            "1",
+            fail_if_called,
+            runtime=rt,
+            state_id="ltf-volume",
+            expression_hint="volume",
+        )
+    ) == [100.0, 200.0]
+
+
 def test_security_lower_tf_empty_and_calc_bars_count_cap() -> None:
     chart = _bars([0, 3_600_000], 3_600_000)
     ltf = _bars([0, 60_000, 120_000, 3_600_000], 60_000, [10.0, 11.0, 12.0, 20.0])

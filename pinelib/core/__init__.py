@@ -1,7 +1,17 @@
 from pinelib.core.bar import Bar
 from pinelib.core.inputs import InputMetadata, InputRegistry
 from pinelib.core.na import fixnan, is_na, na, nz
-from pinelib.core.operators import pine_add, pine_bool, pine_div, pine_mul, pine_range, pine_sub
+from pinelib.core.operators import (
+    pine_add,
+    pine_bool,
+    pine_div,
+    pine_float,
+    pine_int,
+    pine_mul,
+    pine_range,
+    pine_str,
+    pine_sub,
+)
 from pinelib.core.precision import (
     pine_eq,
     pine_gt,
@@ -45,14 +55,17 @@ __all__ = [
     "pine_add",
     "pine_bool",
     "pine_div",
+    "pine_float",
     "pine_eq",
     "pine_gt",
     "pine_gte",
     "pine_isclose",
+    "pine_int",
     "pine_lt",
     "pine_lte",
     "pine_mul",
     "pine_ne",
     "pine_range",
+    "pine_str",
     "pine_sub",
 ]

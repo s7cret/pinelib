@@ -126,6 +126,17 @@ def is_timestamp_in_session(timestamp_ms: int, session: str, timezone_name: str)
 
 
 class TimeFunctions:
+    def change(self, timeframe: str, *, runtime: PineRuntime) -> bool:
+        if runtime.current_bar is None or runtime.bar_index <= 0:
+            return True
+        tf_ms = parse_timeframe_to_ms(timeframe)
+        if tf_ms is None or tf_ms <= 0:
+            return False
+        prev = runtime.chart_bars[runtime.bar_index - 1] if runtime.bar_index - 1 < len(runtime.chart_bars) else None
+        if prev is None:
+            return True
+        return int(prev.time // tf_ms) != int(runtime.current_bar.time // tf_ms)
+
     def time(
         self,
         timeframe: str | None = None,
