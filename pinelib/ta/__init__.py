@@ -143,6 +143,8 @@ class _SmaState:
 
     def update(self, value: Any) -> Any:
         if not is_na(value):
+            if type(value) is bool:
+                raise PineTypeError("ta.sma() does not accept bool source values")
             number = float(value)
             self.values.append(number)
             self.total += number
@@ -250,6 +252,76 @@ def _state(
     if not isinstance(state, expected):
         raise PineRuntimeError(f"State id {state_id!r} is already used by another TA helper")
     return state
+
+
+_rolling_bar_cache: dict[tuple[object, ...], tuple[tuple[Any, Any], Any]] = {}
+_valuewhen_cache: dict[tuple[int, int], dict[str, Any]] = {}
+_extreme_cache: dict[tuple[str, int, int], dict[str, Any]] = {}
+
+
+def _bar_token(source: Any) -> tuple[Any, Any]:
+    if isinstance(source, SupportsSeriesLike):
+        return source.committed_length, source[0]
+    return 0, source
+
+
+def _cached_bar_value(key: tuple[object, ...], token: tuple[Any, Any], factory: Callable[[], Any]) -> Any:
+    cached = _rolling_bar_cache.get(key)
+    if cached is not None and cached[0] == token:
+        return cached[1]
+    value = factory()
+    _rolling_bar_cache[key] = (token, value)
+    return value
+
+
+def _rolling_extreme(source: Any, length: int, mode: str, *, bars: bool) -> Any:
+    history = getattr(source, "_history", None)
+    if not isinstance(history, list):
+        return None
+    state = _extreme_cache.setdefault(
+        (mode, id(source), length),
+        {"processed": 0, "deque": deque()},
+    )
+    queue: deque[tuple[int, float]] = state["deque"]
+    committed = min(len(history), source.committed_length)
+    if int(state.get("processed", 0)) > committed:
+        queue.clear()
+        state["processed"] = 0
+    for idx in range(int(state.get("processed", 0)), committed):
+        value = history[idx]
+        if is_na(value):
+            continue
+        number = float(value)
+        if mode == "high":
+            while queue and queue[-1][1] <= number:
+                queue.pop()
+        else:
+            while queue and queue[-1][1] >= number:
+                queue.pop()
+        queue.append((idx, number))
+    state["processed"] = committed
+
+    current_idx = committed
+    cutoff = current_idx - length + 1
+    while queue and queue[0][0] < cutoff:
+        queue.popleft()
+
+    best_idx: int | None = None
+    best_value: float | None = None
+    if queue:
+        best_idx, best_value = queue[0]
+    current = source[0]
+    if not is_na(current):
+        current_value = float(current)
+        if (
+            best_value is None
+            or (mode == "high" and current_value >= best_value)
+            or (mode == "low" and current_value <= best_value)
+        ):
+            best_idx, best_value = current_idx, current_value
+    if best_value is None or best_idx is None:
+        return na
+    return -(current_idx - best_idx) if bars else best_value
 
 
 def _batch_unary(source: Sequence[Any], updater: Callable[[Any], Any]) -> list[Any]:
@@ -910,46 +982,86 @@ def macd(
 
 def highest(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
-    values = [_history(source, offset, "highest") for offset in range(length)]
-    numbers = [float(value) for value in values if not is_na(value)]
-    return max(numbers) if numbers else na
+
+    def calc() -> Any:
+        if isinstance(source, SupportsSeriesLike):
+            cached = _rolling_extreme(source, length, "high", bars=False)
+            if cached is not None:
+                return cached
+        values = [_history(source, offset, "highest") for offset in range(length)]
+        numbers = [float(value) for value in values if not is_na(value)]
+        return max(numbers) if numbers else na
+
+    if isinstance(source, SupportsSeriesLike):
+        return _cached_bar_value(("highest", id(source), length), _bar_token(source), calc)
+    return calc()
 
 
 def lowest(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     length = _validate_length(length)
-    values = [_history(source, offset, "lowest") for offset in range(length)]
-    numbers = [float(value) for value in values if not is_na(value)]
-    return min(numbers) if numbers else na
+
+    def calc() -> Any:
+        if isinstance(source, SupportsSeriesLike):
+            cached = _rolling_extreme(source, length, "low", bars=False)
+            if cached is not None:
+                return cached
+        values = [_history(source, offset, "lowest") for offset in range(length)]
+        numbers = [float(value) for value in values if not is_na(value)]
+        return min(numbers) if numbers else na
+
+    if isinstance(source, SupportsSeriesLike):
+        return _cached_bar_value(("lowest", id(source), length), _bar_token(source), calc)
+    return calc()
 
 
 def highestbars(source: Any, length: int) -> Any:
     length = _validate_length(length)
-    best_offset: int | None = None
-    best_value: float | None = None
-    for offset in range(length):
-        value = _history(source, offset, "highestbars")
-        if is_na(value):
-            continue
-        numeric = float(value)
-        if best_value is None or numeric > best_value:
-            best_value = numeric
-            best_offset = offset
-    return na if best_offset is None else -best_offset
+
+    def calc() -> Any:
+        if isinstance(source, SupportsSeriesLike):
+            cached = _rolling_extreme(source, length, "high", bars=True)
+            if cached is not None:
+                return cached
+        best_offset: int | None = None
+        best_value: float | None = None
+        for offset in range(length):
+            value = _history(source, offset, "highestbars")
+            if is_na(value):
+                continue
+            numeric = float(value)
+            if best_value is None or numeric > best_value:
+                best_value = numeric
+                best_offset = offset
+        return na if best_offset is None else -best_offset
+
+    if isinstance(source, SupportsSeriesLike):
+        return _cached_bar_value(("highestbars", id(source), length), _bar_token(source), calc)
+    return calc()
 
 
 def lowestbars(source: Any, length: int) -> Any:
     length = _validate_length(length)
-    best_offset: int | None = None
-    best_value: float | None = None
-    for offset in range(length):
-        value = _history(source, offset, "lowestbars")
-        if is_na(value):
-            continue
-        numeric = float(value)
-        if best_value is None or numeric < best_value:
-            best_value = numeric
-            best_offset = offset
-    return na if best_offset is None else -best_offset
+
+    def calc() -> Any:
+        if isinstance(source, SupportsSeriesLike):
+            cached = _rolling_extreme(source, length, "low", bars=True)
+            if cached is not None:
+                return cached
+        best_offset: int | None = None
+        best_value: float | None = None
+        for offset in range(length):
+            value = _history(source, offset, "lowestbars")
+            if is_na(value):
+                continue
+            numeric = float(value)
+            if best_value is None or numeric < best_value:
+                best_value = numeric
+                best_offset = offset
+        return na if best_offset is None else -best_offset
+
+    if isinstance(source, SupportsSeriesLike):
+        return _cached_bar_value(("lowestbars", id(source), length), _bar_token(source), calc)
+    return calc()
 
 
 @dataclass(slots=True)
@@ -1585,6 +1697,42 @@ def pivotlow(source: Any, leftbars: int, rightbars: int) -> Any:
 def valuewhen(condition: Any, source: Any, occurrence: int) -> Any:
     if occurrence < 0:
         raise PineRuntimeError("ta.valuewhen() occurrence must be >= 0")
+    if isinstance(condition, SupportsSeriesLike) and isinstance(source, SupportsSeriesLike):
+        state = _valuewhen_cache.setdefault((id(condition), id(source)), {})
+        condition_history = getattr(condition, "_history", None)
+        source_history = getattr(source, "_history", None)
+        if isinstance(condition_history, list) and isinstance(source_history, list):
+            hits = state.setdefault("hits", [])
+            processed = int(state.get("processed", 0))
+            committed = min(len(condition_history), len(source_history), condition.committed_length)
+            if processed > committed:
+                hits.clear()
+                processed = 0
+            for idx in range(processed, committed):
+                cv = condition_history[idx]
+                if (not is_na(cv)) and bool(cv):
+                    hits.insert(0, source_history[idx])
+            state["processed"] = committed
+            cv = condition[0]
+            if (not is_na(cv)) and bool(cv):
+                return source[0] if occurrence == 0 else (hits[occurrence - 1] if occurrence - 1 < len(hits) else na)
+            return hits[occurrence] if occurrence < len(hits) else na
+
+        # Fallback for derived series: pay the history scan once for this bar.
+        token = (condition.committed_length, condition[0], source[0])
+        if state.get("token") != token:
+            hits: list[Any] = []
+            for off in range(10000, 0, -1):
+                cv = _condition_history(condition, off)
+                if (not is_na(cv)) and bool(cv):
+                    hits.append(_history(source, off, "valuewhen"))
+            cv = condition[0]
+            if (not is_na(cv)) and bool(cv):
+                hits.append(source[0])
+            state["token"] = token
+            state["derived_hits"] = list(reversed(hits))
+        hits = state.get("derived_hits", [])
+        return hits[occurrence] if occurrence < len(hits) else na
     hits: list[Any] = []
     if (
         isinstance(condition, Sequence)
