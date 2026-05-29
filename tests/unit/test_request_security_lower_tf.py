@@ -51,6 +51,22 @@ def test_security_lower_tf_returns_ordered_array_for_current_chart_bar() -> None
     assert list(arr) == [20.0, 21.0]
 
 
+def test_security_lower_tf_reuses_data_provider_window_cache() -> None:
+    chart = _bars([0, 3_600_000], 3_600_000)
+    ltf = _bars([0, 60_000, 120_000, 3_600_000, 3_660_000], 60_000, [10.0, 11.0, 12.0, 20.0, 21.0])
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "1"): ltf})
+    rt = _runtime(provider)
+    rt.request_data_end_ms = chart[-1].time_close
+
+    for bar in chart:
+        rt.begin_bar(bar)
+        security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf")
+        rt.end_bar()
+
+    lower_tf_queries = [m for m in provider.metadata_log if m.normalized_symbol == "TEST:BBB"]
+    assert len(lower_tf_queries) == 1
+
+
 def test_security_lower_tf_empty_and_calc_bars_count_cap() -> None:
     chart = _bars([0, 3_600_000], 3_600_000)
     ltf = _bars([0, 60_000, 120_000, 3_600_000], 60_000, [10.0, 11.0, 12.0, 20.0])

@@ -113,6 +113,56 @@ def merge_requested_series_to_chart_bars(
     return merged
 
 
+def _append_merged_requested_values(
+    cache: dict[str, Any],
+    *,
+    requested_bars: Sequence[Bar],
+    requested_values: Sequence[Any],
+    chart_bars: Sequence[Bar],
+    gaps: GapsMode | str,
+    lookahead: LookaheadMode | str,
+) -> list[Any]:
+    merged = cache.setdefault("merged", [])
+    last_value = cache.get("last_value", na)
+    last_finalized_value = cache.get("last_finalized_value", na)
+    start_index = len(merged)
+    for chart_bar in chart_bars[start_index:]:
+        value: Any = na
+        chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
+        for i, (requested_bar, requested_value) in enumerate(
+            zip(requested_bars, requested_values, strict=True)
+        ):
+            requested_close = (
+                requested_bar.time_close
+                if requested_bar.time_close is not None
+                else requested_bar.time
+            )
+            effective_close = _effective_close_time(requested_bar, requested_bars, i)
+            if lookahead == "barmerge.lookahead_on":
+                if gaps == "barmerge.gaps_on":
+                    matches = chart_bar.time <= requested_bar.time <= chart_close
+                else:
+                    matches = requested_bar.time <= chart_bar.time
+            elif gaps == "barmerge.gaps_on":
+                matches = chart_bar.time <= requested_close <= chart_close
+            else:
+                if chart_close >= effective_close and chart_bar.time >= requested_bar.time:
+                    matches = True
+                    last_finalized_value = requested_value
+                else:
+                    matches = False
+            if matches:
+                value = requested_value
+        if value is na and gaps == "barmerge.gaps_off":
+            value = last_finalized_value
+        elif value is not na:
+            last_value = value
+        merged.append(value if value is not na else last_finalized_value)
+    cache["last_value"] = last_value
+    cache["last_finalized_value"] = last_finalized_value
+    return merged
+
+
 def security(
     symbol: str,
     timeframe: str,
@@ -155,40 +205,62 @@ def security(
         if runtime.chart_bars and runtime.chart_bars[-1].time_close is not None
         else None
     )
+    request_end = getattr(runtime, "request_data_end_ms", None) or chart_end
     # For HTF bars, use start=None to include all HTF bars that could overlap
     # with the chart period. The merge logic (effective_close + lookahead_off)
     # determines which bar's value to return based on finalization status.
     # Previously, start=chart_bars[0].time excluded the HTF bar that started
     # before chart_start (e.g., May 5 D bar at 00:00 when chart starts at 20:00).
-    requested_bars = runtime.data_provider.get_bars(
+    cache_key = (
+        "security",
+        state_id,
         symbol,
         timeframe,
-        None,  # Don't filter by start - include HTF bars from before chart_start
-        chart_end,
-        max_bars=calc_bars_count,
+        gaps,
+        lookahead,
+        calc_bars_count,
+        request_end,
     )
+    cache = runtime.request_security_cache.setdefault(cache_key, {})
+    requested_bars = cache.get("requested_bars")
+    if not isinstance(requested_bars, list):
+        requested_bars = runtime.data_provider.get_bars(
+            symbol,
+            timeframe,
+            None,  # Don't filter by start - include HTF bars from before chart_start
+            request_end,
+            max_bars=calc_bars_count,
+        )
+        cache["requested_bars"] = requested_bars
     if not requested_bars and ignore_invalid_symbol:
         return na
 
     if isinstance(expression_callable, Sequence) and not callable(expression_callable):
         requested_values = list(expression_callable)
     else:
-        child = runtime.spawn_child_context(symbol=symbol, timeframe=timeframe, namespace=state_id)
-        child.request_depth = runtime.request_depth + 1
-        requested_values = []
+        requested_values = cache.get("requested_values")
+        if not isinstance(requested_values, list):
+            requested_values = []
+            cache["requested_values"] = requested_values
+        child = cache.get("child")
+        if child is None:
+            child = runtime.spawn_child_context(symbol=symbol, timeframe=timeframe, namespace=state_id)
+            child.request_depth = runtime.request_depth + 1
+            cache["child"] = child
         expression = expression_callable
         if not callable(expression):
             raise PineRequestError(
                 "request.security expression must be callable or a value sequence"
             )
-        for bar in requested_bars:
+        for bar in requested_bars[len(requested_values):]:
             child.begin_bar(bar)
             requested_values.append(expression(child))
             child.end_bar()
 
-    merged = merge_requested_series_to_chart_bars(
-        requested_values,
+    merged = _append_merged_requested_values(
+        cache,
         requested_bars=requested_bars,
+        requested_values=requested_values,
         chart_bars=runtime.chart_bars,
         gaps=gaps,
         lookahead=lookahead,
@@ -312,13 +384,25 @@ def security_lower_tf(
             )
         query_start = runtime.chart_bars[0].time if runtime.chart_bars else runtime.current_bar.time
         query_end = _bar_close_time(runtime.current_bar)
-        requested_bars = runtime.data_provider.get_bars(
+        request_end = getattr(runtime, "request_data_end_ms", None) or query_end
+        cache_key = (
+            "lower_tf",
             symbol,
             timeframe,
             query_start,
-            query_end,
-            max_bars=calc_bars_count,
+            request_end,
+            calc_bars_count,
         )
+        requested_bars = runtime.request_lower_tf_cache.get(cache_key)
+        if requested_bars is None:
+            requested_bars = runtime.data_provider.get_bars(
+                symbol,
+                timeframe,
+                query_start,
+                request_end,
+                max_bars=calc_bars_count,
+            )
+            runtime.request_lower_tf_cache[cache_key] = requested_bars
         selected_bars = _bars_inside_chart_bar(requested_bars, runtime.current_bar)
 
     metadata = LowerTfQueryMetadata(

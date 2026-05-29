@@ -85,6 +85,29 @@ def test_request_security_callable_child_runtime_and_state_isolation() -> None:
     assert provider.metadata_log[-1].normalized_symbol == "TEST:BBB"
 
 
+def test_request_security_reuses_child_runtime_and_provider_result_cache() -> None:
+    chart = _bars([0, 3_600_000, 7_200_000], 3_600_000)
+    requested = _bars([0, 7_200_000], 7_200_000, [100.0, 200.0])
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "120"): requested})
+    rt = _runtime(provider)
+    rt.request_data_end_ms = chart[-1].time_close
+    calls = 0
+
+    def expr(child: PineRuntime) -> float:
+        nonlocal calls
+        calls += 1
+        return float(child.close[0])
+
+    for bar in chart:
+        rt.begin_bar(bar)
+        security("TEST:BBB", "120", expr, runtime=rt, state_id="cached")
+        rt.end_bar()
+
+    assert calls == len(requested)
+    security_queries = [m for m in provider.metadata_log if m.normalized_symbol == "TEST:BBB"]
+    assert len(security_queries) == 1
+
+
 def test_precomputed_values_and_nested_security_diagnostic() -> None:
     chart = _bars([0], 3_600_000)
     requested = _bars([0], 3_600_000)
