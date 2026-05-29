@@ -47,6 +47,8 @@ class StrategyDeclaration:
     max_labels_count: int | None = None
     max_boxes_count: int | None = None
     strict_tv_parity: bool = False
+    qty_step: float | None = None
+    qty_rounding_mode: str = "none"
     metadata: dict[str, object] = field(default_factory=dict)
 
 
@@ -141,6 +143,8 @@ class StrategyContext:
         self.margin_short = self.declaration.margin_short
         self.fill_orders_on_standard_ohlc = self.declaration.fill_orders_on_standard_ohlc
         self.max_bars_back = self.declaration.max_bars_back
+        self.qty_step = self.declaration.qty_step
+        self.qty_rounding_mode = self.declaration.qty_rounding_mode
         self.equity = self.initial_capital
         self.netprofit = 0.0
         self.openprofit = 0.0
@@ -690,16 +694,19 @@ class StrategyContext:
     ) -> None:
         qty = self._resolved_order_qty(order, price)
         if order.kind == "entry":
+            qty = self._round_qty(qty)
             qty = self._entry_qty_with_reversal_and_pyramiding(order, qty)
             if qty <= 0:
                 order.status = "cancelled"
                 return
         if order.kind == "exit":
+            qty = self._round_qty(qty)
             qty = min(qty, abs(self._available_exit_qty(order.from_entry)))
             if qty <= 0:
                 order.status = "cancelled"
                 return
         if order.kind == "close":
+            qty = self._round_qty(qty)
             qty = min(qty, abs(self._available_entry_qty(order.from_entry)))
             if qty <= 0:
                 order.status = "cancelled"
@@ -873,7 +880,6 @@ class StrategyContext:
         self.openprofit = sum(
             ((price - lot.entry_price) if lot.direction == "long" else (lot.entry_price - price))
             * lot.qty
-            - lot.commission
             for lot in self._lots
         )
         self.equity = self.initial_capital + self.netprofit + self.openprofit
@@ -921,6 +927,9 @@ class StrategyContext:
     def _resolved_order_qty(self, order: Order, price: float) -> float:
         if order.qty is not None:
             return float(order.qty)
+        return self._resolved_default_qty(price)
+
+    def _resolved_default_qty(self, price: float) -> float:
         if self.default_qty_type == "fixed":
             return self.default_qty_value
         if self.default_qty_type == "cash":
@@ -931,6 +940,35 @@ class StrategyContext:
             f"Unsupported default_qty_type {self.default_qty_type!r}",
             code=PL_UNSUPPORTED_STRATEGY_SETTING,
         )
+
+    def _round_qty(self, qty: float) -> float:
+        step = self.qty_step
+        if step is None or step <= 0:
+            return qty
+        mode = self.qty_rounding_mode
+        scaled = abs(qty) / step
+        if mode in {"truncate", "truncate_toward_zero", "floor_abs"}:
+            rounded = int(scaled) * step
+        elif mode == "floor":
+            import math
+
+            rounded = math.floor(qty / step) * step
+            return float(rounded)
+        elif mode == "ceil":
+            import math
+
+            rounded = math.ceil(qty / step) * step
+            return float(rounded)
+        elif mode in {"nearest", "round"}:
+            rounded = round(scaled) * step
+        elif mode in {"none", ""}:
+            return qty
+        else:
+            raise PineStrategyError(
+                f"Unsupported qty_rounding_mode {mode!r}",
+                code=PL_UNSUPPORTED_STRATEGY_SETTING,
+            )
+        return (1.0 if qty >= 0 else -1.0) * float(rounded)
 
     def _resolve_exit_qty(
         self, qty: float | None, qty_percent: float | None, available: float
