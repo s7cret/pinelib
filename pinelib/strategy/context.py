@@ -1137,18 +1137,86 @@ class StrategyContext:
         return trade.exit_time if trade.exit_time is not None else na
 
     def closedtrades_profit(self, index: int | float) -> float | type(na):
+        """Gross profit (profit before commission deduction)."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        trade = self.closed_trade_log[idx]
+        return trade.profit + trade.commission
+
+    def closedtrades_net_profit(self, index: int | float) -> float | type(na):
+        """Net profit (after commission deduction)."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self.closed_trade_log):
             return na
         return self.closed_trade_log[idx].profit
 
-    def closedtrades_size(self, index: int | float) -> float | type(na):
+    def closedtrades_commission(self, index: int | float) -> float | type(na):
+        """Commission paid for the trade."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].commission
+
+    def closedtrades_qty(self, index: int | float) -> float | type(na):
+        """Quantity of the trade (absolute value)."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self.closed_trade_log):
             return na
         return self.closed_trade_log[idx].qty
+
+    def closedtrades_side(self, index: int | float) -> str | type(na):
+        """Trade direction: 'long' or 'short'."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].direction
+
+    def closedtrades_size(self, index: int | float) -> float | type(na):
+        """Size of the trade. Positive for long, negative for short."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        trade = self.closed_trade_log[idx]
+        return trade.qty if trade.direction == "long" else -trade.qty
+
+    def closedtrades_entry_id(self, index: int | float) -> str | type(na):
+        """Entry order ID."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].entry_id
+
+    def closedtrades_exit_id(self, index: int | float) -> str | type(na):
+        """Exit order ID."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return self.closed_trade_log[idx].exit_reason or ""
+
+    def closedtrades_entry_comment(self, index: int | float) -> str | type(na):
+        """Entry order comment."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return ""  # Not stored in Trade
+
+    def closedtrades_exit_comment(self, index: int | float) -> str | type(na):
+        """Exit order comment."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self.closed_trade_log):
+            return na
+        return ""  # Not stored in Trade
 
     def closedtrades_max_runup(self, index: int | float) -> float | type(na):
         from pinelib.core.na import na
@@ -1175,19 +1243,81 @@ class StrategyContext:
         return self._lots[idx].entry_price
 
     def opentrades_profit(self, index: int | float) -> float | type(na):
+        """Unrealized PnL for this open trade."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self._lots):
             return na
         lot = self._lots[idx]
-        return (self.equity - self.initial_capital) * (1 if lot.direction == "long" else -1)
+        # Get current price from runtime
+        current_price = self._runtime.current_bar.close if self._runtime and self._runtime.current_bar else lot.entry_price
+        direction_sign = 1 if lot.direction == "long" else -1
+        return (current_price - lot.entry_price) * lot.qty * direction_sign
 
-    def opentrades_size(self, index: int | float) -> float | type(na):
+    def opentrades_commission(self, index: int | float) -> float | type(na):
+        """Commission paid for the entry of this open trade."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return self._lots[idx].commission
+
+    def opentrades_qty(self, index: int | float) -> float | type(na):
+        """Quantity of the open trade (absolute value)."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self._lots):
             return na
         return self._lots[idx].qty
+
+    def opentrades_side(self, index: int | float) -> str | type(na):
+        """Trade direction: 'long' or 'short'."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return self._lots[idx].direction
+
+    def opentrades_entry_id(self, index: int | float) -> str | type(na):
+        """Entry order ID."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return self._lots[idx].entry_id
+
+    def opentrades_exit_price(self, index: int | float) -> float | type(na):
+        """Exit price (na for open trades)."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return na
+
+    def opentrades_exit_time(self, index: int | float) -> int | type(na):
+        """Exit time (na for open trades)."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return na
+
+    def opentrades_exit_id(self, index: int | float) -> str | type(na):
+        """Exit order ID (empty string for open trades)."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        return ""
+
+    def opentrades_size(self, index: int | float) -> float | type(na):
+        """Size of the open trade. Positive for long, negative for short."""
+        from pinelib.core.na import na
+        idx = int(index)
+        if idx < 0 or idx >= len(self._lots):
+            return na
+        lot = self._lots[idx]
+        return lot.qty if lot.direction == "long" else -lot.qty
 
     def opentrades_max_runup(self, index: int | float) -> float | type(na):
         from pinelib.core.na import na
