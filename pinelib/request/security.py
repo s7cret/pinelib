@@ -241,13 +241,9 @@ def security(
             code=PL_UNSUPPORTED_NESTED_SECURITY,
         )
     if runtime.data_provider is None:
-        # Stage 1: No data provider available; return na for smoke tests
-        # A real data provider should be injected for full functionality
         if ignore_invalid_symbol:
             return na
-        # Use null provider returning empty bars so security call doesn't hard-fail
-        from pinelib.request.providers import NullDataProvider
-        runtime.data_provider = NullDataProvider()
+        raise PineRequestError("request.security requires runtime.data_provider")
 
     chart_end = (
         runtime.chart_bars[-1].time_close

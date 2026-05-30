@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo
+from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo, na
 from pinelib.errors import (
     PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
     PL_UNSUPPORTED_NESTED_SECURITY,
@@ -118,6 +118,23 @@ def test_request_security_lower_tf_missing_provider_fails_closed_without_synthet
         )
         == []
     )
+
+
+def test_request_security_missing_provider_fails_closed_without_null_provider() -> None:
+    runtime = rt()
+    runtime.begin_bar(bar(0, 10, 11, 9, 10))
+
+    with pytest.raises(PineRequestError, match="requires runtime.data_provider"):
+        security("TEST:AAA", "60", [1.0], runtime=runtime, state_id="htf")
+
+    assert security(
+        "TEST:AAA",
+        "60",
+        [1.0],
+        runtime=runtime,
+        state_id="htf-ignore",
+        ignore_invalid_symbol=True,
+    ) is na
 
 
 def test_nested_request_security_rejects_with_diagnostic() -> None:
