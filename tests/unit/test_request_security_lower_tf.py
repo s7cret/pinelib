@@ -4,6 +4,7 @@ from pinelib import (
     PL_UNSUPPORTED_NESTED_SECURITY,
     Bar,
     InMemoryDataProvider,
+    PineDataFormatError,
     PineRequestError,
     PineRuntime,
     PineUnsupportedFeatureError,
@@ -195,3 +196,34 @@ def test_security_lower_tf_metadata_records_intrabar_provider_source() -> None:
     metadata = rt.lower_tf_metadata_log[-1]
     assert metadata.provider_source == "intrabar_provider"
     assert metadata.selected_bar_times == (0, 60_000)
+
+
+def test_security_lower_tf_intrabar_provider_missing_preload_fails_closed() -> None:
+    chart = _bars([0], 3_600_000)
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart})
+    rt = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        intrabar_provider=provider,
+        config=RuntimeConfig(),
+    )
+    rt.begin_bar(chart[0])
+
+    with pytest.raises(PineDataFormatError, match="Intrabar bars are not loaded"):
+        security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf")
+
+
+def test_security_lower_tf_intrabar_provider_explicit_empty_preload_returns_empty_array() -> None:
+    chart = _bars([0], 3_600_000)
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "1"): []})
+    rt = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        intrabar_provider=provider,
+        config=RuntimeConfig(),
+    )
+    rt.begin_bar(chart[0])
+
+    arr = security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf")
+
+    assert list(arr) == []

@@ -141,12 +141,16 @@ class InMemoryDataProvider:
         Bars must be pre-loaded under the (symbol, lower_timeframe) key.
         """
         if lower_timeframe is None:
-            return []
+            raise PineDataFormatError("lower_timeframe is required for intrabar lookup")
 
         normalized_symbol = self.normalize_symbol(symbol)
         normalized_tf = self.normalize_timeframe(lower_timeframe)
         key = (normalized_symbol, normalized_tf)
-        bars = self._bars_by_key.get(key)
+        if key not in self._bars_by_key:
+            raise PineDataFormatError(
+                f"Intrabar bars are not loaded for {normalized_symbol} {normalized_tf}"
+            )
+        bars = self._bars_by_key[key]
         if not bars:
             return []
 
