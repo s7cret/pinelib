@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
@@ -14,6 +14,7 @@ from pinelib.errors import (
     PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
     PL_WARNING_EXIT_QTY_REDUCED,
     PineStrategyError,
+    StrategyLedgerUnavailableError,
 )
 
 Direction = Literal["long", "short"]
@@ -113,6 +114,24 @@ class Trade:
     fill_source: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class RiskRule:
+    name: str
+    value: float | None = None
+    value_type: str | None = None
+    direction: str | None = None
+
+
+class StrategyLedgerView(Protocol):
+    def closedtrades_max_runup(self, index: int) -> float: ...
+
+    def closedtrades_max_drawdown(self, index: int) -> float: ...
+
+    def opentrades_max_runup(self, index: int) -> float: ...
+
+    def opentrades_max_drawdown(self, index: int) -> float: ...
+
+
 @dataclass(slots=True)
 class _OpenLot:
     entry_id: str
@@ -207,6 +226,7 @@ def _unwrap_strategy_scalar(value: Any) -> Any:
 
 class StrategyContext:
     def __init__(self, **kwargs: Any) -> None:
+        strategy_ledger_view = kwargs.pop("strategy_ledger_view", None)
         self.declaration = StrategyDeclaration(**kwargs)
         self.initial_capital = float(self.declaration.initial_capital)
         self.currency = self.declaration.currency
@@ -251,6 +271,8 @@ class StrategyContext:
         self.closed_trade_log: list[Trade] = []
         self.open_trade_log: list[Trade] = []
         self._lots: list[_OpenLot] = []
+        self.risk_rules: list[RiskRule] = []
+        self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
         self._fill_recalc_pending = False
         self._calc_every_tick_warned = False
         self._diagnostics_target: object | None = None
@@ -279,6 +301,9 @@ class StrategyContext:
         runtime.visual.max_counts["box"] = self.declaration.max_boxes_count
         self._sync_runtime_strategy_flags(runtime)
         self._validate_settings(runtime)
+
+    def attach_strategy_ledger_view(self, ledger_view: StrategyLedgerView) -> None:
+        self._strategy_ledger_view = ledger_view
 
     def _sync_runtime_strategy_flags(self, runtime: PineRuntime) -> None:
         expected = {
@@ -861,6 +886,7 @@ class StrategyContext:
     ) -> None:
         signed = qty if order.direction == "long" else -qty
         if self.position_size == 0 or self.position_size * signed > 0:
+            self.netprofit -= commission
             self._lots.append(
                 _OpenLot(
                     order.id,
@@ -872,7 +898,6 @@ class StrategyContext:
                     commission,
                 )
             )
-            self.equity -= commission
         else:
             remaining = qty
             for lot in self._lots_for_close(order):
@@ -888,15 +913,19 @@ class StrategyContext:
                     lot.commission * (close_qty / lot.qty) if lot.qty else 0.0
                 )
                 total_commission = commission * (close_qty / qty) + prorated_entry_commission
-                net_profit = profit - total_commission
-                self.netprofit += net_profit
-                self.grossprofit += max(net_profit, 0.0)
-                self.grossloss += min(net_profit, 0.0)
-                self.equity += net_profit
+                closed_trade_profit = profit - total_commission
+                # TradingView charges entry commission into strategy.netprofit
+                # immediately when the position opens. On close, cumulative
+                # netprofit receives gross PnL minus only the exit commission;
+                # the closed-trade accessor still reports both commissions.
+                exit_commission = commission * (close_qty / qty)
+                self.netprofit += profit - exit_commission
+                self.grossprofit += max(closed_trade_profit, 0.0)
+                self.grossloss += min(closed_trade_profit, 0.0)
                 self.closedtrades += 1
-                if net_profit > 0:
+                if closed_trade_profit > 0:
                     self.wintrades += 1
-                elif net_profit < 0:
+                elif closed_trade_profit < 0:
                     self.losstrades += 1
                 else:
                     self.eventrades += 1
@@ -912,8 +941,8 @@ class StrategyContext:
                         price,
                         close_qty,
                         total_commission,
-                        net_profit,
-                        net_profit / (lot.entry_price * close_qty) * 100
+                        closed_trade_profit,
+                        closed_trade_profit / (lot.entry_price * close_qty) * 100
                         if lot.entry_price and close_qty
                         else 0.0,
                         order.id,
@@ -926,6 +955,8 @@ class StrategyContext:
                 if lot.qty <= 1e-12:
                     self._lots.remove(lot)
             if remaining > 1e-12 and order.kind in {"entry", "order"}:
+                opening_commission = commission * (remaining / qty)
+                self.netprofit -= opening_commission
                 self._lots.append(
                     _OpenLot(
                         order.id,
@@ -934,7 +965,7 @@ class StrategyContext:
                         price,
                         bar.time,
                         runtime.bar_index + 1,
-                        commission * (remaining / qty),
+                        opening_commission,
                     )
                 )
         self._recompute_position(price)
@@ -1344,15 +1375,14 @@ class StrategyContext:
         idx = int(index)
         if idx < 0 or idx >= len(self.closed_trade_log):
             return na
-        return self.closed_trade_log[idx].profit_percent  # stub: use profit_percent as runup proxy
+        return self._ledger_metric("closedtrades_max_runup", idx)
 
     def closedtrades_max_drawdown(self, index: int | float) -> float | type(na):
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self.closed_trade_log):
             return na
-        # Stub: return negated profit_percent as drawdown proxy
-        return -abs(self.closed_trade_log[idx].profit_percent)
+        return self._ledger_metric("closedtrades_max_drawdown", idx)
 
     # ------------------------------------------------------------------
     # strategy.opentrades namespace
@@ -1364,7 +1394,7 @@ class StrategyContext:
         return self._lots[idx].entry_price
 
     def opentrades_profit(self, index: int | float) -> float | type(na):
-        """Unrealized PnL for this open trade."""
+        """TradingView-style unrealized PnL for this open trade."""
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self._lots):
@@ -1373,7 +1403,9 @@ class StrategyContext:
         # Get current price from runtime
         current_price = self._runtime.current_bar.close if self._runtime and self._runtime.current_bar else lot.entry_price
         direction_sign = 1 if lot.direction == "long" else -1
-        return (current_price - lot.entry_price) * lot.qty * direction_sign
+        gross = (current_price - lot.entry_price) * lot.qty * direction_sign
+        exit_commission = self._commission(lot.qty, current_price)
+        return gross - lot.commission - exit_commission
 
     def opentrades_profit_percent(self, index: int | float) -> float | type(na):
         from pinelib.core.na import na
@@ -1457,14 +1489,14 @@ class StrategyContext:
         idx = int(index)
         if idx < 0 or idx >= len(self._lots):
             return na
-        return 0.0  # stub
+        return self._ledger_metric("opentrades_max_runup", idx)
 
     def opentrades_max_drawdown(self, index: int | float) -> float | type(na):
         from pinelib.core.na import na
         idx = int(index)
         if idx < 0 or idx >= len(self._lots):
             return na
-        return 0.0  # stub
+        return self._ledger_metric("opentrades_max_drawdown", idx)
 
     def opentrades_entry_bar_index(self, index: int | float) -> int | type(na):
         from pinelib.core.na import na
@@ -1491,25 +1523,34 @@ class StrategyContext:
     # ------------------------------------------------------------------
     # strategy.risk namespace
     def risk_allow_entry_in(self, direction: str) -> None:
-        # Pine risk rule: restrict entries to long/short/both.
-        # pinelib backtester does not enforce risk rules yet — no-op stub.
-        pass
+        self.risk_rules.append(RiskRule("allow_entry_in", direction=direction))
 
     def risk_max_drawdown(self, value: float, type: str) -> None:
-        # Stub: does not enforce max drawdown limit in backtester
-        pass
+        self.risk_rules.append(RiskRule("max_drawdown", float(value), type))
 
     def risk_max_intraday_loss(self, value: float, type: str) -> None:
-        # Stub: does not enforce intraday loss limit
-        pass
+        self.risk_rules.append(RiskRule("max_intraday_loss", float(value), type))
 
     def risk_max_position_size(self, value: float, type: str = "fixed") -> None:
-        # Stub: does not enforce max position size
-        pass
+        self.risk_rules.append(RiskRule("max_position_size", float(value), type))
 
     def risk_max_intraday_filled_orders(self, value: float, type: str = "fixed") -> None:
-        # Stub: does not enforce max intraday filled orders
-        pass
+        self.risk_rules.append(RiskRule("max_intraday_filled_orders", float(value), type))
+
+    def _ledger_metric(self, method_name: str, index: int) -> float:
+        if self._strategy_ledger_view is None:
+            raise StrategyLedgerUnavailableError(
+                f"strategy.{method_name} requires a StrategyLedgerView supplied by the broker ledger"
+            )
+        method = getattr(self._strategy_ledger_view, method_name, None)
+        if not callable(method):
+            raise StrategyLedgerUnavailableError(
+                f"StrategyLedgerView does not provide {method_name}"
+            )
+        value = method(index)
+        if value is None:
+            raise StrategyLedgerUnavailableError(f"{method_name}({index}) is unavailable")
+        return float(value)
 
     def _emit(self, runtime: PineRuntime | None, code: str, message: str, **extra: object) -> None:
         target = runtime.config if runtime is not None else self._diagnostics_target

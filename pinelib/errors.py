@@ -78,6 +78,10 @@ class PineStrategyError(PineRuntimeError):
     pass
 
 
+class StrategyLedgerUnavailableError(PineRuntimeError):
+    pass
+
+
 class PineUnsupportedFeatureError(PineRuntimeError):
     pass
 

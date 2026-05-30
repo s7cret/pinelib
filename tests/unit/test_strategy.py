@@ -1,4 +1,14 @@
-from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo
+import pytest
+
+from pinelib import (
+    Bar,
+    PineRuntime,
+    RuntimeConfig,
+    StrategyContext,
+    StrategyLedgerUnavailableError,
+    SymbolInfo,
+    TimeframeInfo,
+)
 from pinelib.errors import PL_WARNING_EXIT_QTY_REDUCED
 
 
@@ -270,6 +280,35 @@ def test_commission_slippage_and_percent_sizing() -> None:
     assert round(s.position_size, 6) == round(10000.0 / (10.0 * 1.01), 6)
     assert s.position_avg_price == 10.5
     assert s.equity < s.initial_capital
+    assert s.netprofit < 0
+
+
+def test_entry_commission_hits_netprofit_before_trade_closes() -> None:
+    s = StrategyContext(
+        default_qty_type="fixed",
+        default_qty_value=1,
+        commission_type="percent",
+        commission_value=1,
+        process_orders_on_close=True,
+    )
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 10, 10, 10))
+    s.entry("L", "long")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    assert s.position_size == 1
+    assert s.closedtrades == 0
+    assert s.netprofit == -0.1
+    assert s.openprofit == 0.0
+    assert s.equity == s.initial_capital - 0.1
+
+    process(runtime, s, bar(1, 12, 12, 12, 12))
+
+    assert s.openprofit == 2.0
+    assert s.opentrades_profit(0) == pytest.approx(1.78)
+    assert s.netprofit == -0.1
+    assert s.equity == s.initial_capital + 1.9
 
 
 def test_default_percent_market_entry_sizes_from_creation_close_not_next_open() -> None:
@@ -331,6 +370,65 @@ def test_open_position_mark_to_market_updates_risk_metrics_and_report() -> None:
     report = build_backtest_report(runtime, s, object())
     assert report.max_runup == s.max_runup
     assert report.max_drawdown == s.max_drawdown
+
+
+def test_trade_excursion_accessors_fail_closed_without_ledger_view() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 10, 10, 10))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    s.close("L")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    with pytest.raises(StrategyLedgerUnavailableError):
+        s.closedtrades_max_runup(0)
+
+
+def test_trade_excursion_accessors_use_strategy_ledger_view() -> None:
+    class Ledger:
+        def closedtrades_max_runup(self, index: int) -> float:
+            return 11.0 + index
+
+        def closedtrades_max_drawdown(self, index: int) -> float:
+            return 3.0 + index
+
+        def opentrades_max_runup(self, index: int) -> float:
+            return 7.0 + index
+
+        def opentrades_max_drawdown(self, index: int) -> float:
+            return 2.0 + index
+
+    s = StrategyContext(process_orders_on_close=True, strategy_ledger_view=Ledger())
+    runtime = rt(s)
+    runtime.begin_bar(bar(0, 10, 10, 10, 10))
+    s.entry("L", "long", qty=1)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+
+    assert s.opentrades_max_runup(0) == 7.0
+    assert s.opentrades_max_drawdown(0) == 2.0
+
+    s.close("L")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    assert s.closedtrades_max_runup(0) == 11.0
+    assert s.closedtrades_max_drawdown(0) == 3.0
+
+
+def test_risk_api_registers_risk_rules() -> None:
+    s = StrategyContext()
+
+    s.risk_allow_entry_in("long")
+    s.risk_max_drawdown(10, "percent_of_equity")
+    s.risk_max_position_size(3)
+
+    assert [(r.name, r.value, r.value_type, r.direction) for r in s.risk_rules] == [
+        ("allow_entry_in", None, None, "long"),
+        ("max_drawdown", 10.0, "percent_of_equity", None),
+        ("max_position_size", 3.0, "fixed", None),
+    ]
 
 
 def test_daily_time_session_uses_bar_open_not_inferred_daily_close():
