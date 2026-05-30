@@ -2238,39 +2238,10 @@ __all__ += [
     "correlation",
     "rising",
     "falling",
-    "cum",
     "ta_range",
     "cmo",
     "tsi",
 ]
-
-
-class _CumState:
-    """State for ta.cum (cumulative sum)."""
-    total: float = 0.0
-
-    def update(self, value: Any) -> Any:
-        if not is_na(value):
-            self.total += float(value)
-        return self.total
-
-
-def cum(source: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
-    """Cumulative sum of source."""
-    is_iterable = hasattr(source, '__iter__') and not isinstance(source, (str, bytes))
-    if runtime is None and is_iterable:
-        out: list[float] = []
-        total = 0.0
-        for v in source:
-            if not is_na(v):
-                total += float(v)
-            out.append(total)
-        return out
-    if state_id is None:
-        state_id = "_cum_default"
-    state = _state(runtime, state_id, lambda: _CumState(), _CumState)
-    val = _current(source, "cum") if hasattr(source, 'current') else source
-    return state.update(val)
 
 
 def ta_range(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
