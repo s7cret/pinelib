@@ -19,18 +19,12 @@ from pinelib import (
 from pinelib.errors import (
     PL_MISSING_INTRABAR_DATA,
     PL_REFERENCE_HISTORY_UNSUPPORTED,
-    PL_WARNING_BAR_MAGNIFIER_FALLBACK,
 )
 
 
 def bar(i: int, o: float, h: float, low: float, c: float) -> Bar:
     t = 1704067200000 + i * 3_600_000
     return Bar(time=t, time_close=t + 3_599_999, open=o, high=h, low=low, close=c)
-
-
-def current_bar(runtime: PineRuntime) -> Bar:
-    assert runtime.current_bar is not None
-    return runtime.current_bar
 
 
 class Intrabars:
@@ -70,11 +64,19 @@ def process(runtime: PineRuntime, strategy: StrategyContext, b: Bar) -> None:
 
 
 def seed_long(strategy: StrategyContext, runtime: PineRuntime) -> None:
-    runtime.begin_bar(bar(0, 10, 11, 9, 10))
+    first = bar(0, 10, 11, 9, 10)
+    runtime.begin_bar(first)
     strategy.entry("L", "long", qty=1)
-    strategy.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
+    strategy.process_orders_for_bar(
+        runtime=runtime,
+        bar=runtime.current_bar,  # type: ignore[arg-type]
+        intrabar_bars=[first],
+    )
     runtime.end_bar()
-    process(runtime, strategy, bar(1, 10, 11, 9, 10))
+    second = bar(1, 10, 11, 9, 10)
+    runtime.begin_bar(second)
+    strategy.process_orders_for_bar(runtime=runtime, bar=second, intrabar_bars=[second])
+    runtime.end_bar()
 
 
 def test_intrabar_tp_sl_ordering_can_differ_from_ohlc_path() -> None:
@@ -96,7 +98,7 @@ def test_intrabar_tp_sl_ordering_can_differ_from_ohlc_path() -> None:
     assert s.closed_trade_log[-1].fill_source == "intrabar"
 
 
-def test_invalid_intrabar_close_warns_and_falls_back_unless_strict() -> None:
+def test_invalid_intrabar_close_fails_closed() -> None:
     chart = bar(2, 10, 13, 5, 12)
     assert chart.time_close is not None
     invalid = [
@@ -113,16 +115,8 @@ def test_invalid_intrabar_close_warns_and_falls_back_unless_strict() -> None:
     runtime = rt(s, Intrabars(invalid))
     seed_long(s, runtime)
     s.exit("tp", "L", qty=1, limit=14)
-    process(runtime, s, chart)
-    assert s.position_size == 1
-    assert s.fills[-1].fill_source == "ohlc_path"
-    assert any(d["code"] == PL_WARNING_BAR_MAGNIFIER_FALLBACK for d in runtime.config.diagnostics)
-
-    strict_strategy = StrategyContext(use_bar_magnifier=True)
-    strict_runtime = rt(strict_strategy, Intrabars(invalid), strict=True)
-    strict_runtime.begin_bar(chart)
     with pytest.raises(PineStrategyError) as exc:
-        strict_strategy.process_orders_for_bar(runtime=strict_runtime, bar=chart)
+        process(runtime, s, chart)
     assert exc.value.code == PL_MISSING_INTRABAR_DATA
 
 
@@ -135,9 +129,9 @@ def test_intrabar_open_before_chart_open_is_rejected() -> None:
     runtime = rt(s, Intrabars(invalid))
     seed_long(s, runtime)
     s.exit("tp", "L", qty=1, limit=14)
-    process(runtime, s, chart)
-    assert s.position_size == 1
-    assert any(d["code"] == PL_WARNING_BAR_MAGNIFIER_FALLBACK for d in runtime.config.diagnostics)
+    with pytest.raises(PineStrategyError) as exc:
+        process(runtime, s, chart)
+    assert exc.value.code == PL_MISSING_INTRABAR_DATA
 
 
 def test_non_monotonic_intrabar_closes_are_rejected() -> None:
@@ -157,25 +151,18 @@ def test_non_monotonic_intrabar_closes_are_rejected() -> None:
     runtime = rt(s, Intrabars(invalid))
     seed_long(s, runtime)
     s.exit("tp", "L", qty=1, limit=14)
-    process(runtime, s, chart)
-    assert s.position_size == 1
+    with pytest.raises(PineStrategyError) as exc:
+        process(runtime, s, chart)
+    assert exc.value.code == PL_MISSING_INTRABAR_DATA
 
 
-def test_missing_intrabar_data_warns_and_falls_back_unless_strict() -> None:
+def test_missing_intrabar_data_fails_closed() -> None:
     s = StrategyContext(use_bar_magnifier=True)
     runtime = rt(s, Intrabars([]))
     seed_long(s, runtime)
-    process(runtime, s, bar(2, 10, 12, 8, 11))
-    assert any(d["code"] == PL_WARNING_BAR_MAGNIFIER_FALLBACK for d in runtime.config.diagnostics)
-
-    strict_strategy = StrategyContext(use_bar_magnifier=True)
-    strict_runtime = rt(strict_strategy, Intrabars([]), strict=True)
-    strict_runtime.begin_bar(bar(0, 10, 11, 9, 10))
+    chart = bar(2, 10, 12, 8, 11)
     with pytest.raises(PineStrategyError) as exc:
-        strict_strategy.process_orders_for_bar(
-            runtime=strict_runtime,
-            bar=current_bar(strict_runtime),
-        )
+        process(runtime, s, chart)
     assert exc.value.code == PL_MISSING_INTRABAR_DATA
 
 

@@ -10,7 +10,6 @@ from pinelib.errors import (
     PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
     PL_MISSING_INTRABAR_DATA,
     PL_UNSUPPORTED_STRATEGY_SETTING,
-    PL_WARNING_BAR_MAGNIFIER_FALLBACK,
     PL_WARNING_EXIT_QTY_REDUCED,
     PineStrategyError,
     StrategyLedgerUnavailableError,
@@ -1231,14 +1230,7 @@ class StrategyContext:
         if bars and self._validate_intrabar_bars(bar, bars):
             return self._intrabar_path(bars), "intrabar"
         message = "Bar Magnifier requested but valid intrabar data is missing for chart bar"
-        if (
-            self.declaration.strict_tv_parity
-            or runtime.config.strict_tv_parity
-            or runtime.config.diagnostics_as_errors
-        ):
-            raise PineStrategyError(message, code=PL_MISSING_INTRABAR_DATA)
-        self._emit(runtime, PL_WARNING_BAR_MAGNIFIER_FALLBACK, message, bar_time=bar.time)
-        return self.ohlc_path(bar), "ohlc_path"
+        raise PineStrategyError(message, code=PL_MISSING_INTRABAR_DATA)
 
     def _validate_intrabar_bars(self, chart_bar: Bar, bars: list[Bar]) -> bool:
         last_time: int | None = None
