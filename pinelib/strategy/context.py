@@ -11,7 +11,6 @@ from pinelib.errors import (
     PL_MISSING_INTRABAR_DATA,
     PL_UNSUPPORTED_STRATEGY_SETTING,
     PL_WARNING_BAR_MAGNIFIER_FALLBACK,
-    PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
     PL_WARNING_EXIT_QTY_REDUCED,
     PineStrategyError,
     StrategyLedgerUnavailableError,
@@ -280,7 +279,6 @@ class StrategyContext:
         self.risk_rules: list[RiskRule] = []
         self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
         self._fill_recalc_pending = False
-        self._calc_every_tick_warned = False
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
 
@@ -1267,13 +1265,11 @@ class StrategyContext:
         return bar.time_close if bar.time_close is not None else bar.time
 
     def note_calc_on_every_tick_historical_fallback(self, runtime: PineRuntime) -> None:
-        if self._calc_every_tick_warned:
-            return
-        self._calc_every_tick_warned = True
-        self._emit(
-            runtime,
-            PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
-            "calc_on_every_tick=True but no explicit realtime tick stream was supplied for this historical bar; running one close-only pass",  # noqa: E501
+        del runtime
+        raise PineStrategyError(
+            "calc_on_every_tick=True requires explicit realtime tick data; "
+            "historical close-only fallback is not production-safe",
+            code=PL_MISSING_INTRABAR_DATA,
         )
 
     def _intrabar_path(self, bars: list[Bar]) -> list[float]:

@@ -5,7 +5,6 @@ from typing import cast
 import pytest
 
 from pinelib import (
-    PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK,
     Bar,
     PineRuntime,
     PineStrategyError,
@@ -88,7 +87,7 @@ def test_fill_orders_on_standard_ohlc_is_captured_but_diagnosed() -> None:
     assert "PL_UNSUPPORTED_STRATEGY_SETTING" in codes
 
 
-def test_calc_on_every_tick_historical_fallback_emits_once_at_execution() -> None:
+def test_calc_on_every_tick_without_realtime_ticks_fails_closed() -> None:
     class CountingStrategy:
         def __init__(self) -> None:
             self.calls = 0
@@ -100,14 +99,9 @@ def test_calc_on_every_tick_historical_fallback_emits_once_at_execution() -> Non
     generated = CountingStrategy()
     runtime = _rt()
     strategy = StrategyContext(calc_on_every_tick=True)
-    strategy.attach_runtime(runtime)
-    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [
-        d["code"] for d in runtime.config.diagnostics
-    ]
-    run_generated_strategy(generated, runtime, strategy, [_bar(0), _bar(1)])
-    codes = [d["code"] for d in runtime.config.diagnostics]
-    assert codes.count(PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK) == 1
-    assert generated.calls == 2
+    with pytest.raises(PineStrategyError, match="requires explicit realtime tick data"):
+        run_generated_strategy(generated, runtime, strategy, [_bar(0), _bar(1)])
+    assert generated.calls == 0
 
 
 def test_calc_on_every_tick_supplied_ticks_do_not_emit_false_fallback() -> None:
@@ -131,9 +125,7 @@ def test_calc_on_every_tick_supplied_ticks_do_not_emit_false_fallback() -> None:
         [_bar(0)],
         realtime_ticks=[[TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
     )
-    assert PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK not in [
-        d["code"] for d in runtime.config.diagnostics
-    ]
+    assert runtime.config.diagnostics == []
     assert generated.states == [(False, True, False), (False, True, False)]
 
 
@@ -151,14 +143,12 @@ def test_islastconfirmedhistory_marks_historical_bar_before_realtime() -> None:
     generated = StateStrategy()
     runtime = _rt()
     strategy = StrategyContext(calc_on_every_tick=True)
-    run_generated_strategy(
-        generated,
-        runtime,
-        strategy,
-        [_bar(0), _bar(1)],
-        realtime_ticks=[[], [TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
-    )
-    assert [d["code"] for d in runtime.config.diagnostics].count(
-        PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK
-    ) == 1
-    assert generated.states == [(True, False, True), (False, True, False), (False, True, False)]
+    with pytest.raises(PineStrategyError, match="requires explicit realtime tick data"):
+        run_generated_strategy(
+            generated,
+            runtime,
+            strategy,
+            [_bar(0), _bar(1)],
+            realtime_ticks=[[], [TickUpdate(12, 1), TickUpdate(13, 1, is_final=True)]],
+        )
+    assert generated.states == []
