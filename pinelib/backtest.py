@@ -10,7 +10,7 @@ from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.types import TickUpdate
 from pinelib.errors import PineGoldenMismatchError, PineRuntimeError
-from pinelib.strategy.context import Fill, StrategyContext, Trade
+from pinelib.strategy import Fill, StrategyContext, Trade
 
 
 @runtime_checkable

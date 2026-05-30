@@ -50,3 +50,25 @@ def test_ta_public_init_is_reexport_boundary() -> None:
         "utils.py",
     ]:
         assert (ROOT / "pinelib" / "ta" / module_name).exists()
+
+
+def test_strategy_context_keeps_models_in_models_module() -> None:
+    context_path = ROOT / "pinelib" / "strategy" / "context.py"
+    tree = ast.parse(context_path.read_text(encoding="utf-8"), filename=str(context_path))
+
+    assert (ROOT / "pinelib" / "strategy" / "models.py").exists()
+    model_names = {
+        "StrategyDeclaration",
+        "Order",
+        "Fill",
+        "Trade",
+        "RiskRule",
+        "_OpenLot",
+        "_StrategyScalarSeries",
+    }
+    context_classes = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert context_classes.isdisjoint(model_names)

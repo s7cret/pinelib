@@ -94,7 +94,7 @@ def test_strategy_exit_accepts_comment() -> None:
 
 
 def test_strategy_exit_accepts_comment_and_order_model_has_comment() -> None:
-    from pinelib.strategy.context import Order
+    from pinelib.strategy import Order
     s = StrategyContext(process_orders_on_close=True)
     runtime = rt(s)
     runtime.begin_bar(bar(0, 10, 12, 9, 11))
@@ -108,7 +108,7 @@ def test_strategy_exit_accepts_comment_and_order_model_has_comment() -> None:
 
 
 def test_order_model_accepts_comment_field() -> None:
-    from pinelib.strategy.context import Order
+    from pinelib.strategy import Order
     o = Order(id="test", direction="long", qty=1.0, type="market", kind="entry", comment="test_comment")
     assert o.comment == "test_comment"
 
