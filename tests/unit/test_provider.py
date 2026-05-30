@@ -25,3 +25,4 @@ def test_provider_filters_by_start_end_and_max_bars() -> None:
     ]
     provider = InMemoryDataProvider({("TEST:AAA", "60"): bars})
     assert provider.get_bars("TEST:AAA", "60", 15, 30, max_bars=1) == [bars[1]]
+    assert provider.get_bars("TEST:AAA", "60", 10, 30) == [bars[0], bars[1]]

@@ -85,7 +85,7 @@ class InMemoryDataProvider:
         filtered = [
             bar
             for bar in bars
-            if (start is None or bar.time >= start) and (end is None or bar.time <= end)
+            if (start is None or bar.time >= start) and (end is None or bar.time < end)
         ]
         if max_bars is not None:
             filtered = filtered[:max_bars]
