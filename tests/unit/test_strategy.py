@@ -372,6 +372,26 @@ def test_open_position_mark_to_market_updates_risk_metrics_and_report() -> None:
     assert report.max_drawdown == s.max_drawdown
 
 
+def test_trade_log_records_real_excursions() -> None:
+    s = StrategyContext(process_orders_on_close=True)
+    runtime = rt(s)
+    process(runtime, s, bar(0, 10, 10, 10, 10))
+
+    runtime.begin_bar(bar(1, 10, 15, 7, 12))
+    s.entry("L", "long", qty=2)
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    runtime.begin_bar(bar(2, 12, 14, 6, 11))
+    s.close("L")
+    s.process_orders_for_bar(runtime=runtime, bar=current_bar(runtime))
+    runtime.end_bar()
+
+    trade = s.closed_trade_log[0]
+    assert trade.max_runup == pytest.approx(6.0)
+    assert trade.max_drawdown == pytest.approx(12.0)
+
+
 def test_trade_excursion_accessors_fail_closed_without_ledger_view() -> None:
     s = StrategyContext(process_orders_on_close=True)
     runtime = rt(s)

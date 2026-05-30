@@ -112,6 +112,10 @@ class Trade:
     profit_percent: float
     exit_reason: str | None
     fill_source: str | None = None
+    max_runup: float | None = None
+    max_drawdown: float | None = None
+    commission_entry: float | None = None
+    commission_exit: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +145,8 @@ class _OpenLot:
     entry_time: int
     entry_bar_index: int
     commission: float = 0.0
+    mfe_per_unit: float = 0.0
+    mae_per_unit: float = 0.0
 
 
 class _StrategyScalarSeries:
@@ -612,6 +618,7 @@ class StrategyContext:
     ) -> None:
         self.attach_runtime(runtime) if runtime.strategy is not self else None
         path, fill_source = self._execution_path(runtime, bar, intrabar_bars)
+        self._update_lot_excursions(bar)
         fills_before = len(self.fills)
         while True:
             candidates: list[tuple[int, int, Order, float]] = []
@@ -632,6 +639,7 @@ class StrategyContext:
                 continue
             self._fill_order(order, fill_price, runtime, bar, fill_source)
         self.pending_orders = [o for o in self.pending_orders if o.status == "pending"]
+        self._update_lot_excursions(bar)
         self._mark_to_market(bar.close)
         if len(self.fills) > fills_before and self.calc_on_order_fills:
             self._fill_recalc_pending = True
@@ -947,6 +955,10 @@ class StrategyContext:
                         else 0.0,
                         order.id,
                         order.fill_source,
+                        self._lot_runup(lot, close_qty),
+                        self._lot_drawdown(lot, close_qty),
+                        prorated_entry_commission,
+                        exit_commission,
                     )
                 )
                 lot.qty -= close_qty
@@ -1009,10 +1021,33 @@ class StrategyContext:
                 0.0,
                 None,
                 None,
+                self._lot_runup(lot, lot.qty),
+                self._lot_drawdown(lot, lot.qty),
+                lot.commission,
+                0.0,
             )
             for lot in self._lots
         ]
         self._mark_to_market(mark_price)
+
+    def _update_lot_excursions(self, bar: Bar) -> None:
+        for lot in self._lots:
+            if lot.direction == "long":
+                favorable = bar.high - lot.entry_price
+                adverse = bar.low - lot.entry_price
+            else:
+                favorable = lot.entry_price - bar.low
+                adverse = lot.entry_price - bar.high
+            lot.mfe_per_unit = max(lot.mfe_per_unit, favorable)
+            lot.mae_per_unit = min(lot.mae_per_unit, adverse)
+
+    @staticmethod
+    def _lot_runup(lot: _OpenLot, qty: float) -> float:
+        return max(0.0, lot.mfe_per_unit * qty)
+
+    @staticmethod
+    def _lot_drawdown(lot: _OpenLot, qty: float) -> float:
+        return max(0.0, -lot.mae_per_unit * qty)
 
     def _mark_to_market(self, price: float) -> None:
         self.openprofit = sum(
