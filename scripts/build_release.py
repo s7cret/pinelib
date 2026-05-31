@@ -3,15 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
-import sys
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
-from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION  # noqa: E402
+from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
 VERSION_SLUG = PACKAGE_VERSION.replace(".", "_")
 MANIFEST_PATH = ROOT / f"RELEASE_MANIFEST_v{VERSION_SLUG}.json"
