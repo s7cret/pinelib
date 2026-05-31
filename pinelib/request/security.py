@@ -333,7 +333,7 @@ def _bars_inside_chart_bar(lower_bars: Sequence[Bar], chart_bar: Bar) -> list[Ba
     range in one probe, avoiding scan of pre-chart bars.
     """
     if not lower_bars:
-        return []
+        return list()
 
     chart_time = chart_bar.time
     chart_close = _bar_close_time(chart_bar)

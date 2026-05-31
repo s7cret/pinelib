@@ -152,7 +152,7 @@ class InMemoryDataProvider:
             )
         bars = self._bars_by_key[key]
         if not bars:
-            return []
+            return list()
 
         chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
 
