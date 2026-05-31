@@ -1,23 +1,28 @@
 """Unit tests for MTF prehistory planning."""
 
-from datetime import datetime, timezone
+import os
+
+# Import the functions we're testing
+import sys
+from pathlib import Path
 
 import pytest
 
 from pinelib.core.bar import Bar
 from pinelib.request import InMemoryDataProvider
 
-
-# Import the functions we're testing
-import sys
-from pathlib import Path
-
 # Add the stage runner to path to import the functions
-stage_runner = Path("[local-home]/ast2python/tools/stage_c_p4_mtf_runner.py")
+stack_root = Path(os.environ.get("PINE_STACK_ROOT", Path(__file__).resolve().parents[3]))
+stage_runner = stack_root / "ast2python/tools/stage_c_p4_mtf_runner.py"
+if not stage_runner.exists():
+    pytest.skip(
+        f"optional ast2python stage runner not found: {stage_runner}",
+        allow_module_level=True,
+    )
 sys.path.insert(0, str(stage_runner.parent))
 
 # Import the config and functions
-from stage_c_p4_mtf_runner import (
+from stage_c_p4_mtf_runner import (  # noqa: E402
     MTFPrehistoryConfig,
     calculate_mtf_prehistory_start,
 )
@@ -161,14 +166,45 @@ class TestMTFPrehistoryIntegration:
 
     def test_d_bars_for_close_lookback(self):
         """close needs 1 previous D bar, close[1] needs 2 previous D bars."""
-        chart_start = 1778011200000  # May 5 20:00
-        
+
         # Create D bars for May 2, 3, 4, 5 with valid OHLC (high >= max(open, close))
         d_bars = [
-            Bar(time=1777612800000, time_close=1777699199999, open=75000, high=79000, low=74000, close=78000, volume=10000),
-            Bar(time=1777699200000, time_close=1777785599999, open=76000, high=80000, low=75000, close=79000, volume=10000),
-            Bar(time=1777785600000, time_close=1777871999999, open=77000, high=81000, low=76000, close=80000, volume=10000),
-            Bar(time=1777872000000, time_close=1777958399999, open=78000, high=82000, low=77000, close=81000, volume=10000),
+            Bar(
+                time=1777612800000,
+                time_close=1777699199999,
+                open=75000,
+                high=79000,
+                low=74000,
+                close=78000,
+                volume=10000,
+            ),
+            Bar(
+                time=1777699200000,
+                time_close=1777785599999,
+                open=76000,
+                high=80000,
+                low=75000,
+                close=79000,
+                volume=10000,
+            ),
+            Bar(
+                time=1777785600000,
+                time_close=1777871999999,
+                open=77000,
+                high=81000,
+                low=76000,
+                close=80000,
+                volume=10000,
+            ),
+            Bar(
+                time=1777872000000,
+                time_close=1777958399999,
+                open=78000,
+                high=82000,
+                low=77000,
+                close=81000,
+                volume=10000,
+            ),
         ]
         
         chart_bars = [

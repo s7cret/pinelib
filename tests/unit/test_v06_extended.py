@@ -50,6 +50,9 @@ def test_string_color_math_helpers() -> None:
     assert string.upper("ab") == "AB"
     assert string.contains("pine", "in")
     assert string.tonumber("1.5") == 1.5
+    assert string.pos("BINANCE:BTCUSDT", ":") == 7
+    assert string.pos("BINANCE:BTCUSDT", "BTC", 8) == 8
+    assert string.pos("BINANCE:BTCUSDT", "ETH") is string.na
     c = color.rgb(10, 20, 30, 50)
     assert (color.r(c), color.g(c), color.b(c), color.t(c)) == (10, 20, 30, 50)
     assert pine_math.sqrt(9) == 3

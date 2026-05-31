@@ -62,20 +62,18 @@ def replace(source: str, target: str, replacement: str, occurrence: int | None =
 
 
 def pos(source: str, substr: str, from_pos: int = 0) -> int | float:
-    # TODO: verify exact str.pos index base against TradingView oracle later.
-    # Stage1-safe: returns 1-indexed position, not found → na, NA input → NA.
     if is_na(source) or is_na(substr):
         return na
     if not substr:
-        if from_pos <= 0:
-            return 1
+        if from_pos < 0:
+            return 0
         if from_pos > len(source):
-            return len(source) + 1
-        return from_pos + 1
+            return len(source)
+        return from_pos
     idx = source.find(substr, max(0, from_pos))
     if idx == -1:
         return na
-    return idx + 1  # Pine uses 1-indexed positions
+    return idx
 
 
 __all__ = [
