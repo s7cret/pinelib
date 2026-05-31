@@ -72,13 +72,22 @@ class _SmaState:
 class _EmaState:
     length: int
     value: float | None = None
+    warmup: deque[float] = field(default_factory=deque)
+    warmup_total: float = 0.0
 
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na if self.value is None else self.value
         number = float(value)
         alpha = 2.0 / (self.length + 1.0)
-        self.value = number if self.value is None else alpha * number + (1.0 - alpha) * self.value
+        if self.value is None:
+            self.warmup.append(number)
+            self.warmup_total += number
+            if len(self.warmup) < self.length:
+                return na
+            self.value = self.warmup_total / self.length
+            return self.value
+        self.value = alpha * number + (1.0 - alpha) * self.value
         return self.value
 
 
@@ -97,8 +106,7 @@ class _RmaState:
             self.warmup.append(number)
             self.warmup_total += number
             if len(self.warmup) < self.length:
-                # TradingView returns valid values from bar 0 using SMA until RMA is ready
-                return self.warmup_total / len(self.warmup)
+                return na
             self.value = self.warmup_total / self.length
             return self.value
         self.value = (self.value * (self.length - 1) + number) / self.length
