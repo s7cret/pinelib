@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from marketdata_provider.contracts import InvalidTimeframeError, parse_timeframe
+
 Qualifier = Literal["const", "input", "simple", "series"]
 ReferenceHistoryMode = Literal["unsupported", "identity"]
 
@@ -57,21 +59,20 @@ class TimeframeInfo:
         normalized = value.strip().upper()
         interval_ms = parse_timeframe_to_ms(value)
         multiplier: int | None = None
-        # Monthly: "M" alone or "3MO", "12MO" etc. Also "3M" means 3 months (not 3 minutes in Pine)
-        ismonthly = normalized == "M" or normalized.endswith("MO") or (
-            normalized.endswith("M") and len(normalized) > 1 and normalized[:-1].isdigit()
-        )
-        isseconds = normalized.endswith("S") and not normalized.endswith("MS")
-        isdaily = normalized.endswith("D") and not normalized.endswith("WD")
-        isweekly = normalized.endswith("W") and not normalized.endswith("MW")
-        # Intraday: digit-only ("60"), or ends with H ("1H"), or ends with M for minutes ("15M") but NOT monthly
-        isminutes = (normalized.isdigit()) or (normalized.endswith("M") and not ismonthly)
-        if normalized.isdigit():
+        try:
+            parsed = parse_timeframe(value)
+        except InvalidTimeframeError:
+            parsed = None
+
+        isseconds = False
+        isminutes = parsed.unit == "minute" if parsed is not None else normalized.isdigit()
+        isdaily = parsed.unit == "day" if parsed is not None else normalized.endswith("D")
+        isweekly = parsed.unit == "week" if parsed is not None else normalized.endswith("W")
+        ismonthly = parsed.unit == "month" if parsed is not None else normalized == "M"
+        if parsed is not None:
+            multiplier = parsed.multiplier
+        elif normalized.isdigit():
             multiplier = int(normalized)
-        elif normalized in {"S", "D", "W", "M"}:
-            multiplier = 1
-        elif len(normalized) > 1 and normalized[:-1].isdigit():
-            multiplier = int(normalized[:-1])
         return cls(
             value=value,
             interval_ms=interval_ms,
@@ -132,36 +133,9 @@ class RuntimeConfig:
 
 
 def parse_timeframe_to_ms(value: str) -> int | None:
-    normalized = value.strip().upper()
-    if not normalized:
+    if not value.strip():
         return None
-    if normalized.isdigit():
-        return int(normalized) * 60_000
-    mapping = {
-        "S": 1_000,
-        "D": 86_400_000,
-        "W": 7 * 86_400_000,
-        "MO": 30 * 86_400_000,  # monthly (approximate as 30 days)
-        "M": 60_000,  # minutes (intraday)
-    }
-    if normalized in mapping:
-        return mapping[normalized]
-    # Handle "3MO", "12MO" etc: monthly with explicit multiplier
-    if normalized.endswith("MO") and len(normalized) > 2 and normalized[:-2].isdigit():
-        amount = int(normalized[:-2])
-        return amount * 30 * 86_400_000
-    suffix = normalized[-1]
-    prefix = normalized[:-1]
-    if not prefix.isdigit():
+    try:
+        return parse_timeframe(value).duration_ms
+    except InvalidTimeframeError:
         return None
-    amount = int(prefix)
-    unit_ms = {
-        "S": 1_000,
-        "M": 60_000,  # minutes (intraday)
-        "H": 3_600_000,
-        "D": 86_400_000,
-        "W": 7 * 86_400_000,
-    }.get(suffix)
-    if unit_ms is None:
-        return None
-    return amount * unit_ms
