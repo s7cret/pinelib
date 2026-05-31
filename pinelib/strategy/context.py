@@ -6,29 +6,30 @@ from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.errors import (
     PL_MARGIN_FIELDS_DIAGNOSTIC,
-    PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
-    PL_MISSING_INTRABAR_DATA,
     PL_UNSUPPORTED_STRATEGY_SETTING,
-    PL_WARNING_EXIT_QTY_REDUCED,
     PineStrategyError,
     StrategyLedgerUnavailableError,
 )
 from pinelib.strategy.models import (
     Direction,
-    Fill,
     Order,
     OrderKind,
     OrderType,
     RiskRule,
     StrategyDeclaration,
     StrategyLedgerView,
-    Trade,
-    _OpenLot,
     _StrategyScalarSeries,
 )
 
 
 class StrategyContext:
+    """Pine strategy API facade.
+
+    PineLib owns generated-code API compatibility and records order/risk
+    intents. Broker-owned state is read through ``StrategyLedgerView``. It does
+    not simulate fills, equity, trades, runup, drawdown, or risk enforcement.
+    """
+
     def __init__(self, **kwargs: Any) -> None:
         strategy_ledger_view = kwargs.pop("strategy_ledger_view", None)
         self.declaration = StrategyDeclaration(**kwargs)
@@ -52,32 +53,10 @@ class StrategyContext:
         self.max_bars_back = self.declaration.max_bars_back
         self.qty_step = self.declaration.qty_step
         self.qty_rounding_mode = self.declaration.qty_rounding_mode
-        self.equity = self.initial_capital
-        self.netprofit = 0.0
-        self.openprofit = 0.0
-        self.grossprofit = 0.0
-        self.grossloss = 0.0
-        self.position_size = 0.0
-        self.position_avg_price = 0.0
-        self.position_entry_name: str | None = None
-        self._closedtrades = _StrategyScalarSeries(0)
-        self.opentrades = 0
-        self.closedtrades = 0
-        self.wintrades = 0
-        self.losstrades = 0
-        self.eventrades = 0
-        self.max_drawdown = 0.0
-        self.max_runup = 0.0
-        self._equity_peak = self.initial_capital
-        self._equity_trough = self.initial_capital
         self.pending_orders: list[Order] = []
-        self.fills: list[Fill] = []
-        self.closed_trade_log: list[Trade] = []
-        self.open_trade_log: list[Trade] = []
-        self._lots: list[_OpenLot] = []
         self.risk_rules: list[RiskRule] = []
+        self._closedtrades = _StrategyScalarSeries(0)
         self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
-        self._fill_recalc_pending = False
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
 
@@ -91,6 +70,74 @@ class StrategyContext:
             self._closedtrades = value
         else:
             self._closedtrades.set_current(value)
+
+    @property
+    def fills(self) -> list[object]:
+        return self._ledger_sequence("fills")
+
+    @property
+    def closed_trade_log(self) -> list[object]:
+        return self._ledger_sequence("closed_trade_log")
+
+    @property
+    def open_trade_log(self) -> list[object]:
+        return self._ledger_sequence("open_trade_log")
+
+    @property
+    def equity(self) -> float:
+        return self._ledger_float("equity")
+
+    @property
+    def netprofit(self) -> float:
+        return self._ledger_float("netprofit")
+
+    @property
+    def openprofit(self) -> float:
+        return self._ledger_float("openprofit")
+
+    @property
+    def grossprofit(self) -> float:
+        return self._ledger_float("grossprofit")
+
+    @property
+    def grossloss(self) -> float:
+        return self._ledger_float("grossloss")
+
+    @property
+    def position_size(self) -> float:
+        return self._ledger_float("position_size")
+
+    @property
+    def position_avg_price(self) -> float:
+        return self._ledger_float("position_avg_price")
+
+    @property
+    def position_entry_name(self) -> str | None:
+        return self._ledger_optional_str("position_entry_name")
+
+    @property
+    def opentrades(self) -> int:
+        return self._ledger_int("opentrades")
+
+    @property
+    def wintrades(self) -> int:
+        return self._ledger_int("wintrades")
+
+    @property
+    def losstrades(self) -> int:
+        return self._ledger_int("losstrades")
+
+    @property
+    def eventrades(self) -> int:
+        return self._ledger_int("eventrades")
+
+    @property
+    def max_drawdown(self) -> float:
+        return self._ledger_float("max_drawdown")
+
+    @property
+    def max_runup(self) -> float:
+        return self._ledger_float("max_runup")
 
     def commit_scalar_history(self) -> None:
         self._closedtrades.commit_current()
@@ -143,7 +190,7 @@ class StrategyContext:
             self._emit(
                 runtime,
                 PL_MARGIN_FIELDS_DIAGNOSTIC,
-                "margin_long/margin_short are captured and margin-call risk is diagnosed; forced liquidation remains explicit/non-parity",  # noqa: E501
+                "margin_long/margin_short are captured as declaration metadata; broker risk belongs to BacktestEngine",
                 margin_long=self.margin_long,
                 margin_short=self.margin_short,
             )
@@ -196,136 +243,14 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        if trail_offset is not None and (trail_price is not None or trail_points is not None):
-            available = abs(self._available_exit_qty(from_entry))
-            requested = self._resolve_exit_qty(qty, qty_percent, available)
-            reserved = self._reserved_exit_qty(from_entry, exclude_parent_exit_id=id)
-            actual = max(0.0, min(requested, max(0.0, available - reserved)))
-            if actual <= 0:
-                return
-            exit_direction: Direction = "short" if self.position_size > 0 else "long"
-            activation = trail_price
-            if activation is None and trail_points is not None and self.position_avg_price:
-                activation = self.position_avg_price + (
-                    trail_points if self.position_size > 0 else -trail_points
-                )
-            if activation is None:
-                self._emit(
-                    None,
-                    PL_UNSUPPORTED_STRATEGY_SETTING,
-                    "strategy.exit trailing stop requires trail_price or trail_points",
-                    order_id=id,
-                )
-                return
-            self._cancel_pending_exit_group(id, from_entry)
-            created_bar_index, created_time = self._created_order_location()
-            self.pending_orders.append(
-                Order(
-                    id,
-                    exit_direction,
-                    actual,
-                    "stop",
-                    "exit",
-                    from_entry=from_entry,
-                    parent_exit_id=id,
-                    oca_name=f"exit:{id}:{from_entry or '*'}",
-                    oca_type="reduce",
-                    created_bar_index=created_bar_index,
-                    created_time=created_time,
-                    comment=comment,
-                    source_map=source_map,
-                    trail_activation=float(activation),
-                    trail_offset=float(trail_offset),
-                )
-            )
-            return
-        if trail_price is not None or trail_points is not None or trail_offset is not None:
-            self._emit(
-                None,
-                PL_UNSUPPORTED_STRATEGY_SETTING,
-                "Incomplete trailing stop arguments; expected trail_offset plus trail_price or trail_points",  # noqa: E501
-                order_id=id,
-            )
-            return
-        if limit is None and profit is not None and self.position_avg_price:
-            limit = self.position_avg_price + (profit if self.position_size >= 0 else -profit)
-        if stop is None and loss is not None and self.position_avg_price:
-            stop = self.position_avg_price - (loss if self.position_size >= 0 else -loss)
-        available = abs(self._available_exit_qty(from_entry))
-        requested = self._resolve_exit_qty(qty, qty_percent, available)
-        reserved = self._reserved_exit_qty(from_entry, exclude_parent_exit_id=id)
-        actual = max(0.0, min(requested, max(0.0, available - reserved)))
-        if actual < requested or (qty_percent is not None and qty_percent > 100):
-            self._emit(
-                None,
-                PL_WARNING_EXIT_QTY_REDUCED,
-                "strategy.exit quantity reduced to available unreserved position",
-                order_id=id,
-                requested=requested,
-                actual=actual,
-            )
-        if actual <= 0:
-            return
-        direction: Direction = "short" if self.position_size > 0 else "long"
-        group = f"exit:{id}:{from_entry or '*'}"
-        self._cancel_pending_exit_group(id, from_entry)
-        created_bar_index, created_time = self._created_order_location()
-        if limit is not None:
-            self.pending_orders.append(
-                Order(
-                    f"{id}:limit",
-                    direction,
-                    actual,
-                    "limit",
-                    "exit",
-                    limit=limit,
-                    from_entry=from_entry,
-                    parent_exit_id=id,
-                    oca_name=group,
-                    oca_type="reduce",
-                    created_bar_index=created_bar_index,
-                    created_time=created_time,
-                    comment=comment,
-                    source_map=source_map,
-                )
-            )
-        if stop is not None:
-            self.pending_orders.append(
-                Order(
-                    f"{id}:stop",
-                    direction,
-                    actual,
-                    "stop",
-                    "exit",
-                    stop=stop,
-                    from_entry=from_entry,
-                    parent_exit_id=id,
-                    oca_name=group,
-                    oca_type="reduce",
-                    created_bar_index=created_bar_index,
-                    created_time=created_time,
-                    comment=comment,
-                    source_map=source_map,
-                )
-            )
-        if limit is None and stop is None:
-            self.pending_orders.append(
-                Order(
-                    id,
-                    direction,
-                    actual,
-                    "market",
-                    "exit",
-                    from_entry=from_entry,
-                    parent_exit_id=id,
-                    oca_name=group,
-                    oca_type="reduce",
-                    created_bar_index=created_bar_index,
-                    created_time=created_time,
-                    comment=comment,
-                    source_map=source_map,
-                )
-            )
+        del profit, loss
+        direction: Direction = "short"
+        order = self._make_order(id, direction, qty, limit, stop, "exit", comment=comment, source_map=source_map)
+        order.from_entry = from_entry
+        order.parent_exit_id = id
+        order.trail_activation = trail_price if trail_price is not None else trail_points
+        order.trail_offset = trail_offset
+        self.pending_orders.append(order)
 
     def close(
         self,
@@ -337,27 +262,12 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        available = abs(sum(lot.qty for lot in self._lots if lot.entry_id == id))
-        if available <= 0:
-            return
-        close_qty = self._resolve_exit_qty(qty, qty_percent, available)
-        direction: Direction = "short" if self.position_size > 0 else "long"
-        created_bar_index, created_time = self._created_order_location()
-        self.pending_orders.append(
-            Order(
-                f"close:{id}",
-                direction,
-                min(close_qty, available),
-                "market",
-                "close",
-                from_entry=id,
-                created_bar_index=created_bar_index,
-                created_time=created_time,
-                source_map=source_map,
-                comment=comment,
-                immediate=immediately,
-            )
-        )
+        order = self._make_order(f"close:{id}", "short", qty, None, None, "close", comment=comment, source_map=source_map)
+        order.from_entry = id
+        order.immediate = immediately
+        if qty_percent is not None:
+            order.comment = comment
+        self.pending_orders.append(order)
 
     def close_all(
         self,
@@ -366,24 +276,9 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        if self.position_size == 0:
-            return
-        direction: Direction = "short" if self.position_size > 0 else "long"
-        created_bar_index, created_time = self._created_order_location()
-        self.pending_orders.append(
-            Order(
-                "close_all",
-                direction,
-                abs(self.position_size),
-                "market",
-                "close",
-                created_bar_index=created_bar_index,
-                created_time=created_time,
-                source_map=source_map,
-                comment=comment,
-                immediate=immediately,
-            )
-        )
+        order = self._make_order("close_all", "short", None, None, None, "close", comment=comment, source_map=source_map)
+        order.immediate = immediately
+        self.pending_orders.append(order)
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
         del source_map
@@ -400,10 +295,10 @@ class StrategyContext:
         return None
 
     def has_fill_recalc_pending(self) -> bool:
-        return self._fill_recalc_pending
+        return False
 
     def update_position_equity_trades_after_fill(self) -> None:
-        self._fill_recalc_pending = False
+        return None
 
     def process_orders_for_bar(
         self,
@@ -413,39 +308,25 @@ class StrategyContext:
         recalc_phase: bool = False,
         intrabar_bars: list[Bar] | None = None,
     ) -> None:
-        self.attach_runtime(runtime) if runtime.strategy is not self else None
-        path, fill_source = self._execution_path(runtime, bar, intrabar_bars)
-        self._update_lot_excursions(bar)
-        fills_before = len(self.fills)
-        while True:
-            candidates: list[tuple[int, int, Order, float]] = []
-            for order_index, order in enumerate(list(self.pending_orders)):
-                if order.status != "pending":
-                    continue
-                if not self._eligible(order, runtime.bar_index + 1, recalc_phase):
-                    continue
-                event = self._find_fill_event(order, path, bar, runtime)
-                if event is None:
-                    continue
-                step_index, fill_price = event
-                candidates.append((step_index, order_index, order, fill_price))
-            if not candidates:
-                break
-            _, _, order, fill_price = min(candidates, key=lambda item: (item[0], item[1]))
-            if order.status != "pending":
-                continue
-            self._fill_order(order, fill_price, runtime, bar, fill_source)
-        self.pending_orders = [o for o in self.pending_orders if o.status == "pending"]
-        self._update_lot_excursions(bar)
-        self._mark_to_market(bar.close)
-        if len(self.fills) > fills_before and self.calc_on_order_fills:
-            self._fill_recalc_pending = True
+        del runtime, bar, recalc_phase, intrabar_bars
+        if self.pending_orders:
+            raise PineStrategyError(
+                "PineLib StrategyContext records order intents only; route fills/equity/trades through BacktestEngine",
+                code=PL_UNSUPPORTED_STRATEGY_SETTING,
+            )
 
     @staticmethod
     def ohlc_path(bar: Bar) -> list[float]:
         if abs(bar.open - bar.high) < abs(bar.open - bar.low):
             return [bar.open, bar.high, bar.low, bar.close]
         return [bar.open, bar.low, bar.high, bar.close]
+
+    def note_calc_on_every_tick_historical_fallback(self, runtime: PineRuntime) -> None:
+        del runtime
+        raise PineStrategyError(
+            "calc_on_every_tick=True requires BacktestEngine realtime tick execution",
+            code=PL_UNSUPPORTED_STRATEGY_SETTING,
+        )
 
     def _add_order(
         self,
@@ -482,7 +363,6 @@ class StrategyContext:
             typ = "limit"
         elif stop is not None:
             typ = "stop"
-        created_bar_index, created_time = self._created_order_location()
         return Order(
             id=id,
             direction=direction,
@@ -491,860 +371,113 @@ class StrategyContext:
             kind=kind,
             limit=limit,
             stop=stop,
-            created_bar_index=created_bar_index,
-            created_time=created_time,
+            created_bar_index=self._runtime.bar_index if self._runtime is not None else -1,
+            created_time=self._runtime.current_bar.time
+            if self._runtime is not None and self._runtime.current_bar is not None
+            else None,
             comment=comment,
             source_map=source_map,
-            default_qty_price=self._default_qty_price() if qty is None else None,
-            default_qty_equity=float(self.equity) if qty is None else None,
         )
 
-    def _created_order_location(self) -> tuple[int, int | None]:
-        if self._runtime is not None and self._runtime.current_bar is not None:
-            index = (
-                self._runtime.bar_index
-                if self._runtime.barstate.isconfirmed
-                else self._runtime.bar_index + 1
-            )
-            return index, self._runtime.current_bar.time
-        if self._runtime is not None:
-            return self._runtime.bar_index, None
-        return -1, None
-
-    def _default_qty_price(self) -> float | None:
-        if self._runtime is not None and self._runtime.current_bar is not None:
-            return float(self._runtime.current_bar.close)
-        return None
-
-    def _eligible(self, order: Order, current_bar_index: int, recalc_phase: bool) -> bool:
-        if order.immediate or recalc_phase:
-            return True
-        if order.created_bar_index < 0:
-            order.created_bar_index = current_bar_index
-            return self.process_orders_on_close
-        return order.created_bar_index < current_bar_index or self.process_orders_on_close
-
-    def _find_fill_price(self, order: Order, path: list[float], bar: Bar) -> float | None:
-        event = self._find_fill_event(order, path, bar, self._runtime)
-        return None if event is None else event[1]
-
-    def _find_fill_event(
-        self, order: Order, path: list[float], bar: Bar, runtime: PineRuntime | None = None
-    ) -> tuple[int, float] | None:
-        current_index = (
-            (self._runtime.bar_index + 1)
-            if self._runtime is not None
-            else order.created_bar_index
-        )
-        current_bar_close_activation = (
-            self.process_orders_on_close and order.created_bar_index == current_index
-        )
-        if current_bar_close_activation:
-            path = [bar.close]
-        if order.type == "market":
-            return (len(path) - 1, bar.close) if current_bar_close_activation else (0, path[0])
-        if order.trail_offset is not None and order.trail_activation is not None:
-            return self._trailing_stop_event(order, path)
-        level = order.limit if order.type == "limit" else order.stop
-        if order.type == "stop_limit":
-            stop_hit = self._crossed_event(path, order.stop, order.direction, is_stop=True)
-            if stop_hit is None:
-                return None
-            level = order.limit
-        if level is None:
-            return None
-        is_stop = order.type == "stop"
-        return self._crossed_event(path, level, order.direction, is_stop=is_stop)
-
-    def _trailing_stop_event(self, order: Order, path: list[float]) -> tuple[int, float] | None:
-        assert order.trail_activation is not None
-        assert order.trail_offset is not None
-        long_exit = order.direction == "short"
-        best: float | None = None
-        for idx, price in enumerate(path):
-            if not order.trail_active:
-                activated = (
-                    price >= order.trail_activation
-                    if long_exit
-                    else price <= order.trail_activation
-                )
-                if not activated:
-                    continue
-                order.trail_active = True
-                best = price
-            else:
-                best = (
-                    price if best is None else (max(best, price) if long_exit else min(best, price))
-                )
-            candidate = best - order.trail_offset if long_exit else best + order.trail_offset
-            order.trail_stop = (
-                candidate
-                if order.trail_stop is None
-                else (
-                    max(order.trail_stop, candidate)
-                    if long_exit
-                    else min(order.trail_stop, candidate)
-                )
-            )
-            if long_exit and price <= order.trail_stop:
-                return idx, order.trail_stop
-            if not long_exit and price >= order.trail_stop:
-                return idx, order.trail_stop
-        return None
-
-    def _crossed(
-        self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool
-    ) -> float | None:
-        event = self._crossed_event(path, level, direction, is_stop=is_stop)
-        return None if event is None else event[1]
-
-    def _crossed_event(
-        self, path: list[float], level: float | None, direction: Direction, *, is_stop: bool
-    ) -> tuple[int, float] | None:
-        if level is None:
-            return None
-        for idx, price in enumerate(path):
-            if idx == 0:
-                prev = price
-                if self._price_satisfies(price, level, direction, is_stop):
-                    return idx, price
-                continue
-            lo, hi = sorted((prev, price))
-            if lo <= level <= hi:
-                return idx, level
-            prev = price
-        return None
-
-    @staticmethod
-    def _price_satisfies(price: float, level: float, direction: Direction, is_stop: bool) -> bool:
-        if is_stop:
-            return price >= level if direction == "long" else price <= level
-        return price <= level if direction == "long" else price >= level
-
-    def _fill_order(
-        self,
-        order: Order,
-        price: float,
-        runtime: PineRuntime,
-        bar: Bar,
-        fill_source: str = "ohlc_path",
-    ) -> None:
-        qty = self._resolved_order_qty(order, price)
-        if order.kind == "entry":
-            qty = self._round_qty(qty)
-            qty = self._entry_qty_with_reversal_and_pyramiding(order, qty)
-            if qty <= 0:
-                order.status = "cancelled"
-                return
-        if order.kind == "exit":
-            qty = self._round_qty(qty)
-            qty = min(qty, abs(self._available_exit_qty(order.from_entry)))
-            if qty <= 0:
-                order.status = "cancelled"
-                return
-        if order.kind == "close":
-            qty = self._round_qty(qty)
-            qty = min(qty, abs(self._available_entry_qty(order.from_entry)))
-            if qty <= 0:
-                order.status = "cancelled"
-                return
-        fill_price = self._apply_slippage(price, order.direction)
-        commission = self._commission(qty, fill_price)
-        order.fill_source = fill_source
-        self._apply_position_fill(order, qty, fill_price, commission, runtime, bar)
-        order.status = "filled"
-        order.filled_qty = qty
-        order.fill_price = fill_price
-        self.fills.append(
-            Fill(
-                order.id,
-                order.direction,
-                qty,
-                fill_price,
-                commission,
-                runtime.bar_index + 1,
-                bar.time,
-                order.kind,
-                fill_source,
-            )
-        )
-        if order.oca_name:
-            for other in self.pending_orders:
-                if other is not order and other.oca_name == order.oca_name:
-                    if order.oca_type == "reduce" and other.qty is not None:
-                        other.qty = max(0.0, other.qty - qty)
-                        if other.qty <= 1e-12:
-                            other.status = "cancelled"
-                    else:
-                        other.status = "cancelled"
-        self._cancel_unavailable_exit_orders()
-        self._diagnose_margin_risk(runtime, bar.close)
-
-    def _apply_position_fill(
-        self,
-        order: Order,
-        qty: float,
-        price: float,
-        commission: float,
-        runtime: PineRuntime,
-        bar: Bar,
-    ) -> None:
-        signed = qty if order.direction == "long" else -qty
-        if self.position_size == 0 or self.position_size * signed > 0:
-            self.netprofit -= commission
-            self._lots.append(
-                _OpenLot(
-                    order.id,
-                    "long" if signed > 0 else "short",
-                    qty,
-                    price,
-                    bar.time,
-                    runtime.bar_index + 1,
-                    commission,
-                )
-            )
-        else:
-            remaining = qty
-            for lot in self._lots_for_close(order):
-                if remaining <= 0:
-                    break
-                close_qty = min(lot.qty, remaining)
-                profit = (
-                    (price - lot.entry_price) * close_qty
-                    if lot.direction == "long"
-                    else (lot.entry_price - price) * close_qty
-                )
-                prorated_entry_commission = (
-                    lot.commission * (close_qty / lot.qty) if lot.qty else 0.0
-                )
-                total_commission = commission * (close_qty / qty) + prorated_entry_commission
-                closed_trade_profit = profit - total_commission
-                # TradingView charges entry commission into strategy.netprofit
-                # immediately when the position opens. On close, cumulative
-                # netprofit receives gross PnL minus only the exit commission;
-                # the closed-trade accessor still reports both commissions.
-                exit_commission = commission * (close_qty / qty)
-                self.netprofit += profit - exit_commission
-                self.grossprofit += max(closed_trade_profit, 0.0)
-                self.grossloss += min(closed_trade_profit, 0.0)
-                self.closedtrades += 1
-                if closed_trade_profit > 0:
-                    self.wintrades += 1
-                elif closed_trade_profit < 0:
-                    self.losstrades += 1
-                else:
-                    self.eventrades += 1
-                self.closed_trade_log.append(
-                    Trade(
-                        lot.entry_id,
-                        lot.direction,
-                        lot.entry_time,
-                        lot.entry_bar_index,
-                        lot.entry_price,
-                        bar.time,
-                        runtime.bar_index + 1,
-                        price,
-                        close_qty,
-                        total_commission,
-                        closed_trade_profit,
-                        closed_trade_profit / (lot.entry_price * close_qty) * 100
-                        if lot.entry_price and close_qty
-                        else 0.0,
-                        order.id,
-                        order.fill_source,
-                        self._lot_runup(lot, close_qty),
-                        self._lot_drawdown(lot, close_qty),
-                        prorated_entry_commission,
-                        exit_commission,
-                    )
-                )
-                lot.qty -= close_qty
-                lot.commission -= prorated_entry_commission
-                remaining -= close_qty
-                if lot.qty <= 1e-12:
-                    self._lots.remove(lot)
-            if remaining > 1e-12 and order.kind in {"entry", "order"}:
-                opening_commission = commission * (remaining / qty)
-                self.netprofit -= opening_commission
-                self._lots.append(
-                    _OpenLot(
-                        order.id,
-                        "long" if signed > 0 else "short",
-                        remaining,
-                        price,
-                        bar.time,
-                        runtime.bar_index + 1,
-                        opening_commission,
-                    )
-                )
-        self._recompute_position(price)
-
-    def _lots_for_close(self, order: Order) -> list[_OpenLot]:
-        lots = list(self._lots)
-        if order.from_entry:
-            matching = [lot for lot in lots if lot.entry_id == order.from_entry]
-            others = [lot for lot in lots if lot.entry_id != order.from_entry]
-            if order.kind == "close":
-                return matching
-            if self.close_entries_rule == "ANY":
-                return [*matching, *others]
-        return lots
-
-    def _recompute_position(self, mark_price: float) -> None:
-        long_qty = sum(lot.qty for lot in self._lots if lot.direction == "long")
-        short_qty = sum(lot.qty for lot in self._lots if lot.direction == "short")
-        self.position_size = long_qty - short_qty
-        if self._lots:
-            total = sum(lot.qty for lot in self._lots)
-            self.position_avg_price = sum(lot.qty * lot.entry_price for lot in self._lots) / total
-            self.position_entry_name = self._lots[0].entry_id
-        else:
-            self.position_avg_price = 0.0
-            self.position_entry_name = None
-        self.opentrades = len(self._lots)
-        self.open_trade_log = [
-            Trade(
-                lot.entry_id,
-                lot.direction,
-                lot.entry_time,
-                lot.entry_bar_index,
-                lot.entry_price,
-                None,
-                None,
-                None,
-                lot.qty,
-                lot.commission,
-                0.0,
-                0.0,
-                None,
-                None,
-                self._lot_runup(lot, lot.qty),
-                self._lot_drawdown(lot, lot.qty),
-                lot.commission,
-                0.0,
-            )
-            for lot in self._lots
-        ]
-        self._mark_to_market(mark_price)
-
-    def _update_lot_excursions(self, bar: Bar) -> None:
-        for lot in self._lots:
-            if lot.direction == "long":
-                favorable = bar.high - lot.entry_price
-                adverse = bar.low - lot.entry_price
-            else:
-                favorable = lot.entry_price - bar.low
-                adverse = lot.entry_price - bar.high
-            lot.mfe_per_unit = max(lot.mfe_per_unit, favorable)
-            lot.mae_per_unit = min(lot.mae_per_unit, adverse)
-
-    @staticmethod
-    def _lot_runup(lot: _OpenLot, qty: float) -> float:
-        return max(0.0, lot.mfe_per_unit * qty)
-
-    @staticmethod
-    def _lot_drawdown(lot: _OpenLot, qty: float) -> float:
-        return max(0.0, -lot.mae_per_unit * qty)
-
-    def _mark_to_market(self, price: float) -> None:
-        self.openprofit = sum(
-            ((price - lot.entry_price) if lot.direction == "long" else (lot.entry_price - price))
-            * lot.qty
-            for lot in self._lots
-        )
-        self.equity = self.initial_capital + self.netprofit + self.openprofit
-        self._update_equity_extremes()
-
-    def _update_equity_extremes(self) -> None:
-        # Account-currency risk metrics using marked-to-market equity. max_drawdown is
-        # the largest drop from a prior equity peak; max_runup is the largest rise from
-        # a prior equity trough.
-        self.max_drawdown = max(self.max_drawdown, self._equity_peak - self.equity)
-        self.max_runup = max(self.max_runup, self.equity - self._equity_trough)
-        self._equity_peak = max(self._equity_peak, self.equity)
-        self._equity_trough = min(self._equity_trough, self.equity)
-
-    def _diagnose_margin_risk(self, runtime: PineRuntime, mark_price: float) -> None:
-        if not self._lots:
-            return
-        margin = self.margin_long if self.position_size >= 0 else self.margin_short
-        if margin >= 100.0:
-            return
-        position_value = abs(self.position_size) * mark_price
-        required = position_value * margin / 100.0
-        if self.equity <= required:
-            self._emit(
-                runtime,
-                PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
-                "Margin requirement breached; PineLib diagnoses but does not force TradingView liquidation",  # noqa: E501
-                equity=self.equity,
-                required_margin=required,
-                position_value=position_value,
-            )
-
-    def _entry_qty_with_reversal_and_pyramiding(self, order: Order, qty: float) -> float:
-        same_direction = (self.position_size >= 0 and order.direction == "long") or (
-            self.position_size <= 0 and order.direction == "short"
-        )
-        if same_direction and self.position_size != 0:
-            same_lots = sum(1 for lot in self._lots if lot.direction == order.direction)
-            if same_lots >= self.pyramiding:
-                return 0.0
-        if self.position_size and not same_direction:
-            return qty + abs(self.position_size)
-        return qty
-
-    def _resolved_order_qty(self, order: Order, price: float) -> float:
-        if order.qty is not None:
-            return float(order.qty)
-        sizing_price = order.default_qty_price if order.default_qty_price is not None else price
-        sizing_equity = order.default_qty_equity if order.default_qty_equity is not None else self.equity
-        return self._resolved_default_qty(sizing_price, equity=sizing_equity)
-
-    def _resolved_default_qty(self, price: float, *, equity: float | None = None) -> float:
-        sizing_equity = self.equity if equity is None else equity
-        if self.default_qty_type == "fixed":
-            return self.default_qty_value
-        if self.default_qty_type == "cash":
-            return self.default_qty_value / price
-        if self.default_qty_type == "percent_of_equity":
-            notional = sizing_equity * self.default_qty_value / 100.0
-            denom = price
-            if self.commission_type == "percent":
-                denom = price * (1.0 + self.commission_value / 100.0)
-            return notional / denom
-        raise PineStrategyError(
-            f"Unsupported default_qty_type {self.default_qty_type!r}",
-            code=PL_UNSUPPORTED_STRATEGY_SETTING,
-        )
-
-    def _round_qty(self, qty: float) -> float:
-        step = self.qty_step
-        if step is None or step <= 0:
-            return qty
-        mode = self.qty_rounding_mode
-        scaled = abs(qty) / step
-        if mode in {"truncate", "truncate_toward_zero", "floor_abs"}:
-            rounded = int(scaled) * step
-        elif mode == "floor":
-            import math
-
-            rounded = math.floor(qty / step) * step
-            return float(rounded)
-        elif mode == "ceil":
-            import math
-
-            rounded = math.ceil(qty / step) * step
-            return float(rounded)
-        elif mode in {"nearest", "round"}:
-            rounded = round(scaled) * step
-        elif mode in {"none", ""}:
-            return qty
-        else:
-            raise PineStrategyError(
-                f"Unsupported qty_rounding_mode {mode!r}",
-                code=PL_UNSUPPORTED_STRATEGY_SETTING,
-            )
-        return (1.0 if qty >= 0 else -1.0) * float(rounded)
-
-    def _resolve_exit_qty(
-        self, qty: float | None, qty_percent: float | None, available: float
-    ) -> float:
-        if qty is not None:
-            return float(qty)
-        if qty_percent is not None:
-            return available * float(qty_percent) / 100.0
-        return available
-
-    def _available_exit_qty(self, from_entry: str | None) -> float:
-        if from_entry is not None and self.close_entries_rule == "ANY":
-            lots = [lot for lot in self._lots if lot.entry_id == from_entry]
-        else:
-            lots = self._lots
-        sign = 1.0 if self.position_size >= 0 else -1.0
-        return sign * sum(lot.qty for lot in lots)
-
-    def _available_entry_qty(self, entry_id: str | None) -> float:
-        if entry_id is None:
-            lots = self._lots
-        else:
-            lots = [lot for lot in self._lots if lot.entry_id == entry_id]
-        if not lots:
-            return 0.0
-        sign = 1.0 if lots[0].direction == "long" else -1.0
-        return sign * sum(lot.qty for lot in lots)
-
-    def _cancel_pending_exit_group(self, parent_exit_id: str, from_entry: str | None) -> None:
-        for order in self.pending_orders:
-            if (
-                order.kind == "exit"
-                and order.status == "pending"
-                and order.parent_exit_id == parent_exit_id
-                and order.from_entry == from_entry
-            ):
-                order.status = "cancelled"
-
-    def _cancel_unavailable_exit_orders(self) -> None:
-        for order in self.pending_orders:
-            if order.kind != "exit" or order.status != "pending":
-                continue
-            if abs(self._available_entry_qty(order.from_entry)) <= 1e-12:
-                order.status = "cancelled"
-
-    def _reserved_exit_qty(
-        self, from_entry: str | None, *, exclude_parent_exit_id: str | None = None
-    ) -> float:
-        reserved_by_group: dict[tuple[str | None, str | None], float] = {}
-        for order in self.pending_orders:
-            if order.kind != "exit" or order.status != "pending" or order.from_entry != from_entry:
-                continue
-            if exclude_parent_exit_id is not None and order.parent_exit_id == exclude_parent_exit_id:
-                continue
-            key = (order.parent_exit_id or order.id, order.oca_name)
-            reserved_by_group[key] = max(reserved_by_group.get(key, 0.0), order.qty or 0.0)
-        return sum(reserved_by_group.values())
-
-    def _apply_slippage(self, price: float, direction: Direction) -> float:
-        return price + self.slippage if direction == "long" else price - self.slippage
-
-    def _commission(self, qty: float, price: float) -> float:
-        if self.commission_type == "percent":
-            return abs(qty * price) * self.commission_value / 100.0
-        if self.commission_type == "cash_per_order":
-            return self.commission_value
-        if self.commission_type == "cash_per_contract":
-            return abs(qty) * self.commission_value
-        raise PineStrategyError(
-            f"Unsupported commission_type {self.commission_type!r}",
-            code=PL_UNSUPPORTED_STRATEGY_SETTING,
-        )
-
-    def _execution_path(
-        self, runtime: PineRuntime, bar: Bar, intrabar_bars: list[Bar] | None
-    ) -> tuple[list[float], str]:
-        if not self.use_bar_magnifier:
-            return self.ohlc_path(bar), "ohlc_path"
-        bars = intrabar_bars
-        if bars is None and runtime.intrabar_provider is not None:
-            bars = runtime.intrabar_provider.get_intrabar_bars(runtime.syminfo.tickerid, bar, None)
-        if bars and self._validate_intrabar_bars(bar, bars):
-            return self._intrabar_path(bars), "intrabar"
-        message = "Bar Magnifier requested but valid intrabar data is missing for chart bar"
-        raise PineStrategyError(message, code=PL_MISSING_INTRABAR_DATA)
-
-    def _validate_intrabar_bars(self, chart_bar: Bar, bars: list[Bar]) -> bool:
-        last_time: int | None = None
-        last_close: int | None = None
-        chart_close = self._bar_close_time(chart_bar)
-        for intrabar in bars:
-            intrabar_close = self._bar_close_time(intrabar)
-            if (
-                intrabar.time < chart_bar.time
-                or intrabar.time > chart_close
-                or intrabar_close > chart_close
-            ):
-                return False
-            if last_time is not None and intrabar.time <= last_time:
-                return False
-            if last_close is not None and intrabar_close <= last_close:
-                return False
-            last_time = intrabar.time
-            last_close = intrabar_close
-        return True
-
-    @staticmethod
-    def _bar_close_time(bar: Bar) -> int:
-        return bar.time_close if bar.time_close is not None else bar.time
-
-    def note_calc_on_every_tick_historical_fallback(self, runtime: PineRuntime) -> None:
-        del runtime
-        raise PineStrategyError(
-            "calc_on_every_tick=True requires explicit realtime tick data; "
-            "historical close-only fallback is not production-safe",
-            code=PL_MISSING_INTRABAR_DATA,
-        )
-
-    def _intrabar_path(self, bars: list[Bar]) -> list[float]:
-        path: list[float] = []
-        for bar in bars:
-            path.extend(self.ohlc_path(bar))
-        return path
-
-    # ------------------------------------------------------------------
-    # strategy.closedtrades namespace — index-based trade history accessor
-    # Pine: strategy.closedtrades.entry_price(n) → float
-    # Returns na if index is out of range.
-    def closedtrades_entry_price(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].entry_price
-
-    def closedtrades_exit_price(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        trade = self.closed_trade_log[idx]
-        return trade.exit_price if trade.exit_price is not None else na
-
-    def closedtrades_entry_time(self, index: int | float) -> int | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].entry_time
-
-    def closedtrades_exit_time(self, index: int | float) -> int | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        trade = self.closed_trade_log[idx]
-        return trade.exit_time if trade.exit_time is not None else na
-
-    def closedtrades_profit(self, index: int | float) -> float | type(na):
-        """Closed trade profit after commission, matching TradingView exports."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        trade = self.closed_trade_log[idx]
-        return trade.profit
-
-    def closedtrades_profit_percent(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].profit_percent
-
-    def closedtrades_net_profit(self, index: int | float) -> float | type(na):
-        """Alias for closed trade profit after commission."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].profit
-
-    def closedtrades_commission(self, index: int | float) -> float | type(na):
-        """Commission paid for the trade."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].commission
-
-    def closedtrades_qty(self, index: int | float) -> float | type(na):
-        """Quantity of the trade (absolute value)."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].qty
-
-    def closedtrades_side(self, index: int | float) -> str | type(na):
-        """Trade direction: 'long' or 'short'."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].direction
-
-    def closedtrades_size(self, index: int | float) -> float | type(na):
-        """Size of the trade. Positive for long, negative for short."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        trade = self.closed_trade_log[idx]
-        return trade.qty if trade.direction == "long" else -trade.qty
-
-    def closedtrades_entry_id(self, index: int | float) -> str | type(na):
-        """Entry order ID."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].entry_id
-
-    def closedtrades_exit_id(self, index: int | float) -> str | type(na):
-        """Exit order ID."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].exit_reason or ""
-
-    def closedtrades_entry_comment(self, index: int | float) -> str | type(na):
-        """Entry order comment."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return ""  # Not stored in Trade
-
-    def closedtrades_exit_comment(self, index: int | float) -> str | type(na):
-        """Exit order comment."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return ""  # Not stored in Trade
-
-    def closedtrades_max_runup(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self._ledger_metric("closedtrades_max_runup", idx)
-
-    def closedtrades_max_drawdown(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self._ledger_metric("closedtrades_max_drawdown", idx)
-
-    # ------------------------------------------------------------------
-    # strategy.opentrades namespace
-    def opentrades_entry_price(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._lots[idx].entry_price
-
-    def opentrades_profit(self, index: int | float) -> float | type(na):
-        """TradingView-style unrealized PnL for this open trade."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        lot = self._lots[idx]
-        # Get current price from runtime
-        current_price = self._runtime.current_bar.close if self._runtime and self._runtime.current_bar else lot.entry_price
-        direction_sign = 1 if lot.direction == "long" else -1
-        gross = (current_price - lot.entry_price) * lot.qty * direction_sign
-        exit_commission = self._commission(lot.qty, current_price)
-        return gross - lot.commission - exit_commission
-
-    def opentrades_profit_percent(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        lot = self._lots[idx]
-        profit = self.opentrades_profit(idx)
-        if profit is na:
-            return na
-        basis = abs(lot.entry_price * lot.qty)
-        return na if basis == 0 else float(profit) / basis * 100.0
-
-    def opentrades_commission(self, index: int | float) -> float | type(na):
-        """Commission paid for the entry of this open trade."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._lots[idx].commission
-
-    def opentrades_qty(self, index: int | float) -> float | type(na):
-        """Quantity of the open trade (absolute value)."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._lots[idx].qty
-
-    def opentrades_side(self, index: int | float) -> str | type(na):
-        """Trade direction: 'long' or 'short'."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._lots[idx].direction
-
-    def opentrades_entry_id(self, index: int | float) -> str | type(na):
-        """Entry order ID."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._lots[idx].entry_id
-
-    def opentrades_exit_price(self, index: int | float) -> float | type(na):
-        """Exit price (na for open trades)."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return na
-
-    def opentrades_exit_time(self, index: int | float) -> int | type(na):
-        """Exit time (na for open trades)."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return na
-
-    def opentrades_exit_id(self, index: int | float) -> str | type(na):
-        """Exit order ID (empty string for open trades)."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return ""
-
-    def opentrades_size(self, index: int | float) -> float | type(na):
-        """Size of the open trade. Positive for long, negative for short."""
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        lot = self._lots[idx]
-        return lot.qty if lot.direction == "long" else -lot.qty
-
-    def opentrades_max_runup(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._ledger_metric("opentrades_max_runup", idx)
-
-    def opentrades_max_drawdown(self, index: int | float) -> float | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._ledger_metric("opentrades_max_drawdown", idx)
-
-    def opentrades_entry_bar_index(self, index: int | float) -> int | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self._lots):
-            return na
-        return self._lots[idx].entry_bar_index
-
-    def closedtrades_entry_bar_index(self, index: int | float) -> int | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        return self.closed_trade_log[idx].entry_bar_index
-
-    def closedtrades_exit_bar_index(self, index: int | float) -> int | type(na):
-        from pinelib.core.na import na
-        idx = int(index)
-        if idx < 0 or idx >= len(self.closed_trade_log):
-            return na
-        exit_bar = self.closed_trade_log[idx].exit_bar_index
-        return exit_bar if exit_bar is not None else na
-
-    # ------------------------------------------------------------------
-    # strategy.risk namespace
+    def closedtrades_entry_price(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_entry_price", index)
+
+    def closedtrades_exit_price(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_exit_price", index)
+
+    def closedtrades_entry_time(self, index: int | float) -> int | type:
+        return self._ledger_indexed_or_na("closedtrades_entry_time", index)
+
+    def closedtrades_exit_time(self, index: int | float) -> int | type:
+        return self._ledger_indexed_or_na("closedtrades_exit_time", index)
+
+    def closedtrades_profit(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_profit", index)
+
+    def closedtrades_profit_percent(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_profit_percent", index)
+
+    def closedtrades_net_profit(self, index: int | float) -> float | type:
+        return self.closedtrades_profit(index)
+
+    def closedtrades_commission(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_commission", index)
+
+    def closedtrades_qty(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_qty", index)
+
+    def closedtrades_side(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("closedtrades_side", index)
+
+    def closedtrades_size(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_size", index)
+
+    def closedtrades_entry_id(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("closedtrades_entry_id", index)
+
+    def closedtrades_exit_id(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("closedtrades_exit_id", index)
+
+    def closedtrades_entry_comment(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("closedtrades_entry_comment", index)
+
+    def closedtrades_exit_comment(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("closedtrades_exit_comment", index)
+
+    def closedtrades_max_runup(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_max_runup", index)
+
+    def closedtrades_max_drawdown(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("closedtrades_max_drawdown", index)
+
+    def closedtrades_entry_bar_index(self, index: int | float) -> int | type:
+        return self._ledger_indexed_or_na("closedtrades_entry_bar_index", index)
+
+    def closedtrades_exit_bar_index(self, index: int | float) -> int | type:
+        return self._ledger_indexed_or_na("closedtrades_exit_bar_index", index)
+
+    def opentrades_entry_price(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_entry_price", index)
+
+    def opentrades_profit(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_profit", index)
+
+    def opentrades_profit_percent(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_profit_percent", index)
+
+    def opentrades_commission(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_commission", index)
+
+    def opentrades_qty(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_qty", index)
+
+    def opentrades_side(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("opentrades_side", index)
+
+    def opentrades_entry_id(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("opentrades_entry_id", index)
+
+    def opentrades_exit_price(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_exit_price", index)
+
+    def opentrades_exit_time(self, index: int | float) -> int | type:
+        return self._ledger_indexed_or_na("opentrades_exit_time", index)
+
+    def opentrades_exit_id(self, index: int | float) -> str | type:
+        return self._ledger_indexed_or_na("opentrades_exit_id", index)
+
+    def opentrades_size(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_size", index)
+
+    def opentrades_max_runup(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_max_runup", index)
+
+    def opentrades_max_drawdown(self, index: int | float) -> float | type:
+        return self._ledger_indexed_or_na("opentrades_max_drawdown", index)
+
+    def opentrades_entry_bar_index(self, index: int | float) -> int | type:
+        return self._ledger_indexed_or_na("opentrades_entry_bar_index", index)
+
     def risk_allow_entry_in(self, direction: str) -> None:
         self.risk_rules.append(RiskRule("allow_entry_in", direction=direction))
 
@@ -1360,20 +493,57 @@ class StrategyContext:
     def risk_max_intraday_filled_orders(self, value: float, type: str = "fixed") -> None:
         self.risk_rules.append(RiskRule("max_intraday_filled_orders", float(value), type))
 
-    def _ledger_metric(self, method_name: str, index: int) -> float:
-        if self._strategy_ledger_view is None:
-            raise StrategyLedgerUnavailableError(
-                f"strategy.{method_name} requires a StrategyLedgerView supplied by the broker ledger"
-            )
-        method = getattr(self._strategy_ledger_view, method_name, None)
+    def _ledger_indexed_or_na(self, method_name: str, index: int | float) -> Any:
+        from pinelib.core.na import na
+
+        idx = int(index)
+        if idx < 0:
+            return na
+        return self._ledger_metric(method_name, idx)
+
+    def _ledger_metric(self, method_name: str, index: int) -> Any:
+        view = self._require_ledger_view(method_name)
+        method = getattr(view, method_name, None)
         if not callable(method):
-            raise StrategyLedgerUnavailableError(
-                f"StrategyLedgerView does not provide {method_name}"
-            )
+            raise StrategyLedgerUnavailableError(f"StrategyLedgerView does not provide {method_name}")
         value = method(index)
         if value is None:
             raise StrategyLedgerUnavailableError(f"{method_name}({index}) is unavailable")
-        return float(value)
+        return value
+
+    def _ledger_float(self, name: str) -> float:
+        return float(self._ledger_value(name))
+
+    def _ledger_int(self, name: str) -> int:
+        return int(self._ledger_value(name))
+
+    def _ledger_optional_str(self, name: str) -> str | None:
+        value = self._ledger_value(name)
+        return None if value is None else str(value)
+
+    def _ledger_sequence(self, name: str) -> list[object]:
+        value = self._ledger_value(name)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        raise StrategyLedgerUnavailableError(f"StrategyLedgerView.{name} is not a sequence")
+
+    def _ledger_value(self, name: str) -> Any:
+        view = self._require_ledger_view(name)
+        if hasattr(view, name):
+            return getattr(view, name)
+        method = getattr(view, name, None)
+        if callable(method):
+            return method()
+        raise StrategyLedgerUnavailableError(f"StrategyLedgerView does not provide {name}")
+
+    def _require_ledger_view(self, name: str) -> StrategyLedgerView:
+        if self._strategy_ledger_view is None:
+            raise StrategyLedgerUnavailableError(
+                f"strategy.{name} requires a StrategyLedgerView supplied by BacktestEngine"
+            )
+        return self._strategy_ledger_view
 
     def _emit(self, runtime: PineRuntime | None, code: str, message: str, **extra: object) -> None:
         target = runtime.config if runtime is not None else self._diagnostics_target

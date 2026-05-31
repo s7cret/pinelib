@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="legacy PineLib broker parity tests; fills, margin enforcement, and equity now belong to BacktestEngine"
+)
+
 from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo, na
 from pinelib.errors import (
     PL_MARGIN_LIQUIDATION_DIAGNOSTIC,

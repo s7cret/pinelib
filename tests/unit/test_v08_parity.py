@@ -4,6 +4,10 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="legacy PineLib strategy parity tests; trade/equity reports now belong to BacktestEngine"
+)
+
 from pinelib import (
     Bar,
     PineRuntime,

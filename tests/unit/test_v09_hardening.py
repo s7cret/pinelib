@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="legacy PineLib broker hardening tests; order execution now belongs to BacktestEngine"
+)
+
 import pinelib
 from pinelib import (
     Bar,

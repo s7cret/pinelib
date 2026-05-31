@@ -72,3 +72,25 @@ def test_strategy_context_keeps_models_in_models_module() -> None:
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
     }
     assert context_classes.isdisjoint(model_names)
+
+
+def test_strategy_context_has_no_broker_fill_authority_methods() -> None:
+    context_path = ROOT / "pinelib" / "strategy" / "context.py"
+    tree = ast.parse(context_path.read_text(encoding="utf-8"), filename=str(context_path))
+    method_names = {
+        node.name
+        for class_node in tree.body
+        if isinstance(class_node, ast.ClassDef) and class_node.name == "StrategyContext"
+        for node in class_node.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    forbidden = {
+        "_fill_order",
+        "_apply_position_fill",
+        "_mark_to_market",
+        "_update_equity_extremes",
+        "_update_lot_excursions",
+        "_diagnose_margin_risk",
+    }
+    assert method_names.isdisjoint(forbidden)

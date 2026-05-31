@@ -4,6 +4,10 @@ from typing import cast
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="legacy PineLib realtime broker tests; fills and equity now belong to BacktestEngine"
+)
+
 from pinelib import (
     Bar,
     PineRuntime,
