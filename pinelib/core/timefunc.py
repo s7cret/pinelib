@@ -150,8 +150,9 @@ class TimeFunctions:
     ) -> int | object:
         if runtime.current_bar is None:
             return na
-        if self._is_intraday_daily_request(timeframe, runtime):
-            return self._daily_bucket_open(_bar_time_ms(runtime))
+        bucket = self._higher_timeframe_bucket(timeframe, runtime)
+        if bucket is not None:
+            return bucket[0]
         if not self._validate_timeframe(timeframe, runtime):
             return na
         resolved_tz = timezone or runtime.syminfo.timezone
@@ -172,8 +173,9 @@ class TimeFunctions:
     ) -> int | object:
         if runtime.current_bar is None:
             return na
-        if self._is_intraday_daily_request(timeframe, runtime):
-            return self._daily_bucket_open(_bar_time_ms(runtime)) + 86_400_000
+        bucket = self._higher_timeframe_bucket(timeframe, runtime)
+        if bucket is not None:
+            return bucket[1]
         if not self._validate_timeframe(timeframe, runtime):
             return na
         resolved_tz = timezone or runtime.syminfo.timezone
@@ -230,15 +232,37 @@ class TimeFunctions:
     def _daily_bucket_open(timestamp_ms: int) -> int:
         return (timestamp_ms // 86_400_000) * 86_400_000
 
-    @staticmethod
-    def _is_intraday_daily_request(timeframe: str | None, runtime: PineRuntime) -> bool:
+    def _higher_timeframe_bucket(
+        self,
+        timeframe: str | None,
+        runtime: PineRuntime,
+    ) -> tuple[int, int] | None:
         if timeframe is None:
-            return False
+            return None
         requested = timeframe.strip().upper()
-        if requested not in {"D", "1D"}:
-            return False
+        requested_ms = parse_timeframe_to_ms(timeframe)
         chart_ms = runtime.timeframe.interval_ms
-        return chart_ms is not None and chart_ms < 86_400_000
+        if chart_ms is None or requested_ms is None or chart_ms >= requested_ms:
+            return None
+        timestamp_ms = _bar_time_ms(runtime)
+        if requested in {"D", "1D"}:
+            day_open = self._daily_bucket_open(timestamp_ms)
+            return day_open, day_open + 86_400_000
+        if requested in {"W", "1W"}:
+            return self._weekly_bucket(timestamp_ms, runtime.syminfo.timezone)
+        return None
+
+    @staticmethod
+    def _weekly_bucket(timestamp_ms: int, timezone_name: str) -> tuple[int, int]:
+        local_dt = _localize(timestamp_ms, timezone_name)
+        week_open_local = (local_dt - timedelta(days=local_dt.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        week_close_local = week_open_local + timedelta(days=7)
+        return int(week_open_local.timestamp() * 1000), int(week_close_local.timestamp() * 1000)
 
     def _validate_timeframe(self, timeframe: str | None, runtime: PineRuntime) -> bool:
         """Validate timeframe. Unsupported aggregation returns na after diagnostics."""

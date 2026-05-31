@@ -173,8 +173,8 @@ def test_session_time_time_close_timeframe_guard_matches_tradingview_daily_time_
             "bar_time": float(bar_time) / 1000.0,
             "bar_time_close": runtime.timefunc.time_close(runtime=runtime),
         }
-        assert is_na(runtime.timefunc.time("W", runtime=runtime))
-        assert is_na(runtime.timefunc.time_close("W", runtime=runtime))
+        assert isinstance(runtime.timefunc.time("W", runtime=runtime), int)
+        assert isinstance(runtime.timefunc.time_close("W", runtime=runtime), int)
         runtime.end_bar()
 
     _assert_columns_close(actual, expected_by_index.values(), ["bar_time", "bar_time_close"])

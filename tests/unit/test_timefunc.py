@@ -102,11 +102,25 @@ def test_time_and_time_close_support_daily_bucket_on_intraday_chart() -> None:
     assert runtime.timefunc.time_close("D", runtime=runtime) == day_open + 86_400_000
 
 
+def test_time_and_time_close_support_weekly_bucket_on_intraday_chart() -> None:
+    runtime = _runtime("0000-2359:1234567", "UTC")
+    bar = Bar(
+        time=1_778_448_600_000,
+        time_close=1_778_449_500_000,
+        open=1,
+        high=1,
+        low=1,
+        close=1,
+    )
+    runtime.begin_bar(bar)
+    week_open = 1_777_852_800_000
+    assert runtime.timefunc.time("W", runtime=runtime) == week_open
+    assert runtime.timefunc.time_close("W", runtime=runtime) == week_open + 7 * 86_400_000
+
+
 def test_time_and_time_close_other_non_chart_timeframe_is_explicit_unsupported() -> None:
     runtime = _runtime("0000-2359:1234567", "UTC")
     bar = Bar(time=1_700_000_000_000, time_close=1_700_003_599_999, open=1, high=1, low=1, close=1)
     runtime.begin_bar(bar)
-    assert is_na(runtime.timefunc.time("W", runtime=runtime))
-    assert runtime.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
-    assert is_na(runtime.timefunc.time_close("W", runtime=runtime))
+    assert is_na(runtime.timefunc.time("M", runtime=runtime))
     assert runtime.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC
