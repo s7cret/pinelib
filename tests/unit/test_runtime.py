@@ -35,6 +35,22 @@ def test_runtime_begin_end_bar_commits_after_processing() -> None:
     assert cast(float, user_series[1]) == 11.0
 
 
+def test_runtime_bar_index_offset_shifts_pine_builtin_only() -> None:
+    runtime = PineRuntime(
+        symbol_info=SymbolInfo(tickerid="TEST:AAA", timezone="UTC", session="0000-2359:1234567"),
+        timeframe=TimeframeInfo.from_string("60"),
+        config=RuntimeConfig(),
+        bar_index_offset=42,
+    )
+    first_bar = Bar(time=1_700_000_000_000, open=1.0, high=2.0, low=0.5, close=1.5, volume=3.0)
+
+    runtime.begin_bar(first_bar)
+
+    assert runtime.bar_index == -1
+    assert runtime.bar_index_series.current == 42
+    assert runtime.barstate.isfirst is False
+
+
 def test_runtime_indicator_state_is_stable_and_child_context_isolated() -> None:
     runtime = _runtime()
     bucket = runtime.get_indicator_state("L1_C1_ema_1", list)

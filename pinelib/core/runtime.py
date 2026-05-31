@@ -31,6 +31,7 @@ class PineRuntime:
     data_provider: DataProvider | None = None
     config: RuntimeConfig = field(default_factory=RuntimeConfig)
     intrabar_provider: IntrabarDataProvider | None = None
+    bar_index_offset: int = 0
 
     contract_version: str = field(init=False, default=RUNTIME_CONTRACT_VERSION)
     bar_index: int = field(init=False, default=-1)
@@ -88,8 +89,9 @@ class PineRuntime:
         self.current_bar = effective_bar
         self.chart_bars.append(effective_bar)
         current_index = self.bar_index + 1
+        exposed_index = self._exposed_bar_index(current_index)
         self.barstate = BarStateInfo(
-            isfirst=current_index == 0,
+            isfirst=exposed_index == 0,
             islast=True,
             ishistory=True,
             isrealtime=False,
@@ -99,7 +101,7 @@ class PineRuntime:
         )
         for series in self.series_registry.values():
             series._between_bars = False
-        self._set_builtin_current(effective_bar, current_index)
+        self._set_builtin_current(effective_bar, exposed_index)
 
     def begin_realtime_bar(self, bar: Bar) -> None:
         """Open a deterministic realtime bar without committing it.
@@ -113,8 +115,9 @@ class PineRuntime:
         self.current_bar = effective_bar
         self.chart_bars.append(effective_bar)
         current_index = self.bar_index + 1
+        exposed_index = self._exposed_bar_index(current_index)
         self.barstate = BarStateInfo(
-            isfirst=current_index == 0,
+            isfirst=exposed_index == 0,
             islast=True,
             ishistory=False,
             isrealtime=True,
@@ -124,7 +127,7 @@ class PineRuntime:
         )
         for series in self.series_registry.values():
             series._between_bars = False
-        self._set_builtin_current(effective_bar, current_index)
+        self._set_builtin_current(effective_bar, exposed_index)
 
     def update_realtime_tick(self, tick: TickUpdate) -> Bar:
         if self.current_bar is None:
@@ -148,8 +151,9 @@ class PineRuntime:
         self.current_bar = updated
         self.chart_bars[-1] = updated
         current_index = self.bar_index + 1
+        exposed_index = self._exposed_bar_index(current_index)
         self.barstate = BarStateInfo(
-            isfirst=current_index == 0,
+            isfirst=exposed_index == 0,
             islast=True,
             ishistory=False,
             isrealtime=True,
@@ -157,7 +161,7 @@ class PineRuntime:
             isconfirmed=bool(tick.is_final),
             islastconfirmedhistory=False,
         )
-        self._set_builtin_current(updated, current_index)
+        self._set_builtin_current(updated, exposed_index)
         return updated
 
     def end_bar(self) -> None:
@@ -171,9 +175,10 @@ class PineRuntime:
             if not self.barstate.isrealtime:
                 series.mark_between_bars()
         self.bar_index += 1
+        exposed_index = self._exposed_bar_index(self.bar_index)
         was_realtime = self.barstate.isrealtime
         self.barstate = BarStateInfo(
-            isfirst=self.bar_index == 0,
+            isfirst=exposed_index == 0,
             islast=True,
             ishistory=not was_realtime,
             isrealtime=was_realtime,
@@ -264,6 +269,9 @@ class PineRuntime:
 
     def reset_varip_state(self) -> None:
         self.varip_state.clear()
+
+    def _exposed_bar_index(self, local_index: int) -> int:
+        return local_index + self.bar_index_offset
 
     def _set_builtin_current(self, bar: Bar, current_index: int) -> None:
         self.open.set_current(bar.open)
