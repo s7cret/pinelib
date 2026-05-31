@@ -50,16 +50,34 @@ def test_strategy_context_records_entry_intent_without_filling() -> None:
 def test_strategy_context_records_exit_close_cancel_intents() -> None:
     s = StrategyContext()
 
-    s.exit("XL", from_entry="L", qty=1, limit=12, stop=9, comment="bracket")
-    s.close("L", comment="flatten")
+    s.exit(
+        "XL",
+        from_entry="L",
+        qty_percent=50,
+        limit=12,
+        stop=9,
+        profit=2,
+        loss=1,
+        comment="bracket",
+    )
+    s.close("L", qty_percent=25, immediately=True, comment="flatten")
     s.cancel("XL")
 
     exit_order, close_order = s.pending_orders
     assert exit_order.kind == "exit"
+    assert exit_order.direction is None
     assert exit_order.from_entry == "L"
+    assert exit_order.qty_percent == 50
+    assert exit_order.profit == 2
+    assert exit_order.loss == 1
+    assert exit_order.bracket_group == "XL"
+    assert exit_order.oca_type == "reduce"
     assert exit_order.status == "cancelled"
     assert close_order.kind == "close"
+    assert close_order.direction is None
     assert close_order.from_entry == "L"
+    assert close_order.qty_percent == 25
+    assert close_order.immediate is True
     assert close_order.comment == "flatten"
 
 
@@ -132,7 +150,10 @@ def test_risk_api_registers_risk_rules_only() -> None:
 def test_daily_time_session_uses_bar_open_not_inferred_daily_close():
     from pinelib.core import Bar, PineRuntime, SymbolInfo, TimeframeInfo
 
-    rt = PineRuntime(SymbolInfo("NASDAQ:AAPL", timezone="America/New_York"), TimeframeInfo.from_string("1D"))
+    rt = PineRuntime(
+        SymbolInfo("NASDAQ:AAPL", timezone="America/New_York"),
+        TimeframeInfo.from_string("1D"),
+    )
     # 2026-04-28 13:30 UTC / 09:30 New York, a regular US equity daily open.
     rt.begin_bar(Bar(time=1777383000000, open=1, high=1, low=1, close=1))
     try:

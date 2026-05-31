@@ -4,13 +4,13 @@ import json
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Protocol, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.types import TickUpdate
-from pinelib.errors import PineGoldenMismatchError, PineRuntimeError
-from pinelib.strategy import Fill, StrategyContext, Trade
+from pinelib.errors import PineGoldenMismatchError, PineRuntimeError, StrategyLedgerUnavailableError
+from pinelib.strategy import Fill, Order, RiskRule, StrategyContext, Trade
 
 
 @runtime_checkable
@@ -35,13 +35,15 @@ class BacktestSnapshot:
     bar_index: int
     time: int
     close: float
-    equity: float
-    netprofit: float
-    openprofit: float
-    position_size: float
-    position_avg_price: float
-    fills_count: int
-    closedtrades: int
+    order_intents_count: int = 0
+    risk_rules_count: int = 0
+    equity: float | None = None
+    netprofit: float | None = None
+    openprofit: float | None = None
+    position_size: float | None = None
+    position_avg_price: float | None = None
+    fills_count: int | None = None
+    closedtrades: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,20 +55,24 @@ class BacktestReport:
     timeframe: str
     bars: int
     initial_capital: float
-    final_equity: float
-    netprofit: float
-    grossprofit: float
-    grossloss: float
-    openprofit: float
-    max_drawdown: float
-    max_runup: float
-    closedtrades: int
-    opentrades: int
-    wintrades: int
-    losstrades: int
-    eventrades: int
+    final_equity: float | None
+    netprofit: float | None
+    grossprofit: float | None
+    grossloss: float | None
+    openprofit: float | None
+    max_drawdown: float | None
+    max_runup: float | None
+    closedtrades: int | None
+    opentrades: int | None
+    wintrades: int | None
+    losstrades: int | None
+    eventrades: int | None
     fills: list[dict[str, object]]
     closed_trades: list[dict[str, object]]
+    order_intents: list[dict[str, object]]
+    risk_rules: list[dict[str, object]]
+    execution_mode: str = "intent_only"
+    broker_authority: str = "backtest_engine"
     params: dict[str, object] = field(default_factory=dict)
     params_metadata: dict[str, object] = field(default_factory=dict)
     diagnostics: list[dict[str, object]] = field(default_factory=list)
@@ -103,9 +109,9 @@ def run_generated_strategy(
     """Run generated-like code bar-by-bar using PineRuntime + StrategyContext.
 
     The generated object may expose ``on_bar(runtime, strategy)`` or be directly callable with
-    the same arguments. Orders are processed after each calculation pass. When
-    ``calc_on_order_fills`` is enabled in StrategyContext, a guarded recalc loop repeats the
-    generated pass after fills until no new fill-triggered calculation is pending.
+    the same arguments. PineLib records strategy order/risk intents only; it does not process
+    fills, mutate broker state, enforce risk, or calculate equity/trade reports. End-to-end
+    broker execution belongs to BacktestEngine.
     """
 
     if runtime.strategy is not strategy:
@@ -113,7 +119,6 @@ def run_generated_strategy(
     schedule = schedule or StrategySchedule()
     snapshots: list[BacktestSnapshot] = []
     callback = _resolve_strategy_callback(strategy_instance)
-    max_recalcs = schedule.max_recalculations_per_bar or runtime.config.max_recalculations_per_bar
 
     bars_list = list(bars)
     ticks_list = (
@@ -137,21 +142,14 @@ def run_generated_strategy(
                 active_bar = runtime.current_bar
                 if active_bar is None:
                     raise PineRuntimeError("runtime did not set current_bar")
-                _run_strategy_pass(callback, runtime, strategy, active_bar, schedule, max_recalcs)
+                _run_strategy_pass(callback, runtime, strategy)
             else:
                 runtime.begin_realtime_bar(bar)
                 for idx, tick in enumerate(bar_ticks):
                     if idx == len(bar_ticks) - 1 and not tick.is_final:
                         tick = TickUpdate(tick.price, tick.volume, tick.time, True)
-                    active_bar = runtime.update_realtime_tick(tick)
+                    runtime.update_realtime_tick(tick)
                     callback(runtime, strategy)
-                    if schedule.process_orders:
-                        strategy.process_orders_for_bar(
-                            runtime=runtime, bar=active_bar, recalc_phase=idx > 0
-                        )
-                        _run_fill_recalcs(
-                            callback, runtime, strategy, active_bar, schedule, max_recalcs
-                        )
         else:
             runtime.begin_bar(bar)
             runtime.set_last_confirmed_history(idx == last_confirmed_history_index)
@@ -160,7 +158,7 @@ def run_generated_strategy(
             active_bar = runtime.current_bar
             if active_bar is None:  # defensive; begin_bar guarantees this
                 raise PineRuntimeError("runtime did not set current_bar")
-            _run_strategy_pass(callback, runtime, strategy, active_bar, schedule, max_recalcs)
+            _run_strategy_pass(callback, runtime, strategy)
         runtime.end_bar()
         snapshots.append(snapshot_from_state(runtime, strategy))
         strategy.commit_scalar_history()
@@ -175,40 +173,8 @@ def _run_strategy_pass(
     callback: Callable[[PineRuntime, StrategyContext], None],
     runtime: PineRuntime,
     strategy: StrategyContext,
-    active_bar: Bar,
-    schedule: StrategySchedule,
-    max_recalcs: int,
 ) -> None:
-    if schedule.process_orders:
-        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar)
-        strategy.update_position_equity_trades_after_fill()
     callback(runtime, strategy)
-    if schedule.process_orders:
-        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar)
-        _run_fill_recalcs(callback, runtime, strategy, active_bar, schedule, max_recalcs)
-
-
-def _run_fill_recalcs(
-    callback: Callable[[PineRuntime, StrategyContext], None],
-    runtime: PineRuntime,
-    strategy: StrategyContext,
-    active_bar: Bar,
-    schedule: StrategySchedule,
-    max_recalcs: int,
-) -> None:
-    recalc_count = 0
-    while (
-        schedule.calc_on_order_fills
-        and strategy.calc_on_order_fills
-        and strategy.has_fill_recalc_pending()
-    ):
-        recalc_count += 1
-        if recalc_count > max_recalcs:
-            raise PineRuntimeError("Maximum strategy recalculations per bar exceeded")
-        runtime.guard_recalc_count(recalc_count)
-        strategy.update_position_equity_trades_after_fill()
-        callback(runtime, strategy)
-        strategy.process_orders_for_bar(runtime=runtime, bar=active_bar, recalc_phase=True)
 
 
 def snapshot_from_state(runtime: PineRuntime, strategy: StrategyContext) -> BacktestSnapshot:
@@ -219,13 +185,15 @@ def snapshot_from_state(runtime: PineRuntime, strategy: StrategyContext) -> Back
         bar_index=runtime.bar_index,
         time=bar.time,
         close=bar.close,
-        equity=float(strategy.equity),
-        netprofit=float(strategy.netprofit),
-        openprofit=float(strategy.openprofit),
-        position_size=float(strategy.position_size),
-        position_avg_price=float(strategy.position_avg_price),
-        fills_count=len(strategy.fills),
-        closedtrades=int(strategy.closedtrades),
+        order_intents_count=len(strategy.pending_orders),
+        risk_rules_count=len(strategy.risk_rules),
+        equity=_ledger_float_or_none(strategy, "equity"),
+        netprofit=_ledger_float_or_none(strategy, "netprofit"),
+        openprofit=_ledger_float_or_none(strategy, "openprofit"),
+        position_size=_ledger_float_or_none(strategy, "position_size"),
+        position_avg_price=_ledger_float_or_none(strategy, "position_avg_price"),
+        fills_count=_ledger_len_or_none(strategy, "fills"),
+        closedtrades=None,
     )
 
 
@@ -238,27 +206,32 @@ def build_backtest_report(
     from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 
     return BacktestReport(
-        schema_version="pinelib.backtest.report.v1",
+        schema_version="pinelib.generated_strategy.intent_report.v1",
         package_version=PACKAGE_VERSION,
         contract_version=RUNTIME_CONTRACT_VERSION,
         symbol=runtime.syminfo.tickerid,
         timeframe=runtime.timeframe.value,
         bars=len(runtime.chart_bars),
         initial_capital=float(strategy.initial_capital),
-        final_equity=float(strategy.equity),
-        netprofit=float(strategy.netprofit),
-        grossprofit=float(strategy.grossprofit),
-        grossloss=float(strategy.grossloss),
-        openprofit=float(strategy.openprofit),
-        max_drawdown=float(strategy.max_drawdown),
-        max_runup=float(strategy.max_runup),
-        closedtrades=int(strategy.closedtrades),
-        opentrades=int(strategy.opentrades),
-        wintrades=int(strategy.wintrades),
-        losstrades=int(strategy.losstrades),
-        eventrades=int(strategy.eventrades),
-        fills=[_fill_to_dict(fill) for fill in strategy.fills],
-        closed_trades=[_trade_to_dict(trade) for trade in strategy.closed_trade_log],
+        final_equity=_ledger_float_or_none(strategy, "equity"),
+        netprofit=_ledger_float_or_none(strategy, "netprofit"),
+        grossprofit=_ledger_float_or_none(strategy, "grossprofit"),
+        grossloss=_ledger_float_or_none(strategy, "grossloss"),
+        openprofit=_ledger_float_or_none(strategy, "openprofit"),
+        max_drawdown=_ledger_float_or_none(strategy, "max_drawdown"),
+        max_runup=_ledger_float_or_none(strategy, "max_runup"),
+        closedtrades=None,
+        opentrades=_ledger_int_or_none(strategy, "opentrades"),
+        wintrades=_ledger_int_or_none(strategy, "wintrades"),
+        losstrades=_ledger_int_or_none(strategy, "losstrades"),
+        eventrades=_ledger_int_or_none(strategy, "eventrades"),
+        fills=[_fill_to_dict(fill) for fill in _ledger_sequence_or_empty(strategy, "fills")],
+        closed_trades=[
+            _trade_to_dict(trade)
+            for trade in _ledger_sequence_or_empty(strategy, "closed_trade_log")
+        ],
+        order_intents=[_order_to_dict(order) for order in strategy.pending_orders],
+        risk_rules=[_risk_rule_to_dict(rule) for rule in strategy.risk_rules],
         params=extract_strategy_params(strategy_instance),
         params_metadata=extract_params_metadata(strategy_instance),
         diagnostics=list(runtime.config.diagnostics),
@@ -343,9 +316,50 @@ def _resolve_strategy_callback(
     )
 
 
-def _fill_to_dict(fill: Fill) -> dict[str, object]:
-    return asdict(fill)
+def _fill_to_dict(fill: Fill | object) -> dict[str, object]:
+    return asdict(cast(Any, fill))
 
 
-def _trade_to_dict(trade: Trade) -> dict[str, object]:
-    return asdict(trade)
+def _trade_to_dict(trade: Trade | object) -> dict[str, object]:
+    return asdict(cast(Any, trade))
+
+
+def _order_to_dict(order: Order) -> dict[str, object]:
+    return asdict(order)
+
+
+def _risk_rule_to_dict(rule: RiskRule) -> dict[str, object]:
+    return asdict(rule)
+
+
+def _ledger_float_or_none(strategy: StrategyContext, name: str) -> float | None:
+    try:
+        return float(getattr(strategy, name))
+    except StrategyLedgerUnavailableError:
+        return None
+
+
+def _ledger_int_or_none(strategy: StrategyContext, name: str) -> int | None:
+    try:
+        return int(getattr(strategy, name))
+    except StrategyLedgerUnavailableError:
+        return None
+
+
+def _ledger_len_or_none(strategy: StrategyContext, name: str) -> int | None:
+    try:
+        return len(getattr(strategy, name))
+    except StrategyLedgerUnavailableError:
+        return None
+
+
+def _ledger_sequence_or_empty(strategy: StrategyContext, name: str) -> list[object]:
+    try:
+        value = getattr(strategy, name)
+    except StrategyLedgerUnavailableError:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return []

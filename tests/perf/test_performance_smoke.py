@@ -27,7 +27,7 @@ def test_runtime_ta_smoke_benchmark() -> None:
     assert elapsed < 5.0
 
 
-def test_strategy_broker_smoke_benchmark() -> None:
+def test_strategy_intent_smoke_benchmark() -> None:
     runtime = PineRuntime(SymbolInfo("TEST:AAA"), TimeframeInfo.from_string("1"))
     strategy = StrategyContext(pyramiding=1)
     strategy.attach_runtime(runtime)
@@ -47,7 +47,6 @@ def test_strategy_broker_smoke_benchmark() -> None:
             strategy.entry(f"L{index}", "long", qty=1)
         elif index % 100 == 50:
             strategy.close_all()
-        strategy.process_orders_for_bar(runtime=runtime, bar=bar)
         runtime.end_bar()
     elapsed = perf_counter() - start
     assert elapsed < 5.0

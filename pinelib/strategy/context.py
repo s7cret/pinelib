@@ -190,7 +190,8 @@ class StrategyContext:
             self._emit(
                 runtime,
                 PL_MARGIN_FIELDS_DIAGNOSTIC,
-                "margin_long/margin_short are captured as declaration metadata; broker risk belongs to BacktestEngine",
+                "margin_long/margin_short are captured as declaration metadata; "
+                "broker risk belongs to BacktestEngine",
                 margin_long=self.margin_long,
                 margin_short=self.margin_short,
             )
@@ -206,7 +207,9 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        self._add_order(id, direction, qty, limit, stop, "entry", comment=comment, source_map=source_map)
+        self._add_order(
+            id, direction, qty, limit, stop, "entry", comment=comment, source_map=source_map
+        )
 
     def order(
         self,
@@ -221,7 +224,9 @@ class StrategyContext:
         *,
         source_map: object | None = None,
     ) -> None:
-        order = self._make_order(id, direction, qty, limit, stop, "order", comment=comment, source_map=source_map)
+        order = self._make_order(
+            id, direction, qty, limit, stop, "order", comment=comment, source_map=source_map
+        )
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
@@ -243,11 +248,20 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        del profit, loss
-        direction: Direction = "short"
-        order = self._make_order(id, direction, qty, limit, stop, "exit", comment=comment, source_map=source_map)
+        has_bracket_intent = any(
+            value is not None
+            for value in (limit, stop, profit, loss, trail_price, trail_points, trail_offset)
+        )
+        order = self._make_order(
+            id, None, qty, limit, stop, "exit", comment=comment, source_map=source_map
+        )
+        order.qty_percent = qty_percent
+        order.profit = profit
+        order.loss = loss
         order.from_entry = from_entry
         order.parent_exit_id = id
+        order.bracket_group = id if has_bracket_intent else None
+        order.oca_type = "reduce"
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
         self.pending_orders.append(order)
@@ -262,11 +276,19 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        order = self._make_order(f"close:{id}", "short", qty, None, None, "close", comment=comment, source_map=source_map)
+        order = self._make_order(
+            f"close:{id}",
+            None,
+            qty,
+            None,
+            None,
+            "close",
+            comment=comment,
+            source_map=source_map,
+        )
+        order.qty_percent = qty_percent
         order.from_entry = id
         order.immediate = immediately
-        if qty_percent is not None:
-            order.comment = comment
         self.pending_orders.append(order)
 
     def close_all(
@@ -276,7 +298,16 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        order = self._make_order("close_all", "short", None, None, None, "close", comment=comment, source_map=source_map)
+        order = self._make_order(
+            "close_all",
+            None,
+            None,
+            None,
+            None,
+            "close",
+            comment=comment,
+            source_map=source_map,
+        )
         order.immediate = immediately
         self.pending_orders.append(order)
 
@@ -311,7 +342,8 @@ class StrategyContext:
         del runtime, bar, recalc_phase, intrabar_bars
         if self.pending_orders:
             raise PineStrategyError(
-                "PineLib StrategyContext records order intents only; route fills/equity/trades through BacktestEngine",
+                "PineLib StrategyContext records order intents only; "
+                "route fills/equity/trades through BacktestEngine",
                 code=PL_UNSUPPORTED_STRATEGY_SETTING,
             )
 
@@ -341,13 +373,15 @@ class StrategyContext:
         source_map: object | None = None,
     ) -> None:
         self.pending_orders.append(
-            self._make_order(id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map)
+            self._make_order(
+                id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
+            )
         )
 
     def _make_order(
         self,
         id: str,
-        direction: Direction,
+        direction: Direction | None,
         qty: float | None,
         limit: float | None,
         stop: float | None,
@@ -505,7 +539,9 @@ class StrategyContext:
         view = self._require_ledger_view(method_name)
         method = getattr(view, method_name, None)
         if not callable(method):
-            raise StrategyLedgerUnavailableError(f"StrategyLedgerView does not provide {method_name}")
+            raise StrategyLedgerUnavailableError(
+                f"StrategyLedgerView does not provide {method_name}"
+            )
         value = method(index)
         if value is None:
             raise StrategyLedgerUnavailableError(f"{method_name}({index}) is unavailable")

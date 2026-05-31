@@ -22,8 +22,8 @@ Implemented through v1.0.1:
 - timezone/session-aware `time()` and `time_close()` helpers with IANA DST coverage and explicit unsupported diagnostics for non-chart timeframe aggregation
 - `request.security` foundation with merge modes, child runtime isolation, and explicit nested-request diagnostics
 - StrategyContext order-intent/runtime-local façade with market/limit/stop/stop-limit calls, exit/close/cancel APIs, diagnostics, and legacy local-fixture support; amended broker/equity acceptance belongs to `backtest_engine`
-- bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext` for local/runtime tests, not final broker authority
-- result snapshots, JSON-safe backtest report schema, golden-compare tolerance utility, strategy/equity compare reports, and optimizer-friendly params metadata capture
+- bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext` to record order/risk intents, not broker fills or equity
+- intent-run snapshots, JSON-safe report schema, golden-compare tolerance utility, strategy/equity compare reports, and optimizer-friendly params metadata capture
 - CSV OHLCV loader plus optional Parquet loader with graceful dependency errors
 - TradingView-exported indicator/trade CSV fixture loaders plus oracle-ready fixture scaffolding; no local fixture is claimed as TradingView-verified without exported evidence
 - visual recorder foundation and reference containers (`PineArray`, `PineMap`, `PineMatrix`)
@@ -58,8 +58,10 @@ runtime = PineRuntime(SymbolInfo("TEST:AAA"), TimeframeInfo.from_string("60"))
 strategy = StrategyContext(default_qty_type="fixed", default_qty_value=1)
 
 result = run_generated_strategy(GeneratedLikeStrategy(), runtime, strategy, bars)
-assert strategy.position_size == 1
-assert strategy.position_avg_price == 12
+assert result.report.execution_mode == "intent_only"
+assert result.report.broker_authority == "backtest_engine"
+assert result.report.order_intents[0]["id"] == "L"
+assert result.report.final_equity is None
 assert result.report.params_metadata["qty"]["default"] == 1
 ```
 

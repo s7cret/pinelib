@@ -42,14 +42,18 @@ class StrategyDeclaration:
 @dataclass(slots=True)
 class Order:
     id: str
-    direction: Direction
+    direction: Direction | None
     qty: float | None
+    qty_percent: float | None = None
     type: OrderType = "market"
     kind: OrderKind = "order"
     limit: float | None = None
     stop: float | None = None
+    profit: float | None = None
+    loss: float | None = None
     from_entry: str | None = None
     parent_exit_id: str | None = None
+    bracket_group: str | None = None
     oca_name: str | None = None
     oca_type: str | None = None
     created_bar_index: int = -1
