@@ -4,13 +4,23 @@ import json
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Protocol, TypedDict, cast, runtime_checkable
 
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.types import TickUpdate
 from pinelib.errors import PineGoldenMismatchError, PineRuntimeError, StrategyLedgerUnavailableError
-from pinelib.strategy import Fill, Order, RiskRule, StrategyContext, Trade
+from pinelib.strategy import (
+    Direction,
+    Fill,
+    Order,
+    OrderKind,
+    OrderStatus,
+    OrderType,
+    RiskRule,
+    StrategyContext,
+    Trade,
+)
 
 
 @runtime_checkable
@@ -46,6 +56,132 @@ class BacktestSnapshot:
     closedtrades: int | None = None
 
 
+class FillPayload(TypedDict):
+    order_id: str
+    direction: Direction
+    qty: float
+    price: float
+    commission: float
+    bar_index: int
+    time: int
+    kind: OrderKind
+    fill_source: str
+
+
+class ClosedTradePayload(TypedDict):
+    entry_id: str
+    direction: Direction
+    entry_time: int
+    entry_bar_index: int
+    entry_price: float
+    exit_time: int | None
+    exit_bar_index: int | None
+    exit_price: float | None
+    qty: float
+    commission: float
+    profit: float
+    profit_percent: float
+    exit_reason: str | None
+    fill_source: str | None
+    max_runup: float | None
+    max_drawdown: float | None
+    commission_entry: float | None
+    commission_exit: float | None
+
+
+class OrderIntentPayload(TypedDict):
+    id: str
+    direction: Direction | None
+    qty: float | None
+    qty_percent: float | None
+    type: OrderType
+    kind: OrderKind
+    limit: float | None
+    stop: float | None
+    profit: float | None
+    loss: float | None
+    from_entry: str | None
+    parent_exit_id: str | None
+    bracket_group: str | None
+    oca_name: str | None
+    oca_type: str | None
+    created_bar_index: int
+    created_time: int | None
+    status: OrderStatus
+    filled_qty: float
+    fill_price: float | None
+    fill_source: str | None
+    source_map: object | None
+    comment: str | None
+    immediate: bool
+    default_qty_price: float | None
+    default_qty_equity: float | None
+    trail_activation: float | None
+    trail_offset: float | None
+    trail_stop: float | None
+    trail_active: bool
+
+
+class RiskRulePayload(TypedDict):
+    name: str
+    value: float | None
+    value_type: str | None
+    direction: str | None
+
+
+class DiagnosticPayload(TypedDict, total=False):
+    code: object
+    message: object
+    severity: object
+
+
+class SnapshotPayload(TypedDict):
+    bar_index: int
+    time: int
+    close: float
+    order_intents_count: int
+    risk_rules_count: int
+    equity: float | None
+    netprofit: float | None
+    openprofit: float | None
+    position_size: float | None
+    position_avg_price: float | None
+    fills_count: int | None
+    closedtrades: int | None
+
+
+class BacktestReportPayload(TypedDict):
+    schema_version: str
+    package_version: str
+    contract_version: str
+    symbol: str
+    timeframe: str
+    bars: int
+    initial_capital: float
+    final_equity: float | None
+    netprofit: float | None
+    grossprofit: float | None
+    grossloss: float | None
+    openprofit: float | None
+    max_drawdown: float | None
+    max_runup: float | None
+    closedtrades: int | None
+    opentrades: int | None
+    wintrades: int | None
+    losstrades: int | None
+    eventrades: int | None
+    fills: list[FillPayload]
+    closed_trades: list[ClosedTradePayload]
+    order_intents: list[OrderIntentPayload]
+    risk_rules: list[RiskRulePayload]
+    execution_mode: str
+    broker_authority: str
+    params: dict[str, object]
+    params_metadata: dict[str, object]
+    diagnostics: list[dict[str, object]]
+    snapshots: list[SnapshotPayload]
+
+
 @dataclass(frozen=True, slots=True)
 class BacktestReport:
     schema_version: str
@@ -67,19 +203,19 @@ class BacktestReport:
     wintrades: int | None
     losstrades: int | None
     eventrades: int | None
-    fills: list[dict[str, object]]
-    closed_trades: list[dict[str, object]]
-    order_intents: list[dict[str, object]]
-    risk_rules: list[dict[str, object]]
+    fills: list[FillPayload]
+    closed_trades: list[ClosedTradePayload]
+    order_intents: list[OrderIntentPayload]
+    risk_rules: list[RiskRulePayload]
     execution_mode: str = "intent_only"
     broker_authority: str = "backtest_engine"
     params: dict[str, object] = field(default_factory=dict)
     params_metadata: dict[str, object] = field(default_factory=dict)
     diagnostics: list[dict[str, object]] = field(default_factory=list)
-    snapshots: list[dict[str, object]] = field(default_factory=list)
+    snapshots: list[SnapshotPayload] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+    def to_dict(self) -> BacktestReportPayload:
+        return cast(BacktestReportPayload, asdict(self))
 
     def write_json(self, path: str | Path) -> None:
         Path(path).write_text(
@@ -235,7 +371,7 @@ def build_backtest_report(
         params=extract_strategy_params(strategy_instance),
         params_metadata=extract_params_metadata(strategy_instance),
         diagnostics=list(runtime.config.diagnostics),
-        snapshots=[asdict(snapshot) for snapshot in snapshots],
+        snapshots=[_snapshot_to_payload(snapshot) for snapshot in snapshots],
     )
 
 
@@ -316,20 +452,102 @@ def _resolve_strategy_callback(
     )
 
 
-def _fill_to_dict(fill: Fill | object) -> dict[str, object]:
-    return asdict(cast(Any, fill))
+def _fill_to_dict(fill: Fill) -> FillPayload:
+    return {
+        "order_id": fill.order_id,
+        "direction": fill.direction,
+        "qty": fill.qty,
+        "price": fill.price,
+        "commission": fill.commission,
+        "bar_index": fill.bar_index,
+        "time": fill.time,
+        "kind": fill.kind,
+        "fill_source": fill.fill_source,
+    }
 
 
-def _trade_to_dict(trade: Trade | object) -> dict[str, object]:
-    return asdict(cast(Any, trade))
+def _trade_to_dict(trade: Trade) -> ClosedTradePayload:
+    return {
+        "entry_id": trade.entry_id,
+        "direction": trade.direction,
+        "entry_time": trade.entry_time,
+        "entry_bar_index": trade.entry_bar_index,
+        "entry_price": trade.entry_price,
+        "exit_time": trade.exit_time,
+        "exit_bar_index": trade.exit_bar_index,
+        "exit_price": trade.exit_price,
+        "qty": trade.qty,
+        "commission": trade.commission,
+        "profit": trade.profit,
+        "profit_percent": trade.profit_percent,
+        "exit_reason": trade.exit_reason,
+        "fill_source": trade.fill_source,
+        "max_runup": trade.max_runup,
+        "max_drawdown": trade.max_drawdown,
+        "commission_entry": trade.commission_entry,
+        "commission_exit": trade.commission_exit,
+    }
 
 
-def _order_to_dict(order: Order) -> dict[str, object]:
-    return asdict(order)
+def _order_to_dict(order: Order) -> OrderIntentPayload:
+    return {
+        "id": order.id,
+        "direction": order.direction,
+        "qty": order.qty,
+        "qty_percent": order.qty_percent,
+        "type": order.type,
+        "kind": order.kind,
+        "limit": order.limit,
+        "stop": order.stop,
+        "profit": order.profit,
+        "loss": order.loss,
+        "from_entry": order.from_entry,
+        "parent_exit_id": order.parent_exit_id,
+        "bracket_group": order.bracket_group,
+        "oca_name": order.oca_name,
+        "oca_type": order.oca_type,
+        "created_bar_index": order.created_bar_index,
+        "created_time": order.created_time,
+        "status": order.status,
+        "filled_qty": order.filled_qty,
+        "fill_price": order.fill_price,
+        "fill_source": order.fill_source,
+        "source_map": order.source_map,
+        "comment": order.comment,
+        "immediate": order.immediate,
+        "default_qty_price": order.default_qty_price,
+        "default_qty_equity": order.default_qty_equity,
+        "trail_activation": order.trail_activation,
+        "trail_offset": order.trail_offset,
+        "trail_stop": order.trail_stop,
+        "trail_active": order.trail_active,
+    }
 
 
-def _risk_rule_to_dict(rule: RiskRule) -> dict[str, object]:
-    return asdict(rule)
+def _risk_rule_to_dict(rule: RiskRule) -> RiskRulePayload:
+    return {
+        "name": rule.name,
+        "value": rule.value,
+        "value_type": rule.value_type,
+        "direction": rule.direction,
+    }
+
+
+def _snapshot_to_payload(snapshot: BacktestSnapshot) -> SnapshotPayload:
+    return {
+        "bar_index": snapshot.bar_index,
+        "time": snapshot.time,
+        "close": snapshot.close,
+        "order_intents_count": snapshot.order_intents_count,
+        "risk_rules_count": snapshot.risk_rules_count,
+        "equity": snapshot.equity,
+        "netprofit": snapshot.netprofit,
+        "openprofit": snapshot.openprofit,
+        "position_size": snapshot.position_size,
+        "position_avg_price": snapshot.position_avg_price,
+        "fills_count": snapshot.fills_count,
+        "closedtrades": snapshot.closedtrades,
+    }
 
 
 def _ledger_float_or_none(strategy: StrategyContext, name: str) -> float | None:
