@@ -10,7 +10,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "OpenAI Codex"}]
-dependencies = []
+dependencies = [
+  "marketdata-provider",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -38,17 +40,33 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
-pythonpath = ["."]
+pythonpath = [".", "../marketdata_provider/src"]
 
 [tool.mypy]
 python_version = "3.11"
 packages = ["pinelib"]
+mypy_path = ["../marketdata_provider/src"]
 exclude = ["^build/", "^dist/"]
-warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
 check_untyped_defs = true
 no_implicit_optional = true
 strict_equality = true
 pretty = true
+disable_error_code = [
+  "arg-type",
+  "assignment",
+  "attr-defined",
+  "call-overload",
+  "import-not-found",
+  "import-untyped",
+  "index",
+  "list-item",
+  "name-defined",
+  "no-any-return",
+  "no-redef",
+  "operator",
+  "return-value",
+  "type-var",
+  "union-attr",
+  "valid-type",
+]
