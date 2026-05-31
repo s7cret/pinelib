@@ -6,9 +6,9 @@ import subprocess
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
-ROOT = Path(__file__).resolve().parent.parent
-
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
+
+ROOT = Path(__file__).resolve().parent.parent
 
 VERSION_SLUG = PACKAGE_VERSION.replace(".", "_")
 MANIFEST_PATH = ROOT / f"RELEASE_MANIFEST_v{VERSION_SLUG}.json"
