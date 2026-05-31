@@ -15,9 +15,9 @@ def _to_scalar(value: Any) -> Any:
 def pine_isclose(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
     if is_na(left) or is_na(right):
         return False
-    l = _to_scalar(left)
-    r = _to_scalar(right)
-    return abs(float(l) - float(r)) <= epsilon
+    left_value = _to_scalar(left)
+    right_value = _to_scalar(right)
+    return abs(float(left_value) - float(right_value)) <= epsilon
 
 
 def pine_eq(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
@@ -33,30 +33,30 @@ def pine_ne(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
 def pine_gt(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
     if is_na(left) or is_na(right):
         return False
-    l = _to_scalar(left)
-    r = _to_scalar(right)
-    return float(l) > float(r) + epsilon
+    left_value = _to_scalar(left)
+    right_value = _to_scalar(right)
+    return float(left_value) > float(right_value) + epsilon
 
 
 def pine_gte(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
     if is_na(left) or is_na(right):
         return False
-    l = _to_scalar(left)
-    r = _to_scalar(right)
-    return float(l) >= float(r) - epsilon
+    left_value = _to_scalar(left)
+    right_value = _to_scalar(right)
+    return float(left_value) >= float(right_value) - epsilon
 
 
 def pine_lt(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
     if is_na(left) or is_na(right):
         return False
-    l = _to_scalar(left)
-    r = _to_scalar(right)
-    return float(l) < float(r) - epsilon
+    left_value = _to_scalar(left)
+    right_value = _to_scalar(right)
+    return float(left_value) < float(right_value) - epsilon
 
 
 def pine_lte(left: Any, right: Any, *, epsilon: float = DEFAULT_EPSILON) -> bool:
     if is_na(left) or is_na(right):
         return False
-    l = _to_scalar(left)
-    r = _to_scalar(right)
-    return float(l) <= float(r) + epsilon
+    left_value = _to_scalar(left)
+    right_value = _to_scalar(right)
+    return float(left_value) <= float(right_value) + epsilon

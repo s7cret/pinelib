@@ -150,7 +150,7 @@ def test_lookahead_off_early_child_bars_return_previous_d_close() -> None:
     Chart bars are 60min: [0, 3600000, 7200000].
     Bar 0 (time=0): D0 not finalized (chart_close=599999 < D0.close=3599999) → NA
     Bar 1 (time=3600000): D0 finalized, returns 100.0
-    Bar 2 (time=7200000): D0 not finalized (7200000 >= D0.close=3599999 but chart_bar.time < D1.time?), D1 finalized → returns 200.0
+    Bar 2 (time=7200000): D0 not finalized, D1 finalized → returns 200.0
     With lookahead_off, bar 2 should NOT return D1 (current) but D0 (previous).
     """
     chart = _bars([0, 3600000, 7200000], 3600000)
@@ -163,16 +163,18 @@ def test_lookahead_off_early_child_bars_return_previous_d_close() -> None:
     # Bar 0: first 60min of first 120min → NA (120min not finalized)
     assert is_na(result[0]), f"bar[0] expected NA, got {result[0]}"
     # Bar 1: first 120min finalized → 100.0
-    assert not is_na(result[1]), f"bar[1] should not be NA"
+    assert not is_na(result[1]), "bar[1] should not be NA"
     assert float(result[1]) == pytest.approx(100.0), f"bar[1] expected 100.0, got {result[1]}"
     # Bar 2: falls in second 120min period, but lookahead_off → D0 confirmed, D1 not
     # D0: chart_close=7919999 >= D0.close=3599999 → TRUE, chart_bar.time=7200000 >= D0.time=0 → TRUE
     #     chart_bar.time < D1.time? 7200000 < 3600000? FALSE → D0 doesn't match
-    # D1: chart_close=10799999 >= D1.close=7199999 → TRUE, chart_bar.time=7200000 >= D1.time=3600000 → TRUE
+    # D1: close/time checks pass for requested D1, so it matches value=200.0.
     #     next=None → in_current_htf_period=TRUE → D1 matches, value=200.0
     # BUT D1 is current (not finalized), so should return fallback=100.0
-    assert not is_na(result[2]), f"bar[2] should not be NA (fallback from D0)"
-    assert float(result[2]) == pytest.approx(100.0), f"bar[2] expected 100.0 (fallback), got {result[2]}"
+    assert not is_na(result[2]), "bar[2] should not be NA (fallback from D0)"
+    assert float(result[2]) == pytest.approx(100.0), (
+        f"bar[2] expected 100.0 (fallback), got {result[2]}"
+    )
 
 
 def test_lookahead_off_last_child_bar_returns_current_d_close() -> None:
@@ -206,11 +208,13 @@ def test_lookahead_off_last_child_bar_returns_current_d_close() -> None:
         values, requested_bars=requested, chart_bars=chart, gaps="barmerge.gaps_off"
     )
     # Bar 3 (first child of D2, D2 not finalized): should return D1's value (200.0)
-    # D1: chart_close=11999999 >= 7199999 → TRUE, 10800000 >= 3600000 → TRUE, 10800000 < 7200000 → TRUE → D1 matches
-    # D2: chart_close=11999999 >= 10799999 → TRUE, 10800000 >= 7200000 → TRUE → D2 matches, value=300.0
+    # D1: close/time checks pass, so D1 matches.
+    # D2: close/time checks pass later, so D2 overwrites with value=300.0.
     # D2 (later) overwrites → result=300.0
-    assert not is_na(result[3]), f"bar[3] should not be NA"
-    assert float(result[3]) == pytest.approx(300.0), f"bar[3] expected 300.0 (later HTF overwrites), got {result[3]}"
+    assert not is_na(result[3]), "bar[3] should not be NA"
+    assert float(result[3]) == pytest.approx(300.0), (
+        f"bar[3] expected 300.0 (later HTF overwrites), got {result[3]}"
+    )
 
 
 def test_lookahead_off_next_day_first_child_uses_confirmed_value() -> None:
@@ -222,7 +226,11 @@ def test_lookahead_off_next_day_first_child_uses_confirmed_value() -> None:
     d0_close = 79861.01
     d1_close = 80905.52
     d2_close = 81447.01
-    d_bars = _bars([1777852800000, 1777939200000, 1778025600000, 1778112000000], 86400000, [d0_close, d1_close, d2_close, 80006.0])
+    d_bars = _bars(
+        [1777852800000, 1777939200000, 1778025600000, 1778112000000],
+        86400000,
+        [d0_close, d1_close, d2_close, 80006.0],
+    )
     d_vals = [d0_close, d1_close, d2_close, 80006.0]
 
     # 15m chart: 20 bars from May 5 20:00 to May 6 01:00
@@ -237,7 +245,9 @@ def test_lookahead_off_next_day_first_child_uses_confirmed_value() -> None:
     # Bars 16-19 (00:00-01:00 May 6): D1 is now confirmed → all return D1 close
     for i in range(16, 20):
         assert not is_na(result[i]), f"bar[{i}] should not be NA"
-        assert float(result[i]) == pytest.approx(d1_close), f"bar[{i}] expected {d1_close}, got {result[i]}"
+        assert float(result[i]) == pytest.approx(d1_close), (
+            f"bar[{i}] expected {d1_close}, got {result[i]}"
+        )
 
 
 def test_lookahead_off_close_history_does_not_regress() -> None:
@@ -259,13 +269,13 @@ def test_lookahead_off_close_history_does_not_regress() -> None:
     # Bar 0: first 60min of first 120min bar → NA (120min not finalized)
     assert is_na(result[0]), f"bar[0] expected NA, got {result[0]}"
     # Bar 1: within first 120min → 100.0
-    assert not is_na(result[1]), f"bar[1] should not be NA"
+    assert not is_na(result[1]), "bar[1] should not be NA"
     assert float(result[1]) == pytest.approx(100.0), f"bar[1] expected 100.0, got {result[1]}"
     # Bar 2: fallback from bar[1]'s last finalized → 100.0
-    assert not is_na(result[2]), f"bar[2] should not be NA (fallback from bar[1])"
+    assert not is_na(result[2]), "bar[2] should not be NA (fallback from bar[1])"
     assert float(result[2]) == pytest.approx(100.0), f"bar[2] expected 100.0, got {result[2]}"
     # Bar 3: within second 120min → 200.0
-    assert not is_na(result[3]), f"bar[3] should not be NA"
+    assert not is_na(result[3]), "bar[3] should not be NA"
     assert float(result[3]) == pytest.approx(200.0), f"bar[3] expected 200.0, got {result[3]}"
 
 

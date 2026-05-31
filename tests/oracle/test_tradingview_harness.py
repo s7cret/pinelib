@@ -9,8 +9,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-import pytest
-
 from pinelib import ta
 from pinelib.core.bar import Bar
 from pinelib.core.na import is_na, na

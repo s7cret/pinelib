@@ -13,7 +13,7 @@ Ref: pine-strategy-parity skill, bug #10.
 
 from __future__ import annotations
 
-from pinelib import PineRuntime, SymbolInfo, TimeframeInfo, Bar, ta
+from pinelib import Bar, PineRuntime, SymbolInfo, TimeframeInfo, ta
 
 
 def _runtime() -> PineRuntime:
@@ -38,9 +38,11 @@ def _bar(index: int, close: float) -> Bar:
 # _history scalar preservation
 # ---------------------------------------------------------------------------
 
+
 def test_history_scalar_nonzero_offset_returns_scalar() -> None:
     """_history(50, 1) must return 50, not na."""
     from pinelib.ta import _history
+
     result = _history(50, 1, "test")
     assert result == 50, f"Expected 50, got {result!r}"
 
@@ -48,6 +50,7 @@ def test_history_scalar_nonzero_offset_returns_scalar() -> None:
 def test_history_scalar_zero_offset_returns_scalar() -> None:
     """_history(50, 0) must return 50."""
     from pinelib.ta import _history
+
     result = _history(50, 0, "test")
     assert result == 50
 
@@ -55,6 +58,7 @@ def test_history_scalar_zero_offset_returns_scalar() -> None:
 def test_history_zero_scalar_offset_one() -> None:
     """_history(0, 1) must return 0, not na."""
     from pinelib.ta import _history
+
     result = _history(0, 1, "test")
     assert result == 0, f"Expected 0, got {result!r}"
 
@@ -62,6 +66,7 @@ def test_history_zero_scalar_offset_one() -> None:
 def test_history_negative_scalar_offset() -> None:
     """_history(-99, 1) must return -99."""
     from pinelib.ta import _history
+
     result = _history(-99, 1, "test")
     assert result == -99, f"Expected -99, got {result!r}"
 
@@ -69,6 +74,7 @@ def test_history_negative_scalar_offset() -> None:
 # ---------------------------------------------------------------------------
 # crossover/crossunder with scalar threshold (series vs scalar)
 # ---------------------------------------------------------------------------
+
 
 def test_crossover_series_crosses_above_scalar() -> None:
     """crossover([49, 51], 50) -> True at bar 1.
@@ -181,6 +187,7 @@ def test_crossunder_scalar_exact_boundary_no_cross() -> None:
 # series-vs-series crossover still works (no regression)
 # ---------------------------------------------------------------------------
 
+
 def test_crossover_series_vs_series_still_works() -> None:
     """crossover between two series must still work after the scalar fix."""
     runtime = _runtime()
@@ -224,6 +231,7 @@ def test_crossunder_series_vs_series_still_works() -> None:
 def test_history_series_at_offset_still_works() -> None:
     """For a real series, _history at offset>0 must still return previous bar value."""
     from pinelib.ta import _history
+
     runtime = _runtime()
     s = runtime.series("close", "float")
 

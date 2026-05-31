@@ -12,7 +12,9 @@ def test_runtime_checkpoint_restores_realtime_tick_bar_and_series_current() -> N
     rt = _runtime()
     rt.begin_bar(Bar(time=0, open=10, high=10, low=10, close=10, volume=1, time_close=60))
     rt.end_bar()
-    rt.begin_realtime_bar(Bar(time=60, open=11, high=11, low=11, close=11, volume=1, time_close=120))
+    rt.begin_realtime_bar(
+        Bar(time=60, open=11, high=11, low=11, close=11, volume=1, time_close=120)
+    )
     checkpoint = rt.export_state()
 
     rt.update_realtime_tick(TickUpdate(price=15, volume=5, time=90))

@@ -1,7 +1,8 @@
 """Targeted test for Series.__getitem__ off-by-one after end_bar()."""
+
 from typing import cast
 
-from pinelib import Bar, PineRuntime, RuntimeConfig, SymbolInfo, TimeframeInfo, na
+from pinelib import Bar, PineRuntime, RuntimeConfig, SymbolInfo, TimeframeInfo
 
 
 def _runtime() -> PineRuntime:
@@ -16,7 +17,7 @@ def test_series_getitem_after_end_bar_returns_previous_not_current():
     """
     At bar N (during execution): series[1] must return bar N-1's committed value.
     After end_bar(N): series[1] must STILL return bar N-1's committed value.
-    
+
     Bug: if _between_bars is True after end_bar, series[1] incorrectly returns
     the value from 2 bars ago (index = len-1-1 instead of len-1).
     """
@@ -34,7 +35,9 @@ def test_series_getitem_after_end_bar_returns_previous_not_current():
     # DURING bar 1: series[1] should be bar 0's close = 1.5
     assert cast(float, rt.close[1]) == 1.5, f"during bar: close[1]={rt.close[1]}, expected 1.5"
     assert rt.close._between_bars is False, "during bar: _between_bars should be False"
-    assert len(rt.close._history) == 1, f"during bar: history len={len(rt.close._history)}, expected 1"
+    assert len(rt.close._history) == 1, (
+        f"during bar: history len={len(rt.close._history)}, expected 1"
+    )
 
     # NOW end bar 1
     rt.end_bar()
@@ -43,7 +46,9 @@ def test_series_getitem_after_end_bar_returns_previous_not_current():
     # series[1] should STILL be bar 0's close = 1.5
     # (series[0] is now the current/uncommitted state, series[1] is bar 0)
     assert rt.close._between_bars is True, "after end_bar: _between_bars should be True"
-    assert len(rt.close._history) == 2, f"after end_bar: history len={len(rt.close._history)}, expected 2"
+    assert len(rt.close._history) == 2, (
+        f"after end_bar: history len={len(rt.close._history)}, expected 2"
+    )
 
     # This is the critical assertion - should be 1.5 (bar 0), not bar 1's value
     result = rt.close[1]
@@ -88,7 +93,10 @@ def test_series_getitem_offset_2_after_end_bar():
 
     r1 = cast(float, rt.close[1])
     r2 = cast(float, rt.close[2])
-    assert r1 == 2.5, f"AFTER end_bar: close[1]={r1}, expected 2.5 (bar1). _between_bars={rt.close._between_bars}, len={len(rt.close._history)}"
+    assert r1 == 2.5, (
+        f"AFTER end_bar: close[1]={r1}, expected 2.5 (bar1). "
+        f"_between_bars={rt.close._between_bars}, len={len(rt.close._history)}"
+    )
     assert r2 == 1.5, f"AFTER end_bar: close[2]={r2}, expected 1.5 (bar0)"
 
 

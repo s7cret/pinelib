@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 import json
 from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.skip(
-    reason="legacy PineLib generated-strategy backtest tests; strategy fills and reports now belong to BacktestEngine"
+    reason=(
+        "legacy PineLib generated-strategy backtest tests; strategy fills and reports "
+        "now belong to BacktestEngine"
+    )
 )
 
 from pinelib import (
@@ -102,9 +106,15 @@ def test_next_bar_market_fill_is_visible_to_strategy_pass() -> None:
 
     generated = CloseSeesClosedTrades()
     strategy = StrategyContext(process_orders_on_close=False)
-    run_generated_strategy(generated, runtime(), strategy, bars() + [
-        Bar(BASE + 10_800_000, 16, 17, 15, 16, 100, BASE + 14_399_999),
-    ])
+    run_generated_strategy(
+        generated,
+        runtime(),
+        strategy,
+        bars()
+        + [
+            Bar(BASE + 10_800_000, 16, 17, 15, 16, 100, BASE + 14_399_999),
+        ],
+    )
 
     assert generated.closed_seen[-1] == (3, 1)
     assert generated.closed_changes == [(3, 1.0)]

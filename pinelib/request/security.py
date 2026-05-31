@@ -36,7 +36,9 @@ def _provider_get_bars(
         params = {}
     extra = getattr(getattr(runtime, "config", None), "extra", {}) or {}
     if "exchange" in params:
-        kwargs["exchange"] = extra.get("exchange") or getattr(runtime.syminfo, "exchange", None) or "binance"
+        kwargs["exchange"] = (
+            extra.get("exchange") or getattr(runtime.syminfo, "exchange", None) or "binance"
+        )
     if "market" in params:
         kwargs["market"] = extra.get("market_type") or extra.get("market") or "spot"
     return get_bars(symbol, timeframe, start, end, **kwargs)
@@ -121,7 +123,6 @@ def merge_requested_series_to_chart_bars(
         raise PineRequestError(f"Unsupported request.security lookahead mode: {lookahead}")
 
     merged: list[Any] = []
-    last_value: Any = na
     last_finalized_value: Any = na
     for chart_bar in chart_bars:
         value: Any = na
@@ -157,8 +158,6 @@ def merge_requested_series_to_chart_bars(
         if value is na and gaps == "barmerge.gaps_off":
             # Use last finalized value (last confirmed HTF bar close)
             value = last_finalized_value
-        elif value is not na:
-            last_value = value
         merged.append(value if value is not na else last_finalized_value)
     return merged
 
@@ -289,7 +288,9 @@ def security(
             cache["requested_values"] = requested_values
         child = cache.get("child")
         if child is None:
-            child = runtime.spawn_child_context(symbol=symbol, timeframe=timeframe, namespace=state_id)
+            child = runtime.spawn_child_context(
+                symbol=symbol, timeframe=timeframe, namespace=state_id
+            )
             child.request_depth = runtime.request_depth + 1
             cache["child"] = child
         expression = expression_callable
@@ -297,7 +298,7 @@ def security(
             raise PineRequestError(
                 "request.security expression must be callable or a value sequence"
             )
-        for bar in requested_bars[len(requested_values):]:
+        for bar in requested_bars[len(requested_values) :]:
             child.begin_bar(bar)
             requested_values.append(expression(child))
             child.end_bar()
@@ -318,7 +319,6 @@ def security(
     if index < 0 or index >= len(merged):
         return na
     return merged[index]
-
 
 
 def _bar_close_time(bar: Bar) -> int:

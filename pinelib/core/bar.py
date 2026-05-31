@@ -58,7 +58,9 @@ def to_contract_bar(
     time_close = bar.time_close
     if time_close is None:
         if timeframe.duration_ms is None:
-            raise PineDataFormatError("Bar.time_close is required for non-fixed-duration timeframes")
+            raise PineDataFormatError(
+                "Bar.time_close is required for non-fixed-duration timeframes"
+            )
         time_close = bar.time + timeframe.duration_ms - 1
 
     try:

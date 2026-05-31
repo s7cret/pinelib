@@ -61,7 +61,7 @@ class TestCalculateMTFPrehistoryStart:
             warmup_bars=250,
             include_previous_confirmed=True,
         )
-        
+
         # Should be approximately 251 days before
         diff_days = (target_start - prehistory_start) / 86_400_000
         assert 250 <= diff_days <= 252  # Allow for day boundary alignment
@@ -75,7 +75,7 @@ class TestCalculateMTFPrehistoryStart:
             warmup_bars=250,
             include_previous_confirmed=False,
         )
-        
+
         diff_days = (target_start - prehistory_start) / 86_400_000
         assert 249 <= diff_days <= 251
 
@@ -88,7 +88,7 @@ class TestCalculateMTFPrehistoryStart:
             warmup_bars=1,
             include_previous_confirmed=True,
         )
-        
+
         diff_days = (target_start - prehistory_start) / 86_400_000
         assert 1 <= diff_days <= 2
 
@@ -101,7 +101,7 @@ class TestCalculateMTFPrehistoryStart:
             warmup_bars=10,
             include_previous_confirmed=True,
         )
-        
+
         # 11 hours of prehistory (10 + 1 for previous confirmed)
         diff_hours = (target_start - prehistory_start) / 3_600_000
         assert 10 <= diff_hours <= 12
@@ -115,7 +115,7 @@ class TestMTFPrehistoryIntegration:
         # Create chart bars starting in the middle of a D period
         # May 5 20:00 is in May 5 D period (May 5 00:00 to May 5 23:59)
         chart_start = 1778011200000  # May 5 20:00
-        
+
         # Create chart bars
         chart_bars = [
             Bar(
@@ -129,7 +129,7 @@ class TestMTFPrehistoryIntegration:
             )
             for i in range(10)
         ]
-        
+
         # Create D bars - May 4 and May 5
         may4_d = Bar(
             time=1777852800000,  # May 4 00:00
@@ -140,7 +140,7 @@ class TestMTFPrehistoryIntegration:
             close=79861.01,
             volume=10000,
         )
-        
+
         may5_d = Bar(
             time=1777939200000,  # May 5 00:00
             time_close=1778025599999,  # May 5 23:59
@@ -150,15 +150,17 @@ class TestMTFPrehistoryIntegration:
             close=80905.52,
             volume=12000,
         )
-        
-        provider = InMemoryDataProvider({
-            ("BINANCE:BTCUSDT", "15"): chart_bars,
-            ("BINANCE:BTCUSDT", "D"): [may4_d, may5_d],
-        })
-        
+
+        provider = InMemoryDataProvider(
+            {
+                ("BINANCE:BTCUSDT", "15"): chart_bars,
+                ("BINANCE:BTCUSDT", "D"): [may4_d, may5_d],
+            }
+        )
+
         # Query D bars
         d_bars = provider.get_bars("BINANCE:BTCUSDT", "D", start=None, end=chart_start)
-        
+
         # Should include May 4 D bar (previous confirmed)
         # Should include May 5 D bar (current, not finalized)
         assert len(d_bars) >= 1
@@ -206,7 +208,7 @@ class TestMTFPrehistoryIntegration:
                 volume=10000,
             ),
         ]
-        
+
         chart_bars = [
             Bar(
                 time=1778011200000,
@@ -218,18 +220,20 @@ class TestMTFPrehistoryIntegration:
                 volume=100,
             )
         ]
-        
-        provider = InMemoryDataProvider({
-            ("BINANCE:BTCUSDT", "15"): chart_bars,
-            ("BINANCE:BTCUSDT", "D"): d_bars,
-        })
-        
+
+        provider = InMemoryDataProvider(
+            {
+                ("BINANCE:BTCUSDT", "15"): chart_bars,
+                ("BINANCE:BTCUSDT", "D"): d_bars,
+            }
+        )
+
         # Query D bars
         d_bars_result = provider.get_bars("BINANCE:BTCUSDT", "D", start=None, end=1778011200000)
-        
+
         # Should have 4 D bars
         assert len(d_bars_result) == 4
-        
+
         # For close: need at least 1 previous D bar (May 4 or earlier)
         # For close[1]: need 2 previous D bars (May 3 or earlier)
         # With 4 D bars including up to May 6, we have enough for close[1]
@@ -241,17 +245,17 @@ class TestMTFWarmup250:
     def test_250_warmup_includes_previous_bar(self):
         """warmup_bars=250 with include_previous_confirmed=True gives 251+ bars."""
         target_start = 1778011200000  # May 5 20:00
-        
+
         prehistory_start = calculate_mtf_prehistory_start(
             target_start,
             requested_timeframe="D",
             warmup_bars=250,
             include_previous_confirmed=True,
         )
-        
+
         # Calculate how many D bars we'd get
         days_span = (target_start - prehistory_start) / 86_400_000
-        
+
         # Should be at least 250 (251 if previous confirmed)
         assert days_span >= 250
 
@@ -264,7 +268,7 @@ class TestMTFWarmup250:
             warmup_bars=250,
             include_previous_confirmed=True,
         )
-        
+
         assert warmup.warmup_bars >= 250
 
     def test_250_warmup_enough_for_rsi(self):
@@ -274,6 +278,6 @@ class TestMTFWarmup250:
             warmup_bars=250,
             include_previous_confirmed=True,
         )
-        
+
         assert warmup.warmup_bars >= 14  # RSI needs at least 14
         assert warmup.warmup_bars >= 250  # But 250 is recommended for stability

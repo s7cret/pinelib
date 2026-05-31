@@ -1,5 +1,5 @@
-from pinelib.ta.moving_average import alma, ema, hma, rma, sma, swma, vwma, wma
 from pinelib.ta.momentum import change, cmo, macd, mom, roc, rsi, tsi
+from pinelib.ta.moving_average import alma, ema, hma, rma, sma, swma, vwma, wma
 from pinelib.ta.statistics import (
     barssince,
     correlation,

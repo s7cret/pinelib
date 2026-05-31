@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 from typing import cast
 
 import pytest

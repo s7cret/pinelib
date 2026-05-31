@@ -75,8 +75,6 @@ def test_overnight_session_is_supported() -> None:
     assert runtime.timefunc.time_close(runtime=runtime) == bar.time_close
 
 
-import pytest  # noqa: E402
-
 from pinelib.errors import PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC  # noqa: E402
 
 

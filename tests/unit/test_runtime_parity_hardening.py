@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 import pytest
 
 pytestmark = pytest.mark.skip(
-    reason="legacy PineLib broker parity tests; fills, margin enforcement, and equity now belong to BacktestEngine"
+    reason=(
+        "legacy PineLib broker parity tests; fills, margin enforcement, and equity "
+        "now belong to BacktestEngine"
+    )
 )
 
 from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo, na
@@ -131,14 +135,17 @@ def test_request_security_missing_provider_fails_closed_without_null_provider() 
     with pytest.raises(PineRequestError, match="requires runtime.data_provider"):
         security("TEST:AAA", "60", [1.0], runtime=runtime, state_id="htf")
 
-    assert security(
-        "TEST:AAA",
-        "60",
-        [1.0],
-        runtime=runtime,
-        state_id="htf-ignore",
-        ignore_invalid_symbol=True,
-    ) is na
+    assert (
+        security(
+            "TEST:AAA",
+            "60",
+            [1.0],
+            runtime=runtime,
+            state_id="htf-ignore",
+            ignore_invalid_symbol=True,
+        )
+        is na
+    )
 
 
 def test_nested_request_security_rejects_with_diagnostic() -> None:

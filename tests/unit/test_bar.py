@@ -1,9 +1,9 @@
 import pytest
+from marketdata_provider.contracts import InstrumentKey, parse_timeframe
+from marketdata_provider.contracts.bar import Bar as ContractBar
 
 from pinelib import Bar, PineDataFormatError
 from pinelib.core.bar import from_contract_bar, to_contract_bar
-from marketdata_provider.contracts import InstrumentKey, parse_timeframe
-from marketdata_provider.contracts.bar import Bar as ContractBar
 
 
 def test_bar_validates_ohlc_relationships() -> None:

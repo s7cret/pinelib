@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pinelib.core.na import is_na, na
+from pinelib.core.na import na
 from pinelib.errors import PineNAError
 
 

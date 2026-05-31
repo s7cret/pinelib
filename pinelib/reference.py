@@ -20,7 +20,9 @@ class PineArray(Generic[T]):
 
     # Factory methods for array.new_float, array.new_int, etc.
     @classmethod
-    def new_float(cls, initial: float | None = None, max_size: int | None = None) -> PineArray[float]:
+    def new_float(
+        cls, initial: float | None = None, max_size: int | None = None
+    ) -> PineArray[float]:
         arr = cls()
         if initial is not None:
             arr._values = [initial]
@@ -71,6 +73,7 @@ class PineArray(Generic[T]):
     def shift(self, index: int = 0) -> T:
         if index >= len(self._values):
             from pinelib.core.na import NA
+
             return NA  # type: ignore[return-value]
         return self._values[index]
 

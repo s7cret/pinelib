@@ -62,7 +62,7 @@ def test_htf_bar_opens_before_chart_start_with_previous_bar() -> None:
     # May 5 D bar is included (overlaps chart)
     # At 20:00: May 5 D not finalized -> returns May 4 D close = 79861.01
     result = security("TEST:AAA", "D", [b.close for b in d_bars], runtime=rt, state_id="test1")
-    assert not is_na(result), f"Expected May 4 D close (79861.01), got NA"
+    assert not is_na(result), "Expected May 4 D close (79861.01), got NA"
     assert float(result) == pytest.approx(79861.01)
 
 
@@ -80,7 +80,7 @@ def test_htf_bar_at_last_child_returns_current_close() -> None:
     rt.begin_bar(chart[0])
     # At 23:45: May 5 D is finalized -> returns May 5 D close = 80905.52
     result = security("TEST:AAA", "D", [b.close for b in d_bars], runtime=rt, state_id="test2")
-    assert not is_na(result), f"Expected May 5 D close (80905.52), got NA"
+    assert not is_na(result), "Expected May 5 D close (80905.52), got NA"
     assert float(result) == pytest.approx(80905.52)
 
 
@@ -120,7 +120,9 @@ def test_p4_mtf_overlap_scenario() -> None:
     # Chart: 15m bar at May 5 20:00
     chart = _bars([1778011200000], 900000, [81606.35])
 
-    provider = InMemoryDataProvider({("BINANCE:BTCUSDT", "15"): chart, ("BINANCE:BTCUSDT", "D"): d_bars})
+    provider = InMemoryDataProvider(
+        {("BINANCE:BTCUSDT", "15"): chart, ("BINANCE:BTCUSDT", "D"): d_bars}
+    )
     rt = PineRuntime(
         SymbolInfo("BINANCE:BTCUSDT", timezone="UTC"),
         TimeframeInfo.from_string("15"),
@@ -130,6 +132,8 @@ def test_p4_mtf_overlap_scenario() -> None:
 
     rt.begin_bar(chart[0])
     # At bar 0 (20:00): May 5 D not finalized -> returns May 4 D close
-    result = security("BINANCE:BTCUSDT", "D", [b.close for b in d_bars], runtime=rt, state_id="p4_test")
-    assert not is_na(result), f"P4 scenario: Expected 79861.01, got NA"
+    result = security(
+        "BINANCE:BTCUSDT", "D", [b.close for b in d_bars], runtime=rt, state_id="p4_test"
+    )
+    assert not is_na(result), "P4 scenario: Expected 79861.01, got NA"
     assert float(result) == pytest.approx(79861.01)

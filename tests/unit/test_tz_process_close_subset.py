@@ -1,9 +1,19 @@
 import pytest
 
-from pinelib import Bar, PineRuntime, RuntimeConfig, StrategyContext, SymbolInfo, TimeframeInfo
+from pinelib import (
+    Bar,
+    PineRuntime,
+    RuntimeConfig,
+    StrategyContext,
+    SymbolInfo,
+    TimeframeInfo,
+)
 
 pytestmark = pytest.mark.skip(
-    reason="legacy PineLib process-orders-on-close tests; order execution now belongs to BacktestEngine"
+    reason=(
+        "legacy PineLib process-orders-on-close tests; order execution now belongs "
+        "to BacktestEngine"
+    )
 )
 
 

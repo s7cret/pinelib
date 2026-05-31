@@ -19,7 +19,7 @@ class TestCmoRollingMode:
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         rolling_results = []
         for c in close_vals:
@@ -32,15 +32,16 @@ class TestCmoRollingMode:
         rolling_non_na = [r for r in rolling_results if not is_na(r)]
         batch_non_na = [r for r in batch_result if not is_na(r)]
         assert rolling_non_na and batch_non_na, "Both should have non-na values"
-        assert abs(rolling_non_na[-1] - batch_non_na[-1]) < 1e-6, \
+        assert abs(rolling_non_na[-1] - batch_non_na[-1]) < 1e-6, (
             f"Rolling {rolling_non_na[-1]} != batch {batch_non_na[-1]}"
+        )
 
     def test_cmo_does_not_iterate_series(self):
         """CMO in runtime mode should not call list() on the Series."""
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         # 10 bars, CMO length=4
         for i in range(10):
@@ -58,7 +59,7 @@ class TestCmoRollingMode:
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         close_vals = [100.0, 105.0, 103.0, 108.0, 106.0]
         length = 4
@@ -90,7 +91,7 @@ class TestTsiRollingMode:
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         for c in close_vals:
             bar = Bar(time=0, open=c, high=c, low=c, close=c, volume=1000.0)
@@ -113,7 +114,7 @@ class TestTsiRollingMode:
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         # Need 30+ bars for TSI(13, 25)
         for i in range(30):
@@ -130,7 +131,7 @@ class TestTsiRollingMode:
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         short_len, long_len = 13, 25
         close_vals = [100.0 + i * 0.5 for i in range(long_len + 5)]
@@ -164,7 +165,7 @@ class TestTsiRollingMode:
         runtime = PineRuntime(
             SymbolInfo("TEST", mintick=0.01),
             TimeframeInfo.from_string("15"),
-            config=RuntimeConfig(strict_tv_parity=False)
+            config=RuntimeConfig(strict_tv_parity=False),
         )
         for c in close_vals:
             bar = Bar(time=0, open=c, high=c, low=c, close=c, volume=1000.0)

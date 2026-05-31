@@ -1,7 +1,11 @@
+# ruff: noqa: E402
 import pytest
 
 pytestmark = pytest.mark.skip(
-    reason="legacy PineLib broker-emulator tests; fills and intrabar execution now belong to BacktestEngine"
+    reason=(
+        "legacy PineLib broker-emulator tests; fills and intrabar execution now "
+        "belong to BacktestEngine"
+    )
 )
 
 from pinelib import (

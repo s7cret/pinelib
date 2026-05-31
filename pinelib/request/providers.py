@@ -3,7 +3,7 @@ from __future__ import annotations
 import bisect
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol
 
 from pinelib.core.bar import Bar
 from pinelib.errors import PineDataFormatError

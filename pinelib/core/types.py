@@ -27,7 +27,9 @@ class SymbolInfo:
     exchange: str | None = None
     prefix: str | None = None
     description: str | None = None
-    type: str = "stock"  # security type: stock, futures, index, forex, crypto, cfd, loan, fund, warrant, struct, bond, right, fund_managed
+    # TradingView syminfo.type value: stock, futures, index, forex, crypto,
+    # cfd, loan, fund, warrant, struct, bond, right, fund_managed.
+    type: str = "stock"
     basecurrency: str | None = None
     currency: str | None = None
     pointvalue: float = 1.0
@@ -67,7 +69,9 @@ class TimeframeInfo:
         isseconds = False
         # Pine numeric timeframe strings are minutes even when a shared marketdata
         # parser normalizes "60" to an hour-sized duration.
-        isminutes = normalized.isdigit() or (parsed.unit == "minute" if parsed is not None else False)
+        isminutes = normalized.isdigit() or (
+            parsed.unit == "minute" if parsed is not None else False
+        )
         isdaily = parsed.unit == "day" if parsed is not None else normalized.endswith("D")
         isweekly = parsed.unit == "week" if parsed is not None else normalized.endswith("W")
         ismonthly = parsed.unit == "month" if parsed is not None else normalized == "M"

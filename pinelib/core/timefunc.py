@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -10,7 +10,6 @@ from pinelib.core.types import parse_timeframe_to_ms
 from pinelib.errors import (
     PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC,
     PineSessionError,
-    PineUnsupportedFeatureError,
 )
 
 if TYPE_CHECKING:
@@ -132,7 +131,11 @@ class TimeFunctions:
         tf_ms = parse_timeframe_to_ms(timeframe)
         if tf_ms is None or tf_ms <= 0:
             return False
-        prev = runtime.chart_bars[runtime.bar_index - 1] if runtime.bar_index - 1 < len(runtime.chart_bars) else None
+        prev = (
+            runtime.chart_bars[runtime.bar_index - 1]
+            if runtime.bar_index - 1 < len(runtime.chart_bars)
+            else None
+        )
         if prev is None:
             return True
         return int(prev.time // tf_ms) != int(runtime.current_bar.time // tf_ms)
@@ -250,7 +253,8 @@ class TimeFunctions:
         ):
             return True
         message = (
-            f"time()/time_close() requested timeframe {timeframe!r}, but PineLib v1.0.1 only supports "
+            f"time()/time_close() requested timeframe {timeframe!r}, "
+            "but PineLib v1.0.1 only supports "
             "None or the active chart timeframe; non-chart timeframe aggregation is unsupported"
         )
         runtime.config.emit_diagnostic(
@@ -299,17 +303,17 @@ class TimeFunctions:
         second: int = 0,
     ) -> int:
         """Convert timestamp components (per-bar runtime values) to Unix milliseconds."""
-        from datetime import timezone as tz_module
         # Clamp year to valid datetime range; out-of-range year would crash datetime()
         if not (1 <= year <= 9999):
             from pinelib.core.na import na as NA
+
             return NA
-        tz_map = {"UTC": tz_module.utc}
+        tz_map = {"UTC": UTC}
         tz = tz_map.get(timezone_str)
         if tz is None:
             try:
                 tz = ZoneInfo(timezone_str)
             except (KeyError, ZoneInfoNotFoundError):
-                tz = tz_module.utc
+                tz = UTC
         dt = datetime(year, month, day, hour, minute, second, tzinfo=tz)
         return int(dt.timestamp() * 1000)

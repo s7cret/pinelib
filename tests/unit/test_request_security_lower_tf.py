@@ -72,7 +72,15 @@ def test_security_lower_tf_expression_hint_reads_bar_fields_without_child_runtim
     chart = _bars([0], 3_600_000)
     ltf = [
         Bar(time=0, time_close=59_999, open=10.0, high=11.0, low=9.0, close=10.5, volume=100.0),
-        Bar(time=60_000, time_close=119_999, open=20.0, high=21.0, low=19.0, close=20.5, volume=200.0),
+        Bar(
+            time=60_000,
+            time_close=119_999,
+            open=20.0,
+            high=21.0,
+            low=19.0,
+            close=20.5,
+            volume=200.0,
+        ),
     ]
     provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "1"): ltf})
     rt = _runtime(provider)
@@ -224,6 +232,8 @@ def test_security_lower_tf_intrabar_provider_explicit_empty_preload_returns_empt
     )
     rt.begin_bar(chart[0])
 
-    arr = security_lower_tf("TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf")
+    arr = security_lower_tf(
+        "TEST:BBB", "1", lambda child: child.close[0], runtime=rt, state_id="ltf"
+    )
 
     assert list(arr) == []

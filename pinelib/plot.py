@@ -21,11 +21,12 @@ def _snapshot_plot_value(value: Any) -> Any:
 @dataclass(slots=True)
 class PlotRecord:
     """A single plot() call recorded for one bar."""
-    bar_time: int       # Unix milliseconds
+
+    bar_time: int  # Unix milliseconds
     bar_index: int
-    name: str           # 'plot'
-    value: Any          # evaluated numeric value
-    title: str          # plot title / column name
+    name: str  # 'plot'
+    value: Any  # evaluated numeric value
+    title: str  # plot title / column name
     kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -36,22 +37,24 @@ class PlotRecorder:
     for the data window / exported chart data.
     """
 
-    __slots__ = ('_records', '_from_time', '_to_time')
+    __slots__ = ("_records", "_from_time", "_to_time")
 
     def __init__(self) -> None:
-        object.__setattr__(self, '_records', [])
-        object.__setattr__(self, '_from_time', None)
-        object.__setattr__(self, '_to_time', None)
+        object.__setattr__(self, "_records", [])
+        object.__setattr__(self, "_from_time", None)
+        object.__setattr__(self, "_to_time", None)
 
     def set_time_window(self, from_time: int | None = None, to_time: int | None = None) -> None:
         """Restrict recorded plot calls to an inclusive timestamp window."""
-        object.__setattr__(self, '_from_time', from_time)
-        object.__setattr__(self, '_to_time', to_time)
+        object.__setattr__(self, "_from_time", from_time)
+        object.__setattr__(self, "_to_time", to_time)
 
     def _in_time_window(self, bar_time: int) -> bool:
         from_time = self._from_time
         to_time = self._to_time
-        return (from_time is None or bar_time >= from_time) and (to_time is None or bar_time <= to_time)
+        return (from_time is None or bar_time >= from_time) and (
+            to_time is None or bar_time <= to_time
+        )
 
     def record(
         self,
@@ -64,14 +67,16 @@ class PlotRecorder:
     ) -> None:
         if not self._in_time_window(bar_time):
             return
-        self._records.append(PlotRecord(
-            bar_time=bar_time,
-            bar_index=bar_index,
-            name=name,
-            value=_snapshot_plot_value(value),
-            title=title,
-            kwargs=kwargs or {},
-        ))
+        self._records.append(
+            PlotRecord(
+                bar_time=bar_time,
+                bar_index=bar_index,
+                name=name,
+                value=_snapshot_plot_value(value),
+                title=title,
+                kwargs=kwargs or {},
+            )
+        )
 
     def record_plot(
         self,
@@ -81,7 +86,7 @@ class PlotRecorder:
         title: str,
     ) -> None:
         """Fast-path for plot() calls: no dataclass, just a tuple.
-        
+
         Format: (bar_time, bar_index, value, title)
         This saves ~2.8μs per call vs PlotRecord dataclass.
         """
@@ -91,7 +96,7 @@ class PlotRecorder:
 
     def get_records(self) -> list[PlotRecord]:
         """Return all recorded plot calls in order.
-        
+
         Note: may contain tuples (fast-path) or PlotRecord objects.
         Callers should check with isinstance(r, PlotRecord).
         """

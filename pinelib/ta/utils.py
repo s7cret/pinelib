@@ -87,6 +87,7 @@ class _ShiftedSeries:
 def shifted_series(source: SupportsSeriesLike, offset: int) -> _ShiftedSeries:
     return _ShiftedSeries(source, offset)
 
+
 __all__ = [
     "_history",
     "hl2_series",

@@ -33,4 +33,5 @@ def cum(source: Any, *, runtime: PineRuntime | None = None, state_id: str | None
     val = _current(source, "cum") if hasattr(source, "current") else source
     return state.update(val)
 
+
 __all__ = ["cci", "cum", "mfi", "obv", "stoch", "vwap"]

@@ -76,14 +76,9 @@ class Series(Generic[T]):
         if history_len == 0:
             return False if self.dtype == "bool" else na
 
-        if self._between_bars:
-            # Between bars: _history has the just-committed value as the last element.
-            # _current == _history[-1] (same value, not yet overwritten by next begin_bar).
-            # Use -1 offset to skip the committed value.
-            index = history_len - offset - 1
-        else:
-            # During bar: _history has previous bars. _current is for the current bar.
-            index = history_len - offset
+        # Between bars: _history has the just-committed value as the last element.
+        # During bar: _history has previous bars and _current is for the current bar.
+        index = history_len - offset - 1 if self._between_bars else history_len - offset
 
         if index < 0:
             return False if self.dtype == "bool" else na
@@ -100,54 +95,54 @@ class Series(Generic[T]):
         return left, right
 
     def __add__(self, other: object) -> object:
-        l, r = self._scalar(other)
-        return l + r
+        left, right = self._scalar(other)
+        return left + right
 
     def __radd__(self, other: object) -> object:
         return self.__add__(other)
 
     def __sub__(self, other: object) -> object:
-        l, r = self._scalar(other)
-        return l - r
+        left, right = self._scalar(other)
+        return left - right
 
     def __rsub__(self, other: object) -> object:
-        l, r = self._scalar(other)
-        return r - l
+        left, right = self._scalar(other)
+        return right - left
 
     def __mul__(self, other: object) -> object:
-        l, r = self._scalar(other)
-        return l * r
+        left, right = self._scalar(other)
+        return left * right
 
     def __rmul__(self, other: object) -> object:
         return self.__mul__(other)
 
     def __truediv__(self, other: object) -> object:
-        l, r = self._scalar(other)
-        return l / r
+        left, right = self._scalar(other)
+        return left / right
 
     def __rtruediv__(self, other: object) -> object:
-        l, r = self._scalar(other)
-        return r / l
+        left, right = self._scalar(other)
+        return right / left
 
     def __neg__(self) -> object:
         return -self._current
 
     def __lt__(self, other: object) -> bool:
-        l, r = self._scalar(other)
-        return l < r
+        left, right = self._scalar(other)
+        return left < right
 
     def __le__(self, other: object) -> bool:
-        l, r = self._scalar(other)
-        return l <= r
+        left, right = self._scalar(other)
+        return left <= right
 
     def __gt__(self, other: object) -> bool:
-        l, r = self._scalar(other)
-        return l > r
+        left, right = self._scalar(other)
+        return left > right
 
     def __ge__(self, other: object) -> bool:
-        l, r = self._scalar(other)
-        return l >= r
+        left, right = self._scalar(other)
+        return left >= right
 
     def __eq__(self, other: object) -> bool:
-        l, r = self._scalar(other)
-        return l == r
+        left, right = self._scalar(other)
+        return left == right

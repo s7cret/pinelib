@@ -18,9 +18,9 @@ from pinelib.core.types import (
     TypeInfo,
 )
 from pinelib.errors import PineRuntimeError
+from pinelib.plot import PlotRecorder
 from pinelib.request.providers import DataProvider, IntrabarDataProvider, LowerTfQueryMetadata
 from pinelib.version import RUNTIME_CONTRACT_VERSION
-from pinelib.plot import PlotRecorder
 from pinelib.visual import VisualRecorder
 
 
@@ -41,8 +41,12 @@ class PineRuntime:
     varip_state: dict[str, object] = field(init=False, default_factory=dict)
     strategy: object | None = field(init=False, default=None)
     request_depth: int = field(init=False, default=0)
-    request_security_cache: dict[tuple[object, ...], dict[str, object]] = field(init=False, default_factory=dict)
-    request_lower_tf_cache: dict[tuple[object, ...], list[Bar]] = field(init=False, default_factory=dict)
+    request_security_cache: dict[tuple[object, ...], dict[str, object]] = field(
+        init=False, default_factory=dict
+    )
+    request_lower_tf_cache: dict[tuple[object, ...], list[Bar]] = field(
+        init=False, default_factory=dict
+    )
     request_data_end_ms: int | None = field(init=False, default=None)
     lower_tf_metadata_log: list[LowerTfQueryMetadata] = field(init=False, default_factory=list)
     timefunc: TimeFunctions = field(init=False, default_factory=TimeFunctions)
@@ -237,11 +241,17 @@ class PineRuntime:
         self.barstate = copy.deepcopy(state.get("barstate", BarStateInfo()))
         self.request_depth = int(state.get("request_depth", 0))
         security_cache = state.get("request_security_cache", {})
-        self.request_security_cache = copy.deepcopy(security_cache if isinstance(security_cache, dict) else {})
+        self.request_security_cache = copy.deepcopy(
+            security_cache if isinstance(security_cache, dict) else {}
+        )
         lower_tf_cache = state.get("request_lower_tf_cache", {})
-        self.request_lower_tf_cache = copy.deepcopy(lower_tf_cache if isinstance(lower_tf_cache, dict) else {})
+        self.request_lower_tf_cache = copy.deepcopy(
+            lower_tf_cache if isinstance(lower_tf_cache, dict) else {}
+        )
         request_data_end_ms = state.get("request_data_end_ms")
-        self.request_data_end_ms = int(request_data_end_ms) if request_data_end_ms is not None else None
+        self.request_data_end_ms = (
+            int(request_data_end_ms) if request_data_end_ms is not None else None
+        )
         self.lower_tf_metadata_log = copy.deepcopy(state.get("lower_tf_metadata_log", []))
         self.plot_recorder = copy.deepcopy(state.get("plot_recorder", PlotRecorder()))
         self.visual = copy.deepcopy(state.get("visual", self.visual))

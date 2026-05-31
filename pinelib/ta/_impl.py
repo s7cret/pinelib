@@ -18,10 +18,7 @@ TAValue: TypeAlias = Numeric | object
 
 def _validate_length(length: Any) -> int:
     # Accept Pine input-backed Series (extract scalar from .current)
-    if hasattr(length, 'current'):
-        length = int(length.current)
-    else:
-        length = int(length)
+    length = int(length.current) if hasattr(length, "current") else int(length)
     if isinstance(length, bool) or length <= 0:
         raise PineRuntimeError("TA length must be a positive integer")
     return length
@@ -29,10 +26,7 @@ def _validate_length(length: Any) -> int:
 
 def _current(source: Any, function_name: str) -> Any:
     # Inlined bool rejection: faster than isinstance + function call
-    if isinstance(source, SupportsSeriesLike):
-        value = source[0]
-    else:
-        value = source
+    value = source[0] if isinstance(source, SupportsSeriesLike) else source
     # type() is faster than isinstance for exact type check
     if type(value) is bool:
         raise PineTypeError(f"ta.{function_name}() does not accept bool source values")
@@ -184,7 +178,9 @@ def _bar_token(source: Any) -> tuple[Any, Any]:
     return 0, source
 
 
-def _cached_bar_value(key: tuple[object, ...], token: tuple[Any, Any], factory: Callable[[], Any]) -> Any:
+def _cached_bar_value(
+    key: tuple[object, ...], token: tuple[Any, Any], factory: Callable[[], Any]
+) -> Any:
     cached = _rolling_bar_cache.get(key)
     if cached is not None and cached[0] == token:
         return cached[1]
@@ -245,6 +241,21 @@ def _rolling_extreme(source: Any, length: int, mode: str, *, bars: bool) -> Any:
 
 def _batch_unary(source: Sequence[Any], updater: Callable[[Any], Any]) -> list[Any]:
     return [updater(value) for value in _series_values(source)]
+
+
+def _batch_roc(source: Sequence[Any], length: int) -> list[Any]:
+    values = _series_values(source)
+    result: list[Any] = []
+    for index, current in enumerate(values):
+        if index < length:
+            result.append(na)
+            continue
+        previous = values[index - length]
+        if is_na(current) or is_na(previous) or float(previous) == 0:
+            result.append(na)
+        else:
+            result.append(100.0 * (float(current) - float(previous)) / float(previous))
+    return result
 
 
 def sma(
@@ -309,6 +320,7 @@ class _ModeState:
         if len(self.values) < self.length:
             return na
         from collections import Counter
+
         counts = Counter(self.values)
         return counts.most_common(1)[0][0]
 
@@ -359,7 +371,12 @@ def rma(
 
 
 def tr(
-    *, runtime: PineRuntime | None = None, state_id: str | None = None, high: Any = None, low: Any = None, close: Any = None
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+    high: Any = None,
+    low: Any = None,
+    close: Any = None,
 ) -> Any:
     if runtime is not None:
         high_value = runtime.high[0]
@@ -399,18 +416,23 @@ def _tr_batch_from_close(close: Sequence[Any]) -> list[Any]:
     prev_close: Any = na
     for close_value in close:
         # tr(high=close, low=close, close=prev_close) = abs(close - prev_close)
-        tr_val = abs(float(close_value) - float(prev_close)) if not is_na(prev_close) and not is_na(close_value) else 0.0
+        tr_val = (
+            abs(float(close_value) - float(prev_close))
+            if not is_na(prev_close) and not is_na(close_value)
+            else 0.0
+        )
         out.append(tr_val if tr_val >= 0 else 0.0)
         prev_close = close_value
     return out
 
 
-
 # === Additional state classes for batch-only TA functions ===
+
 
 @dataclass(slots=True)
 class _SarState:
     """State for SAR calculation."""
+
     start: float
     inc: float
     max_val: float
@@ -419,25 +441,25 @@ class _SarState:
     ep: float = 0.0
     sarv: float = 0.0
     first_bar: bool = True
-    
+
     def update(self, high: Any, low: Any) -> Any:
         if is_na(high) or is_na(low):
             return na
         h = float(high)
-        l = float(low)
+        low_value = float(low)
         if self.first_bar:
             self.ep = h
-            self.sarv = l
+            self.sarv = low_value
             self.first_bar = False
             self.af = self.start
             return na
         prev = self.sarv
         self.sarv = prev + self.af * (self.ep - prev)
         if self.long:
-            if l < self.sarv:
+            if low_value < self.sarv:
                 self.long = False
                 self.sarv = self.ep
-                self.ep = l
+                self.ep = low_value
                 self.af = self.start
             elif h > self.ep:
                 self.ep = h
@@ -448,8 +470,8 @@ class _SarState:
                 self.sarv = self.ep
                 self.ep = h
                 self.af = self.start
-            elif l < self.ep:
-                self.ep = l
+            elif low_value < self.ep:
+                self.ep = low_value
                 self.af = min(self.af + self.inc, self.max_val)
         return self.sarv
 
@@ -457,9 +479,10 @@ class _SarState:
 @dataclass(slots=True)
 class _HighestState:
     """State for highest() calculation."""
+
     length: int
     values: deque[float] = field(default_factory=deque)
-    
+
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na
@@ -475,9 +498,10 @@ class _HighestState:
 @dataclass(slots=True)
 class _LowestState:
     """State for lowest() calculation."""
+
     length: int
     values: deque[float] = field(default_factory=deque)
-    
+
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na
@@ -493,6 +517,7 @@ class _LowestState:
 @dataclass(slots=True)
 class _CciState:
     """State for CCI calculation."""
+
     length: int
     typical_prices: deque[float] = field(default_factory=deque)
 
@@ -500,9 +525,9 @@ class _CciState:
         if is_na(high) or is_na(low) or is_na(close):
             return na
         h = float(high)
-        l = float(low)
+        low_value = float(low)
         c = float(close)
-        tp = (h + l + c) / 3.0
+        tp = (h + low_value + c) / 3.0
         self.typical_prices.append(tp)
         if len(self.typical_prices) > self.length:
             self.typical_prices.popleft()
@@ -517,6 +542,7 @@ class _CciState:
 
 class _MfiState:
     """State for MFI (Money Flow Index) calculation."""
+
     __slots__ = ("length", "typical_prices", "raw_mfs", "pos_sum", "neg_sum")
 
     def __init__(self, length: int) -> None:
@@ -561,6 +587,7 @@ class _MfiState:
 @dataclass(slots=True)
 class _CmoState:
     """State for Chande Momentum Oscillator (CMO) calculation."""
+
     length: int
     prev_value: float | None = None
     changes: deque[float] = field(default_factory=deque)
@@ -600,6 +627,7 @@ class _CmoState:
 @dataclass(slots=True)
 class _TsiState:
     """State for True Strength Index (TSI) calculation."""
+
     short_length: int
     long_length: int
     prev_value: float | None = None
@@ -634,13 +662,23 @@ class _TsiState:
         # Double EMA smoothing: first EMA with short_length
         alpha_s = 2.0 / (self.short_length + 1)
         ema_val = momentum if self.ema1 is None else alpha_s * momentum + (1 - alpha_s) * self.ema1
-        ema_abs_val = abs_momentum if self.ema1_abs is None else alpha_s * abs_momentum + (1 - alpha_s) * self.ema1_abs
+        ema_abs_val = (
+            abs_momentum
+            if self.ema1_abs is None
+            else alpha_s * abs_momentum + (1 - alpha_s) * self.ema1_abs
+        )
         self.ema1 = ema_val
         self.ema1_abs = ema_abs_val
         # Second EMA with long_length
         alpha_l = 2.0 / (self.long_length + 1)
-        ema2_val = self.ema1 if self.ema2 is None else alpha_l * self.ema1 + (1 - alpha_l) * self.ema2
-        ema2_abs_val = self.ema1_abs if self.ema2_abs is None else alpha_l * self.ema1_abs + (1 - alpha_l) * self.ema2_abs
+        ema2_val = (
+            self.ema1 if self.ema2 is None else alpha_l * self.ema1 + (1 - alpha_l) * self.ema2
+        )
+        ema2_abs_val = (
+            self.ema1_abs
+            if self.ema2_abs is None
+            else alpha_l * self.ema1_abs + (1 - alpha_l) * self.ema2_abs
+        )
         self.ema2 = ema2_val
         self.ema2_abs = ema2_abs_val
         if self.ema2_abs == 0:
@@ -651,9 +689,10 @@ class _TsiState:
 @dataclass(slots=True)
 class _ObvState:
     """State for OBV calculation."""
+
     prev_close: float | None = None
     obv: float = 0.0
-    
+
     def update(self, close: Any, volume: Any) -> Any:
         if is_na(close) or is_na(volume):
             return na
@@ -674,6 +713,7 @@ class _ObvState:
 @dataclass(slots=True)
 class _HmaState:
     """State for Hull MA calculation."""
+
     length: int
     half_length: int = field(init=False)
     sqrt_length: int = field(init=False)
@@ -682,9 +722,9 @@ class _HmaState:
     results: deque[float] = field(default_factory=deque)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, 'half_length', max(1, self.length // 2))
-        object.__setattr__(self, 'sqrt_length', max(1, int(_py_math.sqrt(self.length))))
-    
+        object.__setattr__(self, "half_length", max(1, self.length // 2))
+        object.__setattr__(self, "sqrt_length", max(1, int(_py_math.sqrt(self.length))))
+
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na
@@ -703,9 +743,13 @@ class _HmaState:
         half_list = list(self.wma_half_vals)
         full_list = list(self.wma_full_vals)
         half_wts = list(range(1, len(half_list) + 1))
-        half_wma = sum(w * v for w, v in zip(half_wts, half_list)) / sum(half_wts) if half_wts else 0
+        half_wma = (
+            sum(w * v for w, v in zip(half_wts, half_list, strict=True)) / sum(half_wts)
+            if half_wts
+            else 0
+        )
         full_wts = list(range(1, len(full_list) + 1))
-        full_wma = sum(w * v for w, v in zip(full_wts, full_list)) / sum(full_wts)
+        full_wma = sum(w * v for w, v in zip(full_wts, full_list, strict=True)) / sum(full_wts)
         raw = 2 * half_wma - full_wma
         self.results.append(raw)
         if len(self.results) > sqrt_n:
@@ -714,17 +758,18 @@ class _HmaState:
             return na
         results_list = list(self.results)
         res_wts = list(range(1, len(results_list) + 1))
-        return sum(w * v for w, v in zip(res_wts, results_list)) / sum(res_wts)
+        return sum(w * v for w, v in zip(res_wts, results_list, strict=True)) / sum(res_wts)
 
 
 @dataclass(slots=True)
 class _WmaState:
     """State for WMA calculation."""
+
     length: int
     values: deque[float] = field(default_factory=deque)
     total: float = 0.0
     weighted_total: float = 0.0
-    
+
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na
@@ -745,12 +790,13 @@ class _WmaState:
 @dataclass(slots=True)
 class _VwmaState:
     """State for VWMA calculation."""
+
     length: int
     values: deque[float] = field(default_factory=deque)
     volumes: deque[float] = field(default_factory=deque)
     weighted_total: float = 0.0
     volume_total: float = 0.0
-    
+
     def update(self, value: Any, volume: Any) -> Any:
         if is_na(value) or is_na(volume):
             return na
@@ -847,7 +893,9 @@ class _CorrelationState:
         deny = sum((y - ym) ** 2 for y in ys)
         if denx == 0 or deny == 0:
             return na
-        return sum((x - xm) * (y - ym) for x, y in zip(xs, ys, strict=True)) / _py_math.sqrt(denx * deny)
+        return sum((x - xm) * (y - ym) for x, y in zip(xs, ys, strict=True)) / _py_math.sqrt(
+            denx * deny
+        )
 
 
 @dataclass(slots=True)
@@ -889,9 +937,10 @@ class _SourceMfiState:
 @dataclass(slots=True)
 class _ChangeState:
     """State for change() calculation."""
+
     length: int
     prev_values: deque[float] = field(default_factory=deque)
-    
+
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na
@@ -907,9 +956,10 @@ class _ChangeState:
 @dataclass(slots=True)
 class _RocState:
     """State for ROC calculation."""
+
     length: int
     prev_values: deque[float] = field(default_factory=deque)
-    
+
     def update(self, value: Any) -> Any:
         if is_na(value):
             return na
@@ -927,6 +977,7 @@ class _RocState:
 
 class _VwapState:
     """State for VWAP calculation."""
+
     __slots__ = ("cumulative_volume", "cumulative_price_volume", "session_key")
 
     def __init__(self) -> None:
@@ -952,7 +1003,6 @@ class _VwapState:
         if self.cumulative_volume == 0:
             return na
         return self.cumulative_price_volume / self.cumulative_volume
-
 
 
 def atr(
@@ -1024,7 +1074,9 @@ def macd(
     return state.update(_current(source, "macd"))
 
 
-def highest(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def highest(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     length = _validate_length(length)
 
     def calc() -> Any:
@@ -1041,7 +1093,9 @@ def highest(source: Any, length: int, *, runtime: PineRuntime | None = None, sta
     return calc()
 
 
-def lowest(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def lowest(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     length = _validate_length(length)
 
     def calc() -> Any:
@@ -1137,7 +1191,9 @@ class _CrossState:
         return bool(result)
 
 
-def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def change(
+    source: Any, length: int = 1, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     length = _validate_length(length)
     current_value = _history(source, 0, "change")
     previous_value = _history(source, length, "change")
@@ -1150,7 +1206,9 @@ def change(source: Any, length: int = 1, *, runtime: PineRuntime | None = None, 
     return float(current_value) - float(previous_value)
 
 
-def crossover(source1: Any, source2: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> bool:
+def crossover(
+    source1: Any, source2: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> bool:
     current_left = _history(source1, 0, "crossover")
     current_right = _history(source2, 0, "crossover")
     if runtime is not None and state_id is not None:
@@ -1167,7 +1225,9 @@ def crossover(source1: Any, source2: Any, *, runtime: PineRuntime | None = None,
     return pine_gt(current_left, current_right) and pine_lte(previous_left, previous_right)
 
 
-def crossunder(source1: Any, source2: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> bool:
+def crossunder(
+    source1: Any, source2: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> bool:
     current_left = _history(source1, 0, "crossunder")
     current_right = _history(source2, 0, "crossunder")
     if runtime is not None and state_id is not None:
@@ -1219,7 +1279,14 @@ def _rolling(source: Sequence[Any], length: int, fn: Callable[[list[Any]], Any])
     return out
 
 
-def stdev(source: Any, length: int, biased: bool = True, *, runtime: Any = None, state_id: str | None = None) -> Any:
+def stdev(
+    source: Any,
+    length: int,
+    biased: bool = True,
+    *,
+    runtime: Any = None,
+    state_id: str | None = None,
+) -> Any:
     length = _validate_length(length)
 
     def calc(win: list[Any]) -> Any:
@@ -1247,7 +1314,14 @@ def stdev(source: Any, length: int, biased: bool = True, *, runtime: Any = None,
     return result
 
 
-def variance(source: Any, length: int, biased: bool = True, *, runtime: Any = None, state_id: str | None = None) -> Any:
+def variance(
+    source: Any,
+    length: int,
+    biased: bool = True,
+    *,
+    runtime: Any = None,
+    state_id: str | None = None,
+) -> Any:
     length = _validate_length(length)
 
     def calc(win: list[Any]) -> Any:
@@ -1299,7 +1373,9 @@ def dev(source: Any, length: int, *, runtime: Any = None, state_id: str | None =
     return result
 
 
-def wma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def wma(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     length = _validate_length(length)
     weights = list(range(1, length + 1))
     denom = sum(weights)
@@ -1320,7 +1396,12 @@ def wma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_i
 
 
 def vwma(
-    source: Any, length: int, volume: Any | None = None, *, runtime: PineRuntime | None = None, state_id: str | None = None
+    source: Any,
+    length: int,
+    volume: Any | None = None,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
 ) -> Any:
     length = _validate_length(length)
     if runtime is not None and volume is None:
@@ -1363,19 +1444,20 @@ def vwma(
     )
 
 
-def hma(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def hma(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     length = _validate_length(length)
     if runtime is None:
         if not isinstance(source, Sequence) or isinstance(source, SupportsSeriesLike):
-            raise PineRuntimeError(
-                "ta.hma() scalar mode is unsupported; use batch series input"
-            )
+            raise PineRuntimeError("ta.hma() scalar mode is unsupported; use batch series input")
         half = max(1, length // 2)
         sqrt_len = max(1, int(_py_math.sqrt(length)))
         w1 = wma(source, half)
         w2 = wma(source, length)
         diff = [
-            na if is_na(a) or is_na(b) else 2 * float(a) - float(b) for a, b in zip(w1, w2, strict=True)
+            na if is_na(a) or is_na(b) else 2 * float(a) - float(b)
+            for a, b in zip(w1, w2, strict=True)
         ]
         return wma(diff, sqrt_len)
     if state_id is None:
@@ -1416,10 +1498,14 @@ def alma(source: Any, length: int, offset: float, sigma: float, floor: bool = Fa
     return calc([_history(source, o, "alma") for o in reversed(range(length))])
 
 
-def bb(source: Any, length: int, mult: float, *, runtime: Any = None, state_id: str | None = None) -> Any:
+def bb(
+    source: Any, length: int, mult: float, *, runtime: Any = None, state_id: str | None = None
+) -> Any:
     # Use runtime path for both sma and stdev so they return scalars consistently.
     # Without runtime: sma/stdev return lists, which breaks generated execution.
-    basis = sma(source, length, runtime=runtime, state_id=f"{state_id}_bb_sma" if state_id else None)
+    basis = sma(
+        source, length, runtime=runtime, state_id=f"{state_id}_bb_sma" if state_id else None
+    )
     sd = stdev(source, length, runtime=runtime, state_id=f"{state_id}_bb_sd" if state_id else None)
     # Unwrap singleton lists that may come from batch paths when runtime is None.
     basis = _unwrap_singleton(basis)
@@ -1428,7 +1514,11 @@ def bb(source: Any, length: int, mult: float, *, runtime: Any = None, state_id: 
     if not isinstance(basis, list) and not isinstance(sd, list):
         if is_na(basis) or is_na(sd):
             return na, na, na
-        return float(basis), float(basis) + float(mult) * float(sd), float(basis) - float(mult) * float(sd)
+        return (
+            float(basis),
+            float(basis) + float(mult) * float(sd),
+            float(basis) - float(mult) * float(sd),
+        )
     # Series/list path
     if isinstance(basis, list) and isinstance(sd, list):
         upper = [
@@ -1444,20 +1534,31 @@ def bb(source: Any, length: int, mult: float, *, runtime: Any = None, state_id: 
     return na, na, na
 
 
-def bbw(source: Any, length: int, mult: float, *, runtime: Any = None, state_id: str | None = None) -> Any:
+def bbw(
+    source: Any, length: int, mult: float, *, runtime: Any = None, state_id: str | None = None
+) -> Any:
     basis, upper, lower = bb(source, length, mult, runtime=runtime, state_id=state_id)
     if isinstance(basis, list):
         return [
-            na if is_na(b) or float(b) == 0 or is_na(u) or is_na(l)
-            else (float(u) - float(l)) / float(b)
-            for b, u, l in zip(basis, upper, lower, strict=True)
+            na
+            if is_na(b) or float(b) == 0 or is_na(u) or is_na(lower_value)
+            else (float(u) - float(lower_value)) / float(b)
+            for b, u, lower_value in zip(basis, upper, lower, strict=True)
         ]
     if is_na(basis) or float(basis) == 0 or is_na(upper) or is_na(lower):
         return na
     return (float(upper) - float(lower)) / float(basis)
 
 
-def stoch(source: Any, high: Any, low: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def stoch(
+    source: Any,
+    high: Any,
+    low: Any,
+    length: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
     length = _validate_length(length)
 
     def calc(src: Any, highs: list[Any], lows: list[Any]) -> Any:
@@ -1510,17 +1611,22 @@ class _DmiState:
         self.rma_dx = _RmaState(self.adx_smoothing)
 
     def update(self, high: Any, low: Any, close: Any) -> tuple[Any, Any, Any]:
-        h, l, c = float(high), float(low), float(close)
+        h = float(high)
+        low_value = float(low)
         if is_na(self.prev_h):
             plus_dm = 0.0
             minus_dm = 0.0
-            tr_val = h - l
+            tr_val = h - low_value
         else:
             up = h - float(self.prev_h)
-            down = float(self.prev_l) - l
+            down = float(self.prev_l) - low_value
             plus_dm = up if up > down and up > 0 else 0.0
             minus_dm = down if down > up and down > 0 else 0.0
-            tr_val = max(h - l, abs(h - float(self.prev_c)), abs(l - float(self.prev_c)))
+            tr_val = max(
+                h - low_value,
+                abs(h - float(self.prev_c)),
+                abs(low_value - float(self.prev_c)),
+            )
         self.prev_h, self.prev_l, self.prev_c = high, low, close
         atr_val = self.rma_tr.update(tr_val)
         plus_rma = self.rma_plus_dm.update(plus_dm)
@@ -1534,7 +1640,16 @@ class _DmiState:
         return di_plus, di_minus, adx_val
 
 
-def dmi(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def dmi(
+    high: Any,
+    low: Any,
+    close: Any,
+    di_length: int,
+    adx_smoothing: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
     if runtime is not None:
         if state_id is None:
             raise PineRuntimeError("ta.dmi() runtime mode requires state_id")
@@ -1590,7 +1705,16 @@ def dmi(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int, *, 
     return plus, minus, rma(dx, adx_smoothing)
 
 
-def adx(high: Any, low: Any, close: Any, di_length: int, adx_smoothing: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def adx(
+    high: Any,
+    low: Any,
+    close: Any,
+    di_length: int,
+    adx_smoothing: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
     return dmi(high, low, close, di_length, adx_smoothing)[2]
 
 
@@ -1608,9 +1732,9 @@ class _SupertrendState:
         if is_na(atr_val):
             return na, 0
         h = float(high)
-        l = float(low)
+        low_value = float(low)
         c = float(close)
-        hl2 = (h + l) / 2
+        hl2 = (h + low_value) / 2
         bub = hl2 + self.factor * float(atr_val)
         blb = hl2 - self.factor * float(atr_val)
         prev_upper = self.upper_band
@@ -1618,8 +1742,16 @@ class _SupertrendState:
         prev_close = self.prev_close
         prev_st = self.prev_st
         pc = float(prev_close) if not is_na(prev_close) else c
-        upper = bub if is_na(prev_upper) or bub < float(prev_upper) or pc > float(prev_upper) else prev_upper
-        lower = blb if is_na(prev_lower) or blb > float(prev_lower) or pc < float(prev_lower) else prev_lower
+        upper = (
+            bub
+            if is_na(prev_upper) or bub < float(prev_upper) or pc > float(prev_upper)
+            else prev_upper
+        )
+        lower = (
+            blb
+            if is_na(prev_lower) or blb > float(prev_lower) or pc < float(prev_lower)
+            else prev_lower
+        )
         if is_na(self.prev_st):
             st = upper
             d = 1
@@ -1637,14 +1769,21 @@ class _SupertrendState:
 
 
 def supertrend(
-    factor: float, atr_period: int, *,
-    runtime: PineRuntime | None = None, state_id: str | None = None,
-    high: Sequence[Any] | None = None, low: Sequence[Any] | None = None, close: Sequence[Any] | None = None
+    factor: float,
+    atr_period: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+    high: Sequence[Any] | None = None,
+    low: Sequence[Any] | None = None,
+    close: Sequence[Any] | None = None,
 ) -> Any:
     if runtime is not None:
         if state_id is None:
             raise PineRuntimeError("ta.supertrend() runtime mode requires state_id")
-        state = _state(runtime, state_id, lambda: _SupertrendState(factor, f"{state_id}:atr"), _SupertrendState)
+        state = _state(
+            runtime, state_id, lambda: _SupertrendState(factor, f"{state_id}:atr"), _SupertrendState
+        )
         atr_val = atr(atr_period, runtime=runtime, state_id=state.atr_state_id)
         st, d = state.update(
             runtime.high.current, runtime.low.current, runtime.close.current, atr_val
@@ -1688,7 +1827,9 @@ def sar(
     start: float = 0.02,
     inc: float = 0.02,
     max_val: float = 0.2,
-    *, runtime: PineRuntime | None = None, state_id: str | None = None,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
 ) -> Any:
     if runtime is not None:
         if state_id is None:
@@ -1781,7 +1922,11 @@ def valuewhen(condition: Any, source: Any, occurrence: int) -> Any:
             state["processed"] = committed
             cv = condition[0]
             if (not is_na(cv)) and bool(cv):
-                return source[0] if occurrence == 0 else (hits[occurrence - 1] if occurrence - 1 < len(hits) else na)
+                return (
+                    source[0]
+                    if occurrence == 0
+                    else (hits[occurrence - 1] if occurrence - 1 < len(hits) else na)
+                )
             return hits[occurrence] if occurrence < len(hits) else na
 
         # Fallback for derived series: pay the history scan once for this bar.
@@ -1912,7 +2057,13 @@ def percentrank(source: Any, length: int) -> Any:
     )
 
 
-def vwap(source: Any, volume: Any | None = None, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def vwap(
+    source: Any,
+    volume: Any | None = None,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
     if runtime is not None:
         if state_id is None:
             raise PineRuntimeError("ta.vwap() runtime mode requires state_id")
@@ -1935,22 +2086,18 @@ def vwap(source: Any, volume: Any | None = None, *, runtime: PineRuntime | None 
         return out
     if volume is None:
         raise PineRuntimeError("ta.vwap() requires volume or runtime")
-    return _VwapState().update(
-        _current(source, "vwap"), _current(volume, "vwap")
-    )
+    return _VwapState().update(_current(source, "vwap"), _current(volume, "vwap"))
 
 
 def mom(
-    source: Any, length: int,
-    *, runtime: PineRuntime | None = None, state_id: str | None = None
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
 ) -> Any:
     """momentum() with optional runtime state tracking."""
     return change(source, length, runtime=runtime, state_id=state_id)
 
 
 def roc(
-    source: Any, length: int,
-    *, runtime: PineRuntime | None = None, state_id: str | None = None
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
 ) -> Any:
     """ROC (Rate of Change) with optional runtime state tracking."""
     length = _validate_length(length)
@@ -2016,10 +2163,19 @@ def falling(source: Any, length: int) -> bool:
     return all(float(values[index]) < float(values[index + 1]) for index in range(length))
 
 
-def cci(source: Any, length: int, *legacy_args: Any, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def cci(
+    source: Any,
+    length: int,
+    *legacy_args: Any,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
     if legacy_args:
         low, close, legacy_length = length, legacy_args[0], legacy_args[1]
-        source = [(float(h) + float(l) + float(c)) / 3 for h, l, c in zip(source, low, close, strict=True)]
+        source = [
+            (float(h) + float(low_value) + float(c)) / 3
+            for h, low_value, c in zip(source, low, close, strict=True)
+        ]
         length = legacy_length
     length = _validate_length(length)
 
@@ -2054,8 +2210,16 @@ def mfi(
     state_id: str | None = None,
 ) -> Any:
     if legacy_args:
-        low, close, legacy_volume, legacy_length = length, legacy_args[0], legacy_args[1], legacy_args[2]
-        source = [(float(h) + float(l) + float(c)) / 3 for h, l, c in zip(source, low, close, strict=True)]
+        low, close, legacy_volume, legacy_length = (
+            length,
+            legacy_args[0],
+            legacy_args[1],
+            legacy_args[2],
+        )
+        source = [
+            (float(h) + float(low_value) + float(c)) / 3
+            for h, low_value, c in zip(source, low, close, strict=True)
+        ]
         volume = legacy_volume
         length = legacy_length
     length = _validate_length(length)
@@ -2108,7 +2272,9 @@ def mfi(
     )
 
 
-def obv(close: Any, volume: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def obv(
+    close: Any, volume: Any, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     out: list[float] = []
     total = 0.0
     prev: Any = na
@@ -2163,7 +2329,9 @@ __all__ += [
 ]
 
 
-def ta_range(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def ta_range(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     """Range = highest(source, length) - lowest(source, length)."""
     if runtime is None:
         vals: list[float] = []
@@ -2186,10 +2354,13 @@ def ta_range(source: Any, length: int, *, runtime: PineRuntime | None = None, st
     hi = highest(source, length, runtime=runtime, state_id=f"{state_id}_h")
     lo = lowest(source, length, runtime=runtime, state_id=f"{state_id}_l")
     from pinelib.core.operators import pine_sub
+
     return pine_sub(hi, lo)
 
 
-def cmo(source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def cmo(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
     """Chande Momentum Oscillator — rolling mode with runtime support."""
     length = _validate_length(length)
     if runtime is None:
@@ -2203,7 +2374,14 @@ def cmo(source: Any, length: int, *, runtime: PineRuntime | None = None, state_i
     return state.update(_current(source, "cmo"))
 
 
-def tsi(source: Any, short_length: int, long_length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
+def tsi(
+    source: Any,
+    short_length: int,
+    long_length: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+) -> Any:
     """True Strength Index — rolling mode with runtime support."""
     short_length = _validate_length(short_length)
     long_length = _validate_length(long_length)
@@ -2249,17 +2427,17 @@ def kc(
         basis_vals = ema(source, length)
         range_vals = ema(tr_vals, length)
         out_basis, out_upper, out_lower = [], [], []
-        for b, r in zip(basis_vals, range_vals):
+        for b, r in zip(basis_vals, range_vals, strict=True):
             if is_na(b) or is_na(r):
                 out_basis.append(na)
                 out_upper.append(na)
                 out_lower.append(na)
             else:
                 u = float(b) + float(r) * mult
-                l = float(b) - float(r) * mult
+                lower_value = float(b) - float(r) * mult
                 out_basis.append(b)
                 out_upper.append(u)
-                out_lower.append(l)
+                out_lower.append(lower_value)
         return (out_basis, out_upper, out_lower)
 
     if state_id is None:
@@ -2275,8 +2453,8 @@ def kc(
     if is_na(b) or is_na(r):
         return (na, na, na)
     u = float(b) + float(r) * mult
-    l = float(b) - float(r) * mult
-    return (b, u, l)
+    lower_value = float(b) - float(r) * mult
+    return (b, u, lower_value)
 
 
 def kcw(
@@ -2295,9 +2473,13 @@ def kcw(
     Returns the normalised width of Keltner Channels as a percentage.
     """
     kc_basis, kc_upper, kc_lower = kc(
-        source, length, mult,
-        usesource=usesource, scaletype=scaletype,
-        runtime=runtime, state_id=state_id,
+        source,
+        length,
+        mult,
+        usesource=usesource,
+        scaletype=scaletype,
+        runtime=runtime,
+        state_id=state_id,
     )
     if is_na(kc_basis) or is_na(kc_upper) or is_na(kc_lower):
         return na
@@ -2309,7 +2491,8 @@ def kcw(
 
 def wpr(length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None) -> Any:
     """
-    Williams %%R: 100 * (close - highest(high, length)) / (highest(high,length) - lowest(low,length))
+    Williams %%R:
+    100 * (close - highest(high, length)) / (highest(high, length) - lowest(low, length))
 
     Simplified form (used in corpus files with just length arg):
     100 * (close - highest(high, length)) / (highest(high, length) - lowest(low, length))
