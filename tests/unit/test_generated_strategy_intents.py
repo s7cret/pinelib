@@ -50,10 +50,17 @@ def test_generated_strategy_runner_records_intents_without_broker_execution() ->
     assert result.report.execution_mode == "intent_only"
     assert result.report.broker_authority == "backtest_engine"
     assert result.report.final_equity is None
+    assert result.report.netprofit is None
+    assert result.report.closedtrades is None
     assert result.report.fills == []
     assert result.report.closed_trades == []
     assert result.report.params == {"qty": 2}
     assert result.report.params_metadata["qty"]["default"] == 2
+    payload = result.report.to_dict()
+    assert payload["order_intents"] == result.report.order_intents
+    assert payload["snapshots"][0]["position_size"] is None
+    assert payload["snapshots"][0]["fills_count"] is None
+    assert payload["snapshots"][0]["closedtrades"] is None
 
     entry_intent, exit_intent, close_intent = result.report.order_intents
     assert entry_intent["id"] == "L"
