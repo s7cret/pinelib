@@ -1550,12 +1550,12 @@ def bbw(
         return [
             na
             if is_na(b) or float(b) == 0 or is_na(u) or is_na(lower_value)
-            else (float(u) - float(lower_value)) / float(b)
+            else 100.0 * (float(u) - float(lower_value)) / float(b)
             for b, u, lower_value in zip(basis, upper, lower, strict=True)
         ]
     if is_na(basis) or float(basis) == 0 or is_na(upper) or is_na(lower):
         return na
-    return (float(upper) - float(lower)) / float(basis)
+    return 100.0 * (float(upper) - float(lower)) / float(basis)
 
 
 def stoch(

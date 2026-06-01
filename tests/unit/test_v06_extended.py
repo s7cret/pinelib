@@ -10,7 +10,7 @@ def test_bb_macd_dmi_extended_helpers() -> None:
     basis, upper, lower = ta.bb(close, 3, 2.0)
     assert basis[-1] == 5.0
     assert upper[-1] > basis[-1] > lower[-1]
-    assert ta.bbw(close, 3, 2.0)[-1] == (upper[-1] - lower[-1]) / basis[-1]
+    assert ta.bbw(close, 3, 2.0)[-1] == 100.0 * (upper[-1] - lower[-1]) / basis[-1]
     macd, signal, hist = ta.macd(close, 2, 4, 3)
     assert len(macd) == len(signal) == len(hist) == len(close)
     plus, minus, adx = ta.dmi([10, 11, 13, 14, 13, 15], [9, 9, 10, 11, 10, 12], close, 3, 3)
