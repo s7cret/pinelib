@@ -28,6 +28,11 @@ def test_math_aliases_propagate_na_and_reject_bool() -> None:
         pine_min(1, True)
 
 
+def test_pine_round_ties_round_up() -> None:
+    assert pine_round(81095.25, 1) == 81095.3
+    assert pine_round(2.5) == 3
+
+
 def test_precision_compare_helpers_are_na_safe() -> None:
     assert pine_isclose(1.0, 1.0 + 1e-11)
     assert pine_eq(1.0, 1.0 + 1e-11)

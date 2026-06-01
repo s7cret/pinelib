@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import math as _math
 from collections.abc import Iterable
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from pinelib.core.na import is_na, na
@@ -105,7 +106,11 @@ def pine_round(value: Any, precision: int | None = None) -> Any:
     _reject_bool(value, "round")
     if is_na(value):
         return na
-    return builtins.round(value) if precision is None else builtins.round(value, precision)
+    quant = Decimal("1") if precision is None else Decimal("1").scaleb(-precision)
+    rounded = Decimal(str(value)).quantize(quant, rounding=ROUND_HALF_UP)
+    if precision is None:
+        return int(rounded)
+    return float(rounded)
 
 
 def round(value: Any, precision: int | None = None) -> Any:
