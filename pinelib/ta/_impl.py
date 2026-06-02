@@ -25,8 +25,10 @@ def _validate_length(length: Any) -> int:
 
 
 def _current(source: Any, function_name: str) -> Any:
-    # Inlined bool rejection: faster than isinstance + function call
-    value = source[0] if isinstance(source, SupportsSeriesLike) else source
+    # Avoid runtime Protocol checks in TA hot loops. request.security evaluates
+    # this path for every child bar, and isinstance(..., Protocol) goes through
+    # typing/inspect machinery.
+    value = source[0] if hasattr(source, "current") and hasattr(source, "__getitem__") else source
     # type() is faster than isinstance for exact type check
     if type(value) is bool:
         raise PineTypeError(f"ta.{function_name}() does not accept bool source values")
