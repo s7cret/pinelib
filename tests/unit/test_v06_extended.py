@@ -55,6 +55,9 @@ def test_string_color_math_helpers() -> None:
     assert string.pos("BINANCE:BTCUSDT", "ETH") is string.na
     c = color.rgb(10, 20, 30, 50)
     assert (color.r(c), color.g(c), color.b(c), color.t(c)) == (10, 20, 30, 50)
+    assert color.lime.to_hex() == "#00ff0000"
+    assert color.aqua.to_hex() == "#00ffff00"
+    assert color.new(color.lime, 25).to_hex() == "#00ff0040"
     assert pine_math.sqrt(9) == 3
     assert pine_math.sign(-2) == -1
     assert pine_math.avg(1, 2, 3) == 2

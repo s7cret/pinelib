@@ -49,7 +49,9 @@ black = rgb(0, 0, 0)
 white = rgb(255, 255, 255)
 red = rgb(255, 0, 0)
 green = rgb(0, 128, 0)
+lime = rgb(0, 255, 0)
 blue = rgb(0, 0, 255)
+aqua = rgb(0, 255, 255)
 yellow = rgb(255, 255, 0)
 orange = rgb(255, 165, 0)
 purple = rgb(128, 0, 128)
@@ -67,7 +69,9 @@ __all__ = [
     "white",
     "red",
     "green",
+    "lime",
     "blue",
+    "aqua",
     "yellow",
     "orange",
     "purple",
