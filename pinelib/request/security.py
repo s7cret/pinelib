@@ -122,44 +122,17 @@ def merge_requested_series_to_chart_bars(
     if lookahead not in {"barmerge.lookahead_on", "barmerge.lookahead_off"}:
         raise PineRequestError(f"Unsupported request.security lookahead mode: {lookahead}")
 
-    merged: list[Any] = []
-    last_finalized_value: Any = na
-    for chart_bar in chart_bars:
-        value: Any = na
-        chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
-        for i, (requested_bar, requested_value) in enumerate(
-            zip(requested_bars, requested_values, strict=True)
-        ):
-            requested_close = (
-                requested_bar.time_close
-                if requested_bar.time_close is not None
-                else requested_bar.time
-            )
-            effective_close = _effective_close_time(requested_bar, requested_bars, i)
-            if lookahead == "barmerge.lookahead_on":
-                if gaps == "barmerge.gaps_on":
-                    matches = chart_bar.time <= requested_bar.time <= chart_close
-                else:
-                    matches = requested_bar.time <= chart_bar.time
-            elif gaps == "barmerge.gaps_on":
-                matches = chart_bar.time <= requested_close <= chart_close
-            else:
-                # lookahead_off, gaps_off: use effective_close for finalization check.
-                # A HTF bar is "finalized" when chart_close >= effective_close.
-                # The "chart_bar.time >= requested_bar.time" check ensures the chart bar
-                # is not before the HTF period started.
-                if chart_close >= effective_close and chart_bar.time >= requested_bar.time:
-                    matches = True
-                    last_finalized_value = requested_value
-                else:
-                    matches = False
-            if matches:
-                value = requested_value
-        if value is na and gaps == "barmerge.gaps_off":
-            # Use last finalized value (last confirmed HTF bar close)
-            value = last_finalized_value
-        merged.append(value if value is not na else last_finalized_value)
-    return merged
+    cache: dict[str, Any] = {}
+    return list(
+        _append_merged_requested_values(
+            cache,
+            requested_bars=requested_bars,
+            requested_values=requested_values,
+            chart_bars=chart_bars,
+            gaps=gaps,
+            lookahead=lookahead,
+        )
+    )
 
 
 def _append_merged_requested_values(
@@ -175,33 +148,78 @@ def _append_merged_requested_values(
     last_value = cache.get("last_value", na)
     last_finalized_value = cache.get("last_finalized_value", na)
     start_index = len(merged)
+
+    requested_times = cache.get("requested_times")
+    requested_closes = cache.get("requested_closes")
+    effective_closes = cache.get("effective_closes")
+    if (
+        not isinstance(requested_times, list)
+        or len(requested_times) != len(requested_bars)
+        or not isinstance(requested_closes, list)
+        or len(requested_closes) != len(requested_bars)
+        or not isinstance(effective_closes, list)
+        or len(effective_closes) != len(requested_bars)
+    ):
+        requested_times = [bar.time for bar in requested_bars]
+        requested_closes = [
+            bar.time_close if bar.time_close is not None else bar.time
+            for bar in requested_bars
+        ]
+        effective_closes = [
+            _effective_close_time(bar, requested_bars, i)
+            for i, bar in enumerate(requested_bars)
+        ]
+        cache["requested_times"] = requested_times
+        cache["requested_closes"] = requested_closes
+        cache["effective_closes"] = effective_closes
+
+    lookahead_on_gaps_off_index = int(cache.get("lookahead_on_gaps_off_index", 0))
+    lookahead_on_gaps_on_index = int(cache.get("lookahead_on_gaps_on_index", 0))
+    lookahead_off_gaps_on_index = int(cache.get("lookahead_off_gaps_on_index", 0))
+    lookahead_off_gaps_off_index = int(cache.get("lookahead_off_gaps_off_index", 0))
+
     for chart_bar in chart_bars[start_index:]:
         value: Any = na
         chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
-        for i, (requested_bar, requested_value) in enumerate(
-            zip(requested_bars, requested_values, strict=True)
-        ):
-            requested_close = (
-                requested_bar.time_close
-                if requested_bar.time_close is not None
-                else requested_bar.time
-            )
-            effective_close = _effective_close_time(requested_bar, requested_bars, i)
-            if lookahead == "barmerge.lookahead_on":
-                if gaps == "barmerge.gaps_on":
-                    matches = chart_bar.time <= requested_bar.time <= chart_close
-                else:
-                    matches = requested_bar.time <= chart_bar.time
-            elif gaps == "barmerge.gaps_on":
-                matches = chart_bar.time <= requested_close <= chart_close
-            else:
-                if chart_close >= effective_close and chart_bar.time >= requested_bar.time:
-                    matches = True
-                    last_finalized_value = requested_value
-                else:
-                    matches = False
-            if matches:
-                value = requested_value
+        if lookahead == "barmerge.lookahead_on" and gaps == "barmerge.gaps_off":
+            while (
+                lookahead_on_gaps_off_index < len(requested_values)
+                and requested_times[lookahead_on_gaps_off_index] <= chart_bar.time
+            ):
+                value = requested_values[lookahead_on_gaps_off_index]
+                last_value = value
+                lookahead_on_gaps_off_index += 1
+            if value is na:
+                value = last_value
+        elif lookahead == "barmerge.lookahead_on":
+            while (
+                lookahead_on_gaps_on_index < len(requested_values)
+                and requested_times[lookahead_on_gaps_on_index] < chart_bar.time
+            ):
+                lookahead_on_gaps_on_index += 1
+            i = lookahead_on_gaps_on_index
+            while i < len(requested_values) and requested_times[i] <= chart_close:
+                value = requested_values[i]
+                i += 1
+        elif gaps == "barmerge.gaps_on":
+            while (
+                lookahead_off_gaps_on_index < len(requested_values)
+                and requested_closes[lookahead_off_gaps_on_index] < chart_bar.time
+            ):
+                lookahead_off_gaps_on_index += 1
+            i = lookahead_off_gaps_on_index
+            while i < len(requested_values) and requested_closes[i] <= chart_close:
+                value = requested_values[i]
+                i += 1
+        else:
+            while (
+                lookahead_off_gaps_off_index < len(requested_values)
+                and requested_times[lookahead_off_gaps_off_index] <= chart_bar.time
+                and effective_closes[lookahead_off_gaps_off_index] <= chart_close
+            ):
+                last_finalized_value = requested_values[lookahead_off_gaps_off_index]
+                value = last_finalized_value
+                lookahead_off_gaps_off_index += 1
         if value is na and gaps == "barmerge.gaps_off":
             value = last_finalized_value
         elif value is not na:
@@ -209,6 +227,10 @@ def _append_merged_requested_values(
         merged.append(value if value is not na else last_finalized_value)
     cache["last_value"] = last_value
     cache["last_finalized_value"] = last_finalized_value
+    cache["lookahead_on_gaps_off_index"] = lookahead_on_gaps_off_index
+    cache["lookahead_on_gaps_on_index"] = lookahead_on_gaps_on_index
+    cache["lookahead_off_gaps_on_index"] = lookahead_off_gaps_on_index
+    cache["lookahead_off_gaps_off_index"] = lookahead_off_gaps_off_index
     return merged
 
 
@@ -456,22 +478,27 @@ def security_lower_tf(
         if _filters_synthetic_empty_bars(runtime):
             selected_bars = [bar for bar in selected_bars if bar.volume != 0]
 
-    metadata = LowerTfQueryMetadata(
-        requested_symbol=symbol,
-        requested_timeframe=timeframe,
-        provider_source=provider_source,
-        state_id=state_id,
-        chart_bar_index=runtime.bar_index + 1,
-        chart_bar_time=runtime.current_bar.time,
-        chart_bar_time_close=runtime.current_bar.time_close,
-        query_start=query_start,
-        query_end=query_end,
-        calc_bars_count=calc_bars_count,
-        requested_bars=len(requested_bars),
-        selected_bars=len(selected_bars),
-        selected_bar_times=tuple(bar.time for bar in selected_bars),
+    record_metadata = bool(
+        getattr(getattr(runtime, "config", None), "extra", {}).get(
+            "record_lower_tf_metadata", True
+        )
     )
-    if hasattr(runtime, "lower_tf_metadata_log"):
+    if record_metadata and hasattr(runtime, "lower_tf_metadata_log"):
+        metadata = LowerTfQueryMetadata(
+            requested_symbol=symbol,
+            requested_timeframe=timeframe,
+            provider_source=provider_source,
+            state_id=state_id,
+            chart_bar_index=runtime.bar_index + 1,
+            chart_bar_time=runtime.current_bar.time,
+            chart_bar_time_close=runtime.current_bar.time_close,
+            query_start=query_start,
+            query_end=query_end,
+            calc_bars_count=calc_bars_count,
+            requested_bars=len(requested_bars),
+            selected_bars=len(selected_bars),
+            selected_bar_times=tuple(bar.time for bar in selected_bars),
+        )
         runtime.lower_tf_metadata_log.append(metadata)
 
     if not selected_bars:

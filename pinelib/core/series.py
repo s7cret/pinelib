@@ -47,6 +47,11 @@ class Series(Generic[T]):
         self._between_bars = False
 
     def commit_current(self) -> None:
+        if self.dtype in {"array", "map", "matrix"} or (
+            self.type_info and not self.type_info.is_history_allowed
+        ):
+            self._history.clear()
+            return
         self._history.append(self._current)
 
     def mark_between_bars(self) -> None:
