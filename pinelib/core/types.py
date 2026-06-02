@@ -34,6 +34,10 @@ class SymbolInfo:
     currency: str | None = None
     pointvalue: float = 1.0
 
+    @property
+    def ticker(self) -> str:
+        return self.tickerid.split(":", 1)[-1]
+
 
 @dataclass(frozen=True, slots=True)
 class TimeframeInfo:

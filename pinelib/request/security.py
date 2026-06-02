@@ -369,6 +369,7 @@ def security_lower_tf(
     state_id: str,
     expression_hint: str | None = None,
     ignore_invalid_symbol: bool = False,
+    ignore_invalid_timeframe: bool = False,
     currency: str | None = None,
     calc_bars_count: int | None = None,
 ) -> PineArray[Any]:
@@ -390,7 +391,7 @@ def security_lower_tf(
     realtime partial intrabars or dynamic remote feeds.
     """
 
-    del currency
+    del currency, ignore_invalid_timeframe
     if calc_bars_count is not None and calc_bars_count < 0:
         raise PineRequestError("request.security_lower_tf calc_bars_count must be non-negative")
     if runtime.request_depth > 0 and not runtime.config.supports_nested_security:
