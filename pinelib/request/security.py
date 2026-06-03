@@ -62,7 +62,8 @@ def _request_start_for_security(runtime: Any, requested_timeframe: str) -> int |
         return chart_start
     extra = getattr(getattr(runtime, "config", None), "extra", {}) or {}
     max_bars_back = int(extra.get("max_bars_back") or 0)
-    preroll_ms = max(requested_ms * 2, chart_ms * max_bars_back)
+    requested_preroll_bars = min(max_bars_back, 500) if max_bars_back else 0
+    preroll_ms = max(requested_ms * 2, requested_ms * requested_preroll_bars)
     start = max(0, chart_start - preroll_ms)
     return (start // requested_ms) * requested_ms
 

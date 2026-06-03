@@ -126,7 +126,29 @@ def test_request_security_uses_chart_max_bars_back_preroll_for_htf_requests() ->
     security("TEST:BBB", "D", lambda child: float(child.close[0]), runtime=rt, state_id="htf")
 
     query = [m for m in provider.metadata_log if m.normalized_symbol == "TEST:BBB"][0]
-    assert query.start == 91 * day
+    assert query.start == 0
+
+
+def test_request_security_caps_max_bars_back_preroll_for_htf_requests() -> None:
+    hour = 3_600_000
+    day = 24 * hour
+    chart_start = 1_000 * day
+    chart = _bars([chart_start], hour)
+    requested = _bars([500 * day, 999 * day, 1_000 * day], day, [1.0, 2.0, 3.0])
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "D"): requested})
+    rt = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(extra={"max_bars_back": 5000}),
+    )
+    rt.request_data_end_ms = 1_001 * day
+
+    rt.begin_bar(chart[0])
+    security("TEST:BBB", "D", lambda child: float(child.close[0]), runtime=rt, state_id="htf")
+
+    query = [m for m in provider.metadata_log if m.normalized_symbol == "TEST:BBB"][0]
+    assert query.start == 500 * day
 
 
 def test_precomputed_values_and_nested_security_diagnostic() -> None:
