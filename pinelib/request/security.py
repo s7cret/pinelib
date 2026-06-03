@@ -60,7 +60,11 @@ def _request_start_for_security(runtime: Any, requested_timeframe: str) -> int |
     chart_ms = getattr(getattr(runtime, "timeframe", None), "interval_ms", None)
     if requested_ms is None or chart_ms is None or requested_ms <= chart_ms:
         return chart_start
-    return max(0, chart_start - (requested_ms * 2))
+    extra = getattr(getattr(runtime, "config", None), "extra", {}) or {}
+    max_bars_back = int(extra.get("max_bars_back") or 0)
+    preroll_ms = max(requested_ms * 2, chart_ms * max_bars_back)
+    start = max(0, chart_start - preroll_ms)
+    return (start // requested_ms) * requested_ms
 
 
 def _filters_synthetic_empty_bars(runtime: Any) -> bool:
