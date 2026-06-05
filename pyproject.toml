@@ -14,6 +14,11 @@ dependencies = [
   "marketdata-provider>=2.18.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/s7cret/pinelib"
+Repository = "https://github.com/s7cret/pinelib"
+Issues = "https://github.com/s7cret/pinelib/issues"
+
 [project.optional-dependencies]
 dev = [
   "black>=25.0.0",
