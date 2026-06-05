@@ -9,17 +9,13 @@ import pytest
 from pinelib import Bar, PineRuntime, SymbolInfo, TimeframeInfo
 from pinelib.core.types import TickUpdate
 
-WORKSPACE = Path(
-    os.environ.get(
-        "OPENCLAW_WORKSPACE",
-        Path(__file__).resolve().parents[3] / "[workspace-root]" / "workspace",
-    )
-)
+WORKSPACE_ENV = os.environ.get("PINELIB_TV_FIXTURE_WORKSPACE")
+WORKSPACE = Path(WORKSPACE_ENV).expanduser() if WORKSPACE_ENV else None
 FIXTURE = (
     WORKSPACE
     / "tv_strategy_oracle/realtime_probe/stage7j_to_9g_next50_2026-04-30"
     / "stage7k_du_sequence_fixture_v3.json"
-)
+) if WORKSPACE else None
 
 
 def _runtime() -> PineRuntime:
@@ -27,7 +23,7 @@ def _runtime() -> PineRuntime:
 
 
 def test_stage7i_boundary_fixture_varip_accumulates_intrabar_and_can_reset_on_new_bar() -> None:
-    if not FIXTURE.exists():
+    if FIXTURE is None or not FIXTURE.exists():
         pytest.skip(f"optional TradingView boundary fixture not found: {FIXTURE}")
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     boundary = next(row for row in data["rows"] if row["timeSec"] == data["boundary"]["timeSec"])
