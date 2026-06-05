@@ -31,8 +31,6 @@ The surrounding OpenPine stack keeps those responsibilities split:
 - `marketdata-provider`: exchange OHLCV loading.
 - `optimizer`: parameter search over backtest runners.
 
-See `docs/BROKER_BOUNDARY.md` for the PineLib and Backtest Engine split.
-
 ## Install
 
 ```bash
@@ -105,20 +103,6 @@ MIT. See `LICENSE`.
 ./scripts/install.sh --dev
 docker compose run --rm pinelib
 ```
-
-For a public GitHub release checklist, see `docs/GITHUB_PUBLICATION.md`.
-
-## Coverage and Limitations
-
-PineLib supports an explicit subset of Pine-compatible runtime behavior. Unsupported or incomplete areas should surface as diagnostics/errors rather than silent approximations.
-
-Start here:
-
-- `docs/BROKER_BOUNDARY.md`
-- `docs/public_api_v1_0_0.md`
-- `docs/semantic_versioning_policy.md`
-- `docs/coverage_map_v1_0_1.md`
-- `docs/migration_v0_9_to_v1_0.md`
 
 ## Acknowledgements
 
