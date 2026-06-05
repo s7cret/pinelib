@@ -91,9 +91,6 @@ python -m compileall pinelib tests scripts
 pytest -q
 mypy pinelib
 python scripts/run_tv_golden_suite.py
-python scripts/build_release.py
-python scripts/check_release_integrity.py RELEASE_MANIFEST_v1_0_1.json --require-head
-python scripts/check_release_artifact_selftest.py pinelib_runtime_v1_0_1.zip
 ```
 
 ## License
@@ -121,7 +118,6 @@ Start here:
 - `docs/coverage_map_v1_0_1.md`
 - `docs/migration_v0_9_to_v1_0.md`
 - `docs/release_checklist_v1_0_0.md`
-- `FINAL_AUDIT_v1.0.1.md`
 
 ## Acknowledgements
 
