@@ -1,0 +1,5 @@
+services:
+  pinelib:
+    build:
+      context: .
+    command: python -m pytest

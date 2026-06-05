@@ -100,6 +100,15 @@ python scripts/check_release_artifact_selftest.py pinelib_runtime_v1_0_1.zip
 
 MIT. See `LICENSE`.
 
+## Installation, Docker, and Publication
+
+```bash
+./scripts/install.sh --dev
+docker compose run --rm pinelib
+```
+
+For a public GitHub release checklist, see `docs/GITHUB_PUBLICATION.md`.
+
 ## Coverage and limitations
 
 v1.0.1 does **not** claim full TradingView parity. Unsupported or incomplete areas are explicit diagnostics/errors, not silent approximations. TradingView oracle-exportable cases are verified under `fixtures/tradingview`; supplied-tick parity is platform-blocked because TradingView exposes no deterministic tick-stream oracle/export.
