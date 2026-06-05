@@ -1,35 +1,37 @@
-# PineLib Runtime v1.0.1
+# PineLib
 
-PineLib is a Python runtime foundation for AST2Python-generated Pine-compatible code.
-v1.0.1 is the current stable release for `runtime_contract_v1.4` / `TZ_01`: the public API surface is reviewed, packaging is typed, release artifacts are reproducible, and known parity limits are documented explicitly.
+PineLib is the Python runtime foundation used by AST2Python-generated Pine-compatible modules. It provides the runtime objects, helper namespaces, diagnostics, and data contracts that generated code needs to execute deterministically in Python.
 
-Stack train metadata: `pain-stack-pine-v6-2026.04-r1`, `pine_language_version=6`, `pine_docs_baseline=2026-04`, `runtime_contract=1.4` (see `RELEASE_STACK_MANIFEST_2026_04_R1.json`). This stack supports a verified Pine v6 subset/oracle snapshot; it does **not** claim full Pine v6 runtime parity. April 2026 language-relevant scope note: UDT collection sorting via `sort_field` for `array.sort`, `array.sort_indices`, and `matrix.sort`; Pine Editor word-wrap is non-runtime UX.
+## What It Supports
 
-## Release scope and stack boundaries
+- Pine-style `Series[T]` history with current vs committed bar semantics.
+- `PineRuntime` bar loop metadata, bar-index/time tracking, inputs, diagnostics, and commit lifecycle.
+- `Bar`, symbol, timeframe, and runtime metadata models with UTC millisecond timestamps.
+- `StrategyContext` order-intent APIs for generated strategies: entry, exit, close, cancel, and risk intent recording.
+- `run_generated_strategy()` for intent-only bar-by-bar execution of generated strategy classes.
+- `DataProvider` and `IntrabarDataProvider` protocols with in-memory helpers.
+- Time/session helpers including `time()` and `time_close()` with timezone-aware behavior.
+- `request.security` foundation with merge modes, child runtime isolation, and explicit diagnostics for unsupported nested behavior.
+- OHLCV CSV loading plus optional Parquet loading when pandas/Parquet dependencies are installed.
+- Pine reference containers: `PineArray`, `PineMap`, and `PineMatrix`.
+- Visual recording scaffolds for generated plot/label/table-style outputs.
+- TA helpers including `sma`, `ema`, `rma`, `rsi`, `macd`, `tr`, `atr`, `highest`, `lowest`, `change`, and crossover/crossunder helpers.
+- Namespace helpers under `pinelib.math`, `pinelib.string`, and `pinelib.color`.
+- Typed package metadata via `py.typed`.
 
-`pinelib` is the runtime foundation used by AST2Python-generated modules. It owns Pine-style series/history behavior, runtime metadata, selected namespace helpers, visual recording scaffolds, data-provider protocols, runtime diagnostics, and a strategy order-intent façade for generated/runtime-local code. It does **not** own final broker/fill/equity authority in the amended 6-package architecture.
+## Boundaries
 
-Backtest Engine and Optimizer are separate packages in the current local stack. `backtest_engine` is the accepted broker/backtest authority; `optimizer` consumes backtest runners through protocol-style boundaries. See `docs/BROKER_BOUNDARY.md` for the explicit PineLib ↔ Backtest Engine split.
+PineLib owns generated-code runtime behavior. It does not parse Pine source, generate Python code, fetch market data from exchanges, optimize strategy parameters, or act as the final broker/fill/equity authority.
 
-Implemented through v1.0.1:
+The surrounding OpenPine stack keeps those responsibilities split:
 
-- contract/version metadata for `pinelib` and runtime contract `1.4`
-- stable reviewed public top-level API surface via `pinelib.__all__`
-- validated `Bar` model with UTC millisecond timestamps
-- `Series[T]` with Pine-compatible current vs committed history semantics
-- `PineRuntime` core loop with built-in bar series registration, commit ownership, recalculation guard scaffold, inputs, metadata, and diagnostics
-- `DataProvider` / `IntrabarDataProvider` protocols and in-memory provider
-- timezone/session-aware `time()` and `time_close()` helpers with IANA DST coverage and explicit unsupported diagnostics for non-chart timeframe aggregation
-- `request.security` foundation with merge modes, child runtime isolation, and explicit nested-request diagnostics
-- StrategyContext order-intent/runtime-local façade with market/limit/stop/stop-limit calls, exit/close/cancel APIs, diagnostics, and legacy local-fixture support; amended broker/equity acceptance belongs to `backtest_engine`
-- bar-by-bar `run_generated_strategy()` helper for generated-like strategy classes using `PineRuntime` + `StrategyContext` to record order/risk intents, not broker fills or equity
-- intent-run snapshots, JSON-safe report schema, golden-compare tolerance utility, strategy/equity compare reports, and optimizer-friendly params metadata capture
-- CSV OHLCV loader plus optional Parquet loader with graceful dependency errors
-- TradingView-exported indicator/trade CSV fixture loaders plus oracle-ready fixture scaffolding; no local fixture is claimed as TradingView-verified without exported evidence
-- visual recorder foundation and reference containers (`PineArray`, `PineMap`, `PineMatrix`)
-- TA helpers: `sma`, `ema`, `rma`, `rsi`, `macd`, `tr`, `atr`, `highest`, `lowest`, `change`, crosses, plus the v0.6 extended helper set
-- namespace helpers: expanded `pinelib.math`, basic `pinelib.string`, and basic `pinelib.color`
-- `py.typed`, mypy strict-ish package gate, release checklist, migration guide, final audit, and performance smoke tests
+- `pine2ast`: Pine source to normalized AST JSON.
+- `ast2python`: AST JSON to Python code targeting PineLib.
+- `backtest_engine`: broker/fill/equity authority for historical backtests.
+- `marketdata-provider`: exchange OHLCV loading.
+- `optimizer`: parameter search over backtest runners.
+
+See `docs/BROKER_BOUNDARY.md` for the PineLib and Backtest Engine split.
 
 ## Install
 
@@ -106,9 +108,9 @@ docker compose run --rm pinelib
 
 For a public GitHub release checklist, see `docs/GITHUB_PUBLICATION.md`.
 
-## Coverage and limitations
+## Coverage and Limitations
 
-v1.0.1 does **not** claim full TradingView parity. Unsupported or incomplete areas are explicit diagnostics/errors, not silent approximations. TradingView oracle-exportable cases are verified under `fixtures/tradingview`; supplied-tick parity is platform-blocked because TradingView exposes no deterministic tick-stream oracle/export.
+PineLib supports an explicit subset of Pine-compatible runtime behavior. Unsupported or incomplete areas should surface as diagnostics/errors rather than silent approximations.
 
 Start here:
 
@@ -117,7 +119,6 @@ Start here:
 - `docs/semantic_versioning_policy.md`
 - `docs/coverage_map_v1_0_1.md`
 - `docs/migration_v0_9_to_v1_0.md`
-- `docs/release_checklist_v1_0_0.md`
 
 ## Acknowledgements
 
