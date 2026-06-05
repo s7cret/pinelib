@@ -12,10 +12,14 @@ from pinelib.core.types import TickUpdate
 WORKSPACE_ENV = os.environ.get("PINELIB_TV_FIXTURE_WORKSPACE")
 WORKSPACE = Path(WORKSPACE_ENV).expanduser() if WORKSPACE_ENV else None
 FIXTURE = (
-    WORKSPACE
-    / "tv_strategy_oracle/realtime_probe/stage7j_to_9g_next50_2026-04-30"
-    / "stage7k_du_sequence_fixture_v3.json"
-) if WORKSPACE else None
+    (
+        WORKSPACE
+        / "tv_strategy_oracle/realtime_probe/stage7j_to_9g_next50_2026-04-30"
+        / "stage7k_du_sequence_fixture_v3.json"
+    )
+    if WORKSPACE
+    else None
+)
 
 
 def _runtime() -> PineRuntime:

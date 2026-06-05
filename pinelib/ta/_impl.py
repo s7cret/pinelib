@@ -1550,9 +1550,11 @@ def bbw(
     basis, upper, lower = bb(source, length, mult, runtime=runtime, state_id=state_id)
     if isinstance(basis, list):
         return [
-            na
-            if is_na(b) or float(b) == 0 or is_na(u) or is_na(lower_value)
-            else 100.0 * (float(u) - float(lower_value)) / float(b)
+            (
+                na
+                if is_na(b) or float(b) == 0 or is_na(u) or is_na(lower_value)
+                else 100.0 * (float(u) - float(lower_value)) / float(b)
+            )
             for b, u, lower_value in zip(basis, upper, lower, strict=True)
         ]
     if is_na(basis) or float(basis) == 0 or is_na(upper) or is_na(lower):

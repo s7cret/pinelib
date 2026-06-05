@@ -406,9 +406,11 @@ class StrategyContext:
             limit=limit,
             stop=stop,
             created_bar_index=self._runtime.bar_index if self._runtime is not None else -1,
-            created_time=self._runtime.current_bar.time
-            if self._runtime is not None and self._runtime.current_bar is not None
-            else None,
+            created_time=(
+                self._runtime.current_bar.time
+                if self._runtime is not None and self._runtime.current_bar is not None
+                else None
+            ),
             comment=comment,
             source_map=source_map,
         )

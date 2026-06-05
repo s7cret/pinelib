@@ -27,4 +27,4 @@ jobs:
       - name: Release script smoke
         run: python scripts/build_release.py
       - name: Release integrity
-        run: python scripts/check_release_integrity.py RELEASE_MANIFEST_v1_0_1.json --require-head
+        run: python scripts/check_release_integrity.py --require-head

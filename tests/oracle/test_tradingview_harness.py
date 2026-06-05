@@ -42,9 +42,9 @@ def _assert_close(
         return
     assert not is_na(actual), f"{row_id} {column}: expected {expected_value!r}, got na"
     assert isinstance(expected_value, float)
-    assert math.isclose(float(actual), expected_value, rel_tol=tolerance, abs_tol=tolerance), (
-        f"{row_id} {column}: expected {expected_value!r}, got {actual!r}"
-    )
+    assert math.isclose(
+        float(actual), expected_value, rel_tol=tolerance, abs_tol=tolerance
+    ), f"{row_id} {column}: expected {expected_value!r}, got {actual!r}"
 
 
 def _assert_columns_close(
@@ -138,15 +138,14 @@ def test_calc_on_every_tick_supplied_ticks_is_platform_blocked_not_pending() -> 
         case for case in _manifest()["cases"] if case["id"] == "calc_on_every_tick_supplied_ticks"
     )
     evidence = json.loads((case_dir / "evidence.json").read_text(encoding="utf-8"))
-    blocked_evidence = (case_dir / "platform_blocked_evidence.md").read_text(encoding="utf-8")
 
     assert case["status"] == "platform_blocked"
     assert evidence["status"] == "platform_blocked"
     assert evidence["candidate_verified"] is False
     assert evidence["oracle_not_applicable"] is True
     assert "No ticks.csv" in evidence["hard_rule_note"]
-    assert "historical bars contain no tick data" in blocked_evidence
-    assert "no deterministic tick stream" in blocked_evidence
+    assert "historical bars contain no tick data" in evidence["last_attempt_summary"][0]
+    assert "not a deterministic supplied synthetic tick stream" in evidence["blocker"]
     assert all(not (case_dir / required_file).exists() for required_file in case["required_files"])
 
 

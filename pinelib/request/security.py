@@ -167,12 +167,10 @@ def _append_merged_requested_values(
     ):
         requested_times = [bar.time for bar in requested_bars]
         requested_closes = [
-            bar.time_close if bar.time_close is not None else bar.time
-            for bar in requested_bars
+            bar.time_close if bar.time_close is not None else bar.time for bar in requested_bars
         ]
         effective_closes = [
-            _effective_close_time(bar, requested_bars, i)
-            for i, bar in enumerate(requested_bars)
+            _effective_close_time(bar, requested_bars, i) for i, bar in enumerate(requested_bars)
         ]
         cache["requested_times"] = requested_times
         cache["requested_closes"] = requested_closes
@@ -484,9 +482,7 @@ def security_lower_tf(
             selected_bars = [bar for bar in selected_bars if bar.volume != 0]
 
     record_metadata = bool(
-        getattr(getattr(runtime, "config", None), "extra", {}).get(
-            "record_lower_tf_metadata", True
-        )
+        getattr(getattr(runtime, "config", None), "extra", {}).get("record_lower_tf_metadata", True)
     )
     if record_metadata and hasattr(runtime, "lower_tf_metadata_log"):
         metadata = LowerTfQueryMetadata(

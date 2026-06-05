@@ -35,9 +35,9 @@ def test_series_getitem_after_end_bar_returns_previous_not_current():
     # DURING bar 1: series[1] should be bar 0's close = 1.5
     assert cast(float, rt.close[1]) == 1.5, f"during bar: close[1]={rt.close[1]}, expected 1.5"
     assert rt.close._between_bars is False, "during bar: _between_bars should be False"
-    assert len(rt.close._history) == 1, (
-        f"during bar: history len={len(rt.close._history)}, expected 1"
-    )
+    assert (
+        len(rt.close._history) == 1
+    ), f"during bar: history len={len(rt.close._history)}, expected 1"
 
     # NOW end bar 1
     rt.end_bar()
@@ -46,9 +46,9 @@ def test_series_getitem_after_end_bar_returns_previous_not_current():
     # series[1] should STILL be bar 0's close = 1.5
     # (series[0] is now the current/uncommitted state, series[1] is bar 0)
     assert rt.close._between_bars is True, "after end_bar: _between_bars should be True"
-    assert len(rt.close._history) == 2, (
-        f"after end_bar: history len={len(rt.close._history)}, expected 2"
-    )
+    assert (
+        len(rt.close._history) == 2
+    ), f"after end_bar: history len={len(rt.close._history)}, expected 2"
 
     # This is the critical assertion - should be 1.5 (bar 0), not bar 1's value
     result = rt.close[1]
