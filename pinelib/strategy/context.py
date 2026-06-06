@@ -205,10 +205,25 @@ class StrategyContext:
         stop: float | None = None,
         *,
         comment: str | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        alert_message: str | None = None,
+        disable_alert: bool | None = None,
         source_map: object | None = None,
     ) -> None:
         self._add_order(
-            id, direction, qty, limit, stop, "entry", comment=comment, source_map=source_map
+            id,
+            direction,
+            qty,
+            limit,
+            stop,
+            "entry",
+            comment=comment,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            alert_message=alert_message,
+            disable_alert=disable_alert,
+            source_map=source_map,
         )
 
     def order(
@@ -246,6 +261,16 @@ class StrategyContext:
         trail_offset: float | None = None,
         *,
         comment: str | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        comment_profit: str | None = None,
+        comment_loss: str | None = None,
+        comment_trailing: str | None = None,
+        alert_message: str | None = None,
+        alert_profit: str | None = None,
+        alert_loss: str | None = None,
+        alert_trailing: str | None = None,
+        disable_alert: bool | None = None,
         source_map: object | None = None,
     ) -> None:
         has_bracket_intent = any(
@@ -261,7 +286,16 @@ class StrategyContext:
         order.from_entry = from_entry
         order.parent_exit_id = id
         order.bracket_group = id if has_bracket_intent else None
-        order.oca_type = "reduce"
+        order.oca_name = oca_name
+        order.oca_type = oca_type or "reduce"
+        order.comment_profit = comment_profit
+        order.comment_loss = comment_loss
+        order.comment_trailing = comment_trailing
+        order.alert_message = alert_message
+        order.alert_profit = alert_profit
+        order.alert_loss = alert_loss
+        order.alert_trailing = alert_trailing
+        order.disable_alert = disable_alert
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
         self.pending_orders.append(order)
@@ -274,6 +308,8 @@ class StrategyContext:
         immediately: bool = False,
         *,
         comment: str | None = None,
+        alert_message: str | None = None,
+        disable_alert: bool | None = None,
         source_map: object | None = None,
     ) -> None:
         order = self._make_order(
@@ -284,6 +320,8 @@ class StrategyContext:
             None,
             "close",
             comment=comment,
+            alert_message=alert_message,
+            disable_alert=disable_alert,
             source_map=source_map,
         )
         order.qty_percent = qty_percent
@@ -370,11 +408,26 @@ class StrategyContext:
         kind: OrderKind,
         *,
         comment: str | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        alert_message: str | None = None,
+        disable_alert: bool | None = None,
         source_map: object | None = None,
     ) -> None:
         self.pending_orders.append(
             self._make_order(
-                id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
+                id,
+                direction,
+                qty,
+                limit,
+                stop,
+                kind,
+                comment=comment,
+                oca_name=oca_name,
+                oca_type=oca_type,
+                alert_message=alert_message,
+                disable_alert=disable_alert,
+                source_map=source_map,
             )
         )
 
@@ -388,6 +441,10 @@ class StrategyContext:
         kind: OrderKind,
         *,
         comment: str | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        alert_message: str | None = None,
+        disable_alert: bool | None = None,
         source_map: object | None = None,
     ) -> Order:
         typ: OrderType = "market"
@@ -410,6 +467,10 @@ class StrategyContext:
             if self._runtime is not None and self._runtime.current_bar is not None
             else None,
             comment=comment,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            alert_message=alert_message,
+            disable_alert=disable_alert,
             source_map=source_map,
         )
 

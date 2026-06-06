@@ -64,6 +64,14 @@ class Order:
     fill_source: str | None = None
     source_map: object | None = None
     comment: str | None = None
+    comment_profit: str | None = None
+    comment_loss: str | None = None
+    comment_trailing: str | None = None
+    alert_message: str | None = None
+    alert_profit: str | None = None
+    alert_loss: str | None = None
+    alert_trailing: str | None = None
+    disable_alert: bool | None = None
     immediate: bool = False
     default_qty_price: float | None = None
     default_qty_equity: float | None = None

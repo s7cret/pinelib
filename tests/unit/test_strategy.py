@@ -33,7 +33,15 @@ def test_strategy_context_records_entry_intent_without_filling() -> None:
     runtime = rt(s)
     runtime.begin_bar(bar(0, 10, 12, 9, 11))
 
-    s.entry("L", "long", comment="signal")
+    s.entry(
+        "L",
+        "long",
+        comment="signal",
+        oca_name="grp",
+        oca_type="cancel",
+        alert_message="entry",
+        disable_alert=False,
+    )
 
     order = s.pending_orders[-1]
     assert (order.id, order.direction, order.qty, order.kind, order.comment) == (
@@ -43,6 +51,10 @@ def test_strategy_context_records_entry_intent_without_filling() -> None:
         "entry",
         "signal",
     )
+    assert order.oca_name == "grp"
+    assert order.oca_type == "cancel"
+    assert order.alert_message == "entry"
+    assert order.disable_alert is False
     with pytest.raises(PineStrategyError, match="records order intents only"):
         s.process_orders_for_bar(runtime=runtime, bar=runtime.current_bar)  # type: ignore[arg-type]
 
@@ -59,8 +71,24 @@ def test_strategy_context_records_exit_close_cancel_intents() -> None:
         profit=2,
         loss=1,
         comment="bracket",
+        oca_name="exit_grp",
+        comment_profit="tp",
+        comment_loss="sl",
+        comment_trailing="trail",
+        alert_message="exit",
+        alert_profit="tp alert",
+        alert_loss="sl alert",
+        alert_trailing="trail alert",
+        disable_alert=True,
     )
-    s.close("L", qty_percent=25, immediately=True, comment="flatten")
+    s.close(
+        "L",
+        qty_percent=25,
+        immediately=True,
+        comment="flatten",
+        alert_message="close",
+        disable_alert=False,
+    )
     s.cancel("XL")
 
     exit_order, close_order = s.pending_orders
@@ -71,7 +99,16 @@ def test_strategy_context_records_exit_close_cancel_intents() -> None:
     assert exit_order.profit == 2
     assert exit_order.loss == 1
     assert exit_order.bracket_group == "XL"
+    assert exit_order.oca_name == "exit_grp"
     assert exit_order.oca_type == "reduce"
+    assert exit_order.comment_profit == "tp"
+    assert exit_order.comment_loss == "sl"
+    assert exit_order.comment_trailing == "trail"
+    assert exit_order.alert_message == "exit"
+    assert exit_order.alert_profit == "tp alert"
+    assert exit_order.alert_loss == "sl alert"
+    assert exit_order.alert_trailing == "trail alert"
+    assert exit_order.disable_alert is True
     assert exit_order.status == "cancelled"
     assert close_order.kind == "close"
     assert close_order.direction is None
@@ -79,6 +116,8 @@ def test_strategy_context_records_exit_close_cancel_intents() -> None:
     assert close_order.qty_percent == 25
     assert close_order.immediate is True
     assert close_order.comment == "flatten"
+    assert close_order.alert_message == "close"
+    assert close_order.disable_alert is False
 
 
 def test_broker_owned_state_requires_strategy_ledger_view() -> None:
