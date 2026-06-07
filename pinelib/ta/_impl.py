@@ -2524,3 +2524,82 @@ def wpr(length: int, *, runtime: PineRuntime | None = None, state_id: str | None
     if hi == lo:
         return na
     return 100.0 * (float(close) - float(hi)) / (float(hi) - float(lo))
+
+
+def ta_max(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    """ta.max — returns the highest value in source over length bars."""
+    return highest(source, length, runtime=runtime, state_id=state_id)
+
+
+def ta_min(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    """ta.min — returns the lowest value in source over length bars."""
+    return lowest(source, length, runtime=runtime, state_id=state_id)
+
+
+def ta_cog(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    """ta.cog — Center of Gravity oscillator.
+    COG = -sum((i+1) * source[i], length) / sum(source[i], length)
+    where i=0 is the most recent bar.
+    """
+    from pinelib.core.na import is_na, na as pine_na
+
+    length = _validate_length(length)
+    numerator = 0.0
+    denominator = 0.0
+    for i in range(length):
+        val = _history(source, i, "ta.cog")
+        if is_na(val):
+            return pine_na
+        weight = float(length - i)
+        numerator += weight * float(val)
+        denominator += float(val)
+    if denominator == 0:
+        return pine_na
+    return -numerator / denominator
+
+
+def ta_rci(
+    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+) -> Any:
+    """ta.rci — Rank Correlation Index.
+    RCI = (1 - 6 * sum(d^2) / (n * (n^2 - 1))) * 100
+    where d = rank_of_time - rank_of_value
+    """
+    from pinelib.core.na import is_na, na as pine_na
+
+    length = _validate_length(length)
+    values: list[float] = []
+    for i in range(length):
+        val = _history(source, i, "ta.rci")
+        if is_na(val):
+            return pine_na
+        values.append(float(val))
+
+    # Time ranks: 0 (most recent) to length-1 (oldest)
+    # Value ranks: rank by value ascending
+    n = length
+    if n < 2:
+        return pine_na
+
+    # Rank values (ascending)
+    indexed = sorted(range(n), key=lambda i: values[i])
+    value_ranks = [0.0] * n
+    for rank, idx in enumerate(indexed):
+        value_ranks[idx] = float(rank + 1)
+
+    # Time ranks: most recent (i=0) gets highest rank
+    time_ranks = [float(n - i) for i in range(n)]
+
+    # Sum of squared differences
+    d_squared_sum = sum((time_ranks[i] - value_ranks[i]) ** 2 for i in range(n))
+
+    denom = n * (n * n - 1)
+    if denom == 0:
+        return pine_na
+    return (1.0 - 6.0 * d_squared_sum / denom) * 100.0

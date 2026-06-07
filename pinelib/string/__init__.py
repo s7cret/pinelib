@@ -76,6 +76,47 @@ def pos(source: str, substr: str, from_pos: int = 0) -> int | float:
     return idx
 
 
+def repeat(source: str, count: int) -> str:
+    if is_na(source) or is_na(count):
+        return na
+    return source * int(count)
+
+
+def trim(source: str) -> str:
+    if is_na(source):
+        return na
+    return source.strip()
+
+
+def format_time(time_ms: int, format: str = "%Y-%m-%dT%H:%M:%S", timezone: str = "UTC") -> str:
+    import datetime
+    if is_na(time_ms):
+        return na
+    try:
+        dt = datetime.datetime.fromtimestamp(time_ms / 1000, tz=datetime.timezone.utc)
+        if timezone != "UTC":
+            import zoneinfo
+            try:
+                tz = zoneinfo.ZoneInfo(timezone)
+                dt = dt.astimezone(tz)
+            except Exception:
+                pass
+        return dt.strftime(format)
+    except Exception:
+        return na
+
+
+def match(source: str, regex: str) -> str:
+    import re
+    if is_na(source) or is_na(regex):
+        return na
+    try:
+        m = re.search(regex, source)
+        return m.group(0) if m else na
+    except Exception:
+        return na
+
+
 __all__ = [
     "tostring",
     "tonumber",
@@ -88,4 +129,8 @@ __all__ = [
     "substring",
     "replace",
     "pos",
+    "repeat",
+    "trim",
+    "format_time",
+    "match",
 ]
