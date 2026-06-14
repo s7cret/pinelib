@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from marketdata_provider.contracts import InvalidTimeframeError, parse_timeframe
+try:
+    from marketdata_provider.contracts import InvalidTimeframeError, parse_timeframe
+except ModuleNotFoundError:
+    from pinelib.compat.marketdata import InvalidTimeframeError, parse_timeframe
 
 Qualifier = Literal["const", "input", "simple", "series"]
 ReferenceHistoryMode = Literal["unsupported", "identity"]

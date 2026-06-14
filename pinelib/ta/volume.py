@@ -2,6 +2,7 @@ from typing import Any
 
 from pinelib.core.na import is_na
 from pinelib.core.runtime import PineRuntime
+from pinelib.errors import PineRuntimeError
 from pinelib.ta._impl import _current, _state, cci, mfi, obv, stoch, vwap
 
 
@@ -27,6 +28,8 @@ def cum(source: Any, *, runtime: PineRuntime | None = None, state_id: str | None
                 total += float(v)
             out.append(total)
         return out
+    if runtime is None:
+        raise PineRuntimeError("ta.cum() scalar mode requires runtime")
     if state_id is None:
         state_id = "_cum_default"
     state = _state(runtime, state_id, lambda: _CumState(), _CumState)

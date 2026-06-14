@@ -85,8 +85,7 @@
       ],
       "evidence_files": [
         "evidence.json",
-        "oracle_script.pine",
-        "platform_blocked_evidence.md"
+        "oracle_script.pine"
       ],
       "blocked_reason": "TradingView documents calc_on_every_tick as realtime-only, loses tick data on refresh, and states historical bars contain no tick data; Chromium/CDP captures expose chart bars, plots, and Strategy Tester reportData but no deterministic supplied tick-stream export/API.",
       "blocked_by": "TradingView platform: no public/UI/CDP oracle path to inject or export the exact realtime tick stream needed for supplied-tick parity.",

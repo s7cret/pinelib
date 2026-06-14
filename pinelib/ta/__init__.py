@@ -42,7 +42,6 @@ from pinelib.ta.utils import (
     shifted_series,
 )
 from pinelib.ta.volatility import atr, bb, bbw, kc, kcw, ta_range, tr, tr_batch, wpr
-from pinelib.ta._impl import ta_cog as cog, ta_max as max_, ta_min as min_, ta_rci as rci
 from pinelib.ta.volume import cci, cum, mfi, obv, stoch, vwap
 
 __all__ = [

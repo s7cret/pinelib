@@ -9,10 +9,18 @@ from pathlib import Path
 from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE_VERSION = "4.0.0"
 
 
 def _run(cmd: list[str], cwd: Path) -> None:
     subprocess.run(cmd, cwd=cwd, check=True)
+
+
+def _project_root_after_extract(extract_root: Path) -> Path:
+    children = [path for path in extract_root.iterdir() if path.is_dir()]
+    if len(children) == 1 and (children[0] / "pinelib").is_dir():
+        return children[0]
+    return extract_root
 
 
 def check(archive_path: Path) -> None:
@@ -22,31 +30,33 @@ def check(archive_path: Path) -> None:
         extract_root = Path(tmp) / "extract"
         with ZipFile(archive_path) as archive:
             names = set(archive.namelist())
+            prefix = f"pinelib-{PACKAGE_VERSION}/"
             required = {
-                "scripts/run_tv_golden_suite.py",
-                "fixtures/tradingview/cases.json",
+                f"{prefix}scripts/run_tv_golden_suite.py",
+                f"{prefix}fixtures/tradingview/cases.json",
             }
             missing = sorted(required - names)
             if missing:
                 raise SystemExit(f"Archive is missing required oracle evidence paths: {missing}")
             archive.extractall(extract_root)
-        cases_path = extract_root / "fixtures" / "tradingview" / "cases.json"
+        project_root = _project_root_after_extract(extract_root)
+        cases_path = project_root / "fixtures" / "tradingview" / "cases.json"
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
         for case in cases.get("cases", []):
             for key in ("source", "oracle", "expected"):
                 value = case.get(key)
                 if isinstance(value, str) and value:
-                    candidate = extract_root / value
+                    candidate = project_root / value
                     if not candidate.exists():
                         raise SystemExit(
                             f"Archive missing fixture reference for case {case.get('id')}: {value}"
                         )
-        _run([sys.executable, "scripts/run_tv_golden_suite.py"], cwd=extract_root)
+        _run([sys.executable, "scripts/run_tv_golden_suite.py"], cwd=project_root)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract and self-test a PineLib release archive.")
-    parser.add_argument("archive", nargs="?", default="pinelib_runtime_v1_0_1.zip")
+    parser.add_argument("archive", nargs="?", default=f"pinelib-{PACKAGE_VERSION}.zip")
     args = parser.parse_args()
     check(ROOT / args.archive)
 

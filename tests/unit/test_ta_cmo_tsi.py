@@ -32,9 +32,9 @@ class TestCmoRollingMode:
         rolling_non_na = [r for r in rolling_results if not is_na(r)]
         batch_non_na = [r for r in batch_result if not is_na(r)]
         assert rolling_non_na and batch_non_na, "Both should have non-na values"
-        assert abs(rolling_non_na[-1] - batch_non_na[-1]) < 1e-6, (
-            f"Rolling {rolling_non_na[-1]} != batch {batch_non_na[-1]}"
-        )
+        assert (
+            abs(rolling_non_na[-1] - batch_non_na[-1]) < 1e-6
+        ), f"Rolling {rolling_non_na[-1]} != batch {batch_non_na[-1]}"
 
     def test_cmo_does_not_iterate_series(self):
         """CMO in runtime mode should not call list() on the Series."""
@@ -105,9 +105,9 @@ class TestTsiRollingMode:
             assert not is_na(rolling_result), "TSI should compute, got na"
             batch_non_na = [r for r in batch_result if not is_na(r)]
             assert batch_non_na, "Batch should have non-na values"
-            assert abs(rolling_result - batch_non_na[-1]) < 1e-4, (
-                f"Rolling {rolling_result} != batch {batch_non_na[-1]}"
-            )
+            assert (
+                abs(rolling_result - batch_non_na[-1]) < 1e-4
+            ), f"Rolling {rolling_result} != batch {batch_non_na[-1]}"
 
     def test_tsi_does_not_iterate_series(self):
         """TSI in runtime mode should not call list() on the Series."""
@@ -154,9 +154,9 @@ class TestTsiRollingMode:
         assert non_na, "Should have non-na TSI values"
         # Raw ratio should be between -1 and 1 typically, definitely < 10
         for r in non_na:
-            assert abs(r) < 10, (
-                f"TSI raw ratio should be < 10 (got {r}); likely still multiplied by 100"
-            )
+            assert (
+                abs(r) < 10
+            ), f"TSI raw ratio should be < 10 (got {r}); likely still multiplied by 100"
 
     def test_tsi_runtime_matches_batch_raw_ratio(self):
         """Runtime TSI should return same raw ratio as batch."""

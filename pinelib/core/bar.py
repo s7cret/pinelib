@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pinelib.errors import PineDataFormatError
 
 if TYPE_CHECKING:
     from marketdata_provider.contracts import InstrumentKey, Timeframe
     from marketdata_provider.contracts.bar import Bar as ContractBar
+else:
+    InstrumentKey = Any
+    Timeframe = Any
+    ContractBar = Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,8 +56,11 @@ def to_contract_bar(
     timeframe: Timeframe,
     closed: bool = True,
 ) -> ContractBar:
-    from marketdata_provider.contracts.bar import Bar as ContractBar
-    from marketdata_provider.contracts.errors import InvalidBarError
+    try:
+        from marketdata_provider.contracts.bar import Bar as ContractBar
+        from marketdata_provider.contracts.errors import InvalidBarError
+    except ModuleNotFoundError:
+        from pinelib.compat.marketdata import ContractBar, InvalidBarError
 
     time_close = bar.time_close
     if time_close is None:

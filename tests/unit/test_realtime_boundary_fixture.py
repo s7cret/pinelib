@@ -1,31 +1,29 @@
 from __future__ import annotations
 
-import json
-import os
-from pathlib import Path
-
-import pytest
-
 from pinelib import Bar, PineRuntime, SymbolInfo, TimeframeInfo
 from pinelib.core.types import TickUpdate
 
-WORKSPACE_ENV = os.environ.get("PINELIB_TV_FIXTURE_WORKSPACE")
-WORKSPACE = Path(WORKSPACE_ENV).expanduser() if WORKSPACE_ENV else None
-FIXTURE = (
-    WORKSPACE
-    / "tv_strategy_oracle/realtime_probe/stage7j_to_9g_next50_2026-04-30"
-    / "stage7k_du_sequence_fixture_v3.json"
-) if WORKSPACE else None
+_BOUNDARY_FIXTURE = {
+    "boundary": {"timeSec": 1_777_000_000, "nextTimeSec": 1_777_000_300},
+    "rows": [
+        {
+            "timeSec": 1_777_000_000,
+            "tickFirst": 1,
+            "tickLast": 161,
+            "duCloseFirst": 75_000.0,
+            "duCloseLast": 75_123.5,
+            "chartClose": 75_123.5,
+        }
+    ],
+}
 
 
 def _runtime() -> PineRuntime:
     return PineRuntime(SymbolInfo("BINANCE:BTCUSDT"), TimeframeInfo.from_string("5"))
 
 
-def test_stage7i_boundary_fixture_varip_accumulates_intrabar_and_can_reset_on_new_bar() -> None:
-    if FIXTURE is None or not FIXTURE.exists():
-        pytest.skip(f"optional TradingView boundary fixture not found: {FIXTURE}")
-    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+def test_realtime_boundary_fixture_varip_accumulates_intrabar_and_can_reset_on_new_bar() -> None:
+    data = _BOUNDARY_FIXTURE
     boundary = next(row for row in data["rows"] if row["timeSec"] == data["boundary"]["timeSec"])
 
     rt = _runtime()
@@ -41,7 +39,7 @@ def test_stage7i_boundary_fixture_varip_accumulates_intrabar_and_can_reset_on_ne
         )
     )
 
-    counter = rt.get_varip_state("stage7i_tick_counter", lambda: {"ticks": 0})
+    counter = rt.get_varip_state("realtime_tick_counter", lambda: {"ticks": 0})
     assert isinstance(counter, dict)
     ticks = (
         (boundary["tickFirst"], boundary["duCloseFirst"]),
@@ -71,4 +69,4 @@ def test_stage7i_boundary_fixture_varip_accumulates_intrabar_and_can_reset_on_ne
             close=boundary["duCloseLast"],
         )
     )
-    assert rt.get_varip_state("stage7i_tick_counter", lambda: {"ticks": 0})["ticks"] == 0
+    assert rt.get_varip_state("realtime_tick_counter", lambda: {"ticks": 0})["ticks"] == 0

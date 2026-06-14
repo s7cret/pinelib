@@ -49,7 +49,7 @@ class StrategyCompareReport:
 
 @dataclass(frozen=True, slots=True)
 class TradingViewSampleContract:
-    """Placeholder data contract for target strategy integration samples."""
+    """External TradingView sample data contract for target strategy integration samples."""
 
     symbol: str
     timeframe: str
@@ -57,7 +57,7 @@ class TradingViewSampleContract:
     indicator_export_csv: str
     trades_csv: str
     equity_csv: str
-    notes: str = "Replace placeholder paths with TradingView exports before parity runs."
+    notes: str = "Fill these paths with TradingView exports before parity runs."
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -90,10 +90,6 @@ def load_tradingview_indicator_csv(
                     ) from exc
             for name in columns:
                 columns[name].append(_parse_tv_cell(row.get(name)))
-    if columns:
-        lengths = {len(values) for values in columns.values()}
-        if len(lengths) != 1:
-            raise PineDataFormatError("TradingView indicator CSV columns have inconsistent lengths")
     if times and columns and len(times) != len(next(iter(columns.values()))):
         raise PineDataFormatError(
             "TradingView indicator CSV time column length differs from data columns"

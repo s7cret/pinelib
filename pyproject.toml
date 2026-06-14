@@ -4,15 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinelib"
-version = "2.17.0"
+version = "4.0.0"
 description = "PineLib runtime foundation for generated Pine-compatible Python modules"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
-authors = [{name = "OpenAI Codex"}]
-dependencies = [
-  "marketdata-provider>=2.18.0",
-]
+license = "MIT"
+authors = [{name = "OpenPine maintainers"}]
+dependencies = []
+
+
+[project.scripts]
+pinelib = "pinelib.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/s7cret/pinelib"
@@ -20,15 +22,20 @@ Repository = "https://github.com/s7cret/pinelib"
 Issues = "https://github.com/s7cret/pinelib/issues"
 
 [project.optional-dependencies]
+marketdata = [
+  "marketdata-provider @ git+https://github.com/s7cret/marketdata-provider.git@v4.0.0",
+]
 dev = [
   "black>=25.0.0",
   "mypy>=1.10.0",
   "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
   "ruff>=0.6.0",
+  "build>=1.2.0",
 ]
 
 [tool.setuptools]
-packages = ["pinelib", "pinelib.color", "pinelib.core", "pinelib.math", "pinelib.request", "pinelib.strategy", "pinelib.string", "pinelib.ta"]
+packages = ["pinelib", "pinelib.color", "pinelib.compat", "pinelib.core", "pinelib.math", "pinelib.request", "pinelib.strategy", "pinelib.string", "pinelib.ta"]
 package-data = {"pinelib" = ["py.typed"]}
 
 [tool.black]
@@ -74,4 +81,15 @@ disable_error_code = [
   "type-var",
   "union-attr",
   "valid-type",
+]
+
+[tool.coverage.run]
+source = ["pinelib"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+exclude_lines = [
+  "if TYPE_CHECKING:",
+  "if __name__ == \"__main__\":",
 ]

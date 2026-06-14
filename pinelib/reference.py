@@ -72,8 +72,6 @@ class PineArray(Generic[T]):
 
     def shift(self, index: int = 0) -> T:
         if index >= len(self._values):
-            from pinelib.core.na import NA
-
             return NA  # type: ignore[return-value]
         return self._values[index]
 

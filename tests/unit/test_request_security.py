@@ -215,9 +215,9 @@ def test_lookahead_off_early_child_bars_return_previous_d_close() -> None:
     #     next=None → in_current_htf_period=TRUE → D1 matches, value=200.0
     # BUT D1 is current (not finalized), so should return fallback=100.0
     assert not is_na(result[2]), "bar[2] should not be NA (fallback from D0)"
-    assert float(result[2]) == pytest.approx(100.0), (
-        f"bar[2] expected 100.0 (fallback), got {result[2]}"
-    )
+    assert float(result[2]) == pytest.approx(
+        100.0
+    ), f"bar[2] expected 100.0 (fallback), got {result[2]}"
 
 
 def test_lookahead_off_last_child_bar_returns_current_d_close() -> None:
@@ -255,9 +255,9 @@ def test_lookahead_off_last_child_bar_returns_current_d_close() -> None:
     # D2: close/time checks pass later, so D2 overwrites with value=300.0.
     # D2 (later) overwrites → result=300.0
     assert not is_na(result[3]), "bar[3] should not be NA"
-    assert float(result[3]) == pytest.approx(300.0), (
-        f"bar[3] expected 300.0 (later HTF overwrites), got {result[3]}"
-    )
+    assert float(result[3]) == pytest.approx(
+        300.0
+    ), f"bar[3] expected 300.0 (later HTF overwrites), got {result[3]}"
 
 
 def test_lookahead_off_next_day_first_child_uses_confirmed_value() -> None:
@@ -288,9 +288,9 @@ def test_lookahead_off_next_day_first_child_uses_confirmed_value() -> None:
     # Bars 16-19 (00:00-01:00 May 6): D1 is now confirmed → all return D1 close
     for i in range(16, 20):
         assert not is_na(result[i]), f"bar[{i}] should not be NA"
-        assert float(result[i]) == pytest.approx(d1_close), (
-            f"bar[{i}] expected {d1_close}, got {result[i]}"
-        )
+        assert float(result[i]) == pytest.approx(
+            d1_close
+        ), f"bar[{i}] expected {d1_close}, got {result[i]}"
 
 
 def test_lookahead_off_close_history_does_not_regress() -> None:

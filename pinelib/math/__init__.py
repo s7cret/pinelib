@@ -3,7 +3,7 @@ from __future__ import annotations
 import builtins
 import math as _math
 from collections.abc import Iterable
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from pinelib.core.na import is_na, na

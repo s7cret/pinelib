@@ -75,13 +75,13 @@ def load_bars_parquet(path: str | Path) -> list[Bar]:
 
     try:
         import pandas as pd  # type: ignore[import-untyped]
-    except ImportError as exc:  # pragma: no cover - environment dependent
+    except ImportError as exc:
         raise PineUnsupportedFeatureError(
             "Parquet loading requires optional dependency pandas with a parquet engine"
         ) from exc
     try:
         frame = pd.read_parquet(path)
-    except ImportError as exc:  # pragma: no cover - environment dependent
+    except ImportError as exc:
         raise PineUnsupportedFeatureError(
             "Parquet loading requires pyarrow or fastparquet"
         ) from exc

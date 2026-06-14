@@ -553,28 +553,28 @@ def _snapshot_to_payload(snapshot: BacktestSnapshot) -> SnapshotPayload:
 def _ledger_float_or_none(strategy: StrategyContext, name: str) -> float | None:
     try:
         return float(getattr(strategy, name))
-    except StrategyLedgerUnavailableError:
+    except (AttributeError, StrategyLedgerUnavailableError):
         return None
 
 
 def _ledger_int_or_none(strategy: StrategyContext, name: str) -> int | None:
     try:
         return int(getattr(strategy, name))
-    except StrategyLedgerUnavailableError:
+    except (AttributeError, StrategyLedgerUnavailableError):
         return None
 
 
 def _ledger_len_or_none(strategy: StrategyContext, name: str) -> int | None:
     try:
         return len(getattr(strategy, name))
-    except StrategyLedgerUnavailableError:
+    except (AttributeError, StrategyLedgerUnavailableError):
         return None
 
 
 def _ledger_sequence_or_empty(strategy: StrategyContext, name: str) -> list[object]:
     try:
         value = getattr(strategy, name)
-    except StrategyLedgerUnavailableError:
+    except (AttributeError, StrategyLedgerUnavailableError):
         return []
     if isinstance(value, list):
         return value

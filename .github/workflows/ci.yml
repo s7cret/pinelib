@@ -19,12 +19,28 @@ jobs:
       - name: Install
         run: python -m pip install -U pip && python -m pip install -e '.[dev]'
       - name: Compile
-        run: python -m compileall pinelib tests scripts
-      - name: Test
-        run: pytest -q
+        run: python -m compileall -q pinelib tests scripts
+      - name: Lint
+        run: python -m ruff check .
+      - name: Format
+        run: python -m black --check .
       - name: Typecheck
-        run: mypy pinelib
-      - name: Release script smoke
-        run: python scripts/build_release.py
-      - name: Release integrity
-        run: python scripts/check_release_integrity.py RELEASE_MANIFEST_v1_0_1.json --require-head
+        run: python -m mypy pinelib
+      - name: Test
+        run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
+      - name: Coverage
+        run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p pytest_cov tests --cov=pinelib --cov-report=term
+      - name: Quality
+        run: |
+          python -m pinelib.quality duplicates pinelib
+          python -m pinelib.quality architecture pinelib --max-lines 700
+      - name: TradingView golden suite
+        run: python scripts/run_tv_golden_suite.py
+      - name: Release manifest
+        run: |
+          python -m pinelib.distribution manifest --root .
+          python -m pinelib.release --root .
+      - name: Import smoke
+        run: bash scripts/smoke_import_parse.sh
+      - name: Wheel smoke
+        run: bash scripts/wheel_smoke.sh
