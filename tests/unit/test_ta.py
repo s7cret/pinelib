@@ -119,6 +119,34 @@ def test_highest_lowest_change_cross_helpers() -> None:
     assert not ta.crossunder(left, right)
 
 
+def test_stateful_highest_lowest_only_advance_when_call_executes() -> None:
+    runtime = _runtime()
+    observed: list[tuple[float, float]] = []
+
+    for index, (high, low, should_call) in enumerate(
+        [
+            (10.0, 9.0, False),
+            (12.0, 7.0, True),
+            (99.0, 1.0, False),
+            (15.0, 6.0, True),
+        ]
+    ):
+        runtime.begin_bar(_bar(index, close=low, high=high, low=low))
+        if should_call:
+            observed.append(
+                (
+                    ta.highest(runtime.high, 3, runtime=runtime, state_id="cond_high"),
+                    ta.lowest(runtime.low, 3, runtime=runtime, state_id="cond_low"),
+                )
+            )
+        runtime.end_bar()
+
+    # Pine's stateful TA call history is per executed call site, not the global
+    # chart series. If the call only executes on bars 2 and 4, length=3 still
+    # sees only those two values.
+    assert observed == [(12.0, 7.0), (15.0, 6.0)]
+
+
 def test_ta_rejects_bool_sources_and_unstable_state_lengths() -> None:
     with pytest.raises(PineTypeError):
         ta.sma([True], 1)

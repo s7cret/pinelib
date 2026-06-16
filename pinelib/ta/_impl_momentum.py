@@ -24,7 +24,7 @@ from pinelib.ta._impl_core import (
     tr,
     tr_batch,
 )
-from pinelib.ta._impl_states import _ChangeState
+from pinelib.ta._impl_states import _ChangeState, _HighestState, _LowestState
 from pinelib.ta.utils import _condition_history, _history
 
 
@@ -101,6 +101,13 @@ def highest(
     source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
 ) -> Any:
     length = _validate_length(length)
+    if runtime is not None:
+        if state_id is None:
+            raise PineRuntimeError("ta.highest() runtime mode requires state_id")
+        state = _state(runtime, state_id, lambda: _HighestState(length), _HighestState)
+        if state.length != length:
+            raise PineRuntimeError("ta.highest() length must remain stable for a state_id")
+        return state.update(_current(source, "highest"))
 
     def calc() -> Any:
         if isinstance(source, SupportsSeriesLike):
@@ -120,6 +127,13 @@ def lowest(
     source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
 ) -> Any:
     length = _validate_length(length)
+    if runtime is not None:
+        if state_id is None:
+            raise PineRuntimeError("ta.lowest() runtime mode requires state_id")
+        state = _state(runtime, state_id, lambda: _LowestState(length), _LowestState)
+        if state.length != length:
+            raise PineRuntimeError("ta.lowest() length must remain stable for a state_id")
+        return state.update(_current(source, "lowest"))
 
     def calc() -> Any:
         if isinstance(source, SupportsSeriesLike):

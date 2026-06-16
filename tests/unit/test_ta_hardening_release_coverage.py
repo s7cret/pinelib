@@ -207,12 +207,15 @@ def test_private_state_objects_cover_branchy_update_logic() -> None:
 
     hi = _HighestState(2)
     lo = _LowestState(2)
+    # Pine semantics: highest/lowest never return na once a non-na sample
+    # has been observed; until then they return na even if the value itself
+    # is not na. This matches ta.highest/lowest() in TV v6.
     assert is_na(hi.update(na))
     assert is_na(lo.update(na))
-    assert is_na(hi.update(1))
+    assert hi.update(1) == 1
     assert hi.update(3) == 3
     assert hi.update(2) == 3
-    assert is_na(lo.update(1))
+    assert lo.update(1) == 1
     assert lo.update(3) == 1
     assert lo.update(0) == 0
 

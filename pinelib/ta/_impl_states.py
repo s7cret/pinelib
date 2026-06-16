@@ -65,13 +65,11 @@ class _HighestState:
 
     def update(self, value: Any) -> Any:
         if is_na(value):
-            return na
+            return na if not self.values else max(self.values)
         number = float(value)
         self.values.append(number)
         if len(self.values) > self.length:
             self.values.popleft()
-        if len(self.values) < self.length:
-            return na
         return max(self.values)
 
 
@@ -84,13 +82,11 @@ class _LowestState:
 
     def update(self, value: Any) -> Any:
         if is_na(value):
-            return na
+            return na if not self.values else min(self.values)
         number = float(value)
         self.values.append(number)
         if len(self.values) > self.length:
             self.values.popleft()
-        if len(self.values) < self.length:
-            return na
         return min(self.values)
 
 
