@@ -11,7 +11,11 @@ OrderStatus = Literal["pending", "filled", "cancelled"]
 
 @dataclass(slots=True)
 class StrategyDeclaration:
-    initial_capital: float = 100000.0
+    # TradingView strategy() default initial capital is 1,000,000. Keep this
+    # default aligned because generated strategies omit initial_capital when the
+    # Pine declaration does, and OpenPine runtime validates config against this
+    # declaration object.
+    initial_capital: float = 1_000_000.0
     currency: str = "USD"
     default_qty_type: str = "fixed"
     default_qty_value: float = 1.0

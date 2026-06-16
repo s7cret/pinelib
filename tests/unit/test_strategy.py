@@ -28,6 +28,10 @@ def bar(i: int, o: float, h: float, low: float, c: float) -> Bar:
     return Bar(time=t, time_close=t + 3_599_999, open=o, high=h, low=low, close=c)
 
 
+def test_strategy_context_uses_tradingview_default_initial_capital() -> None:
+    assert StrategyContext().initial_capital == 1_000_000.0
+
+
 def test_strategy_context_records_entry_intent_without_filling() -> None:
     s = StrategyContext(default_qty_value=2)
     runtime = rt(s)
