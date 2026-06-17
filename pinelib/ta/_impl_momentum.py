@@ -107,6 +107,15 @@ def highest(
         state = _state(runtime, state_id, lambda: _HighestState(length), _HighestState)
         if state.length != length:
             raise PineRuntimeError("ta.highest() length must remain stable for a state_id")
+        # On first call, seed the deque from series history so the rolling
+        # window starts with correct context. This matters when highest() is
+        # called lazily (e.g. inside a ternary branch): the deque should reflect
+        # the last `length` bars of the source series, not just the first call.
+        if not state.values and isinstance(source, SupportsSeriesLike):
+            for offset in range(min(length, runtime.bar_index + 1) - 1, -1, -1):
+                val = _history(source, offset, "highest")
+                if not is_na(val):
+                    state.values.append(float(val))
         return state.update(_current(source, "highest"))
 
     def calc() -> Any:
@@ -133,6 +142,12 @@ def lowest(
         state = _state(runtime, state_id, lambda: _LowestState(length), _LowestState)
         if state.length != length:
             raise PineRuntimeError("ta.lowest() length must remain stable for a state_id")
+        # On first call, seed the deque from series history. See highest().
+        if not state.values and isinstance(source, SupportsSeriesLike):
+            for offset in range(min(length, runtime.bar_index + 1) - 1, -1, -1):
+                val = _history(source, offset, "lowest")
+                if not is_na(val):
+                    state.values.append(float(val))
         return state.update(_current(source, "lowest"))
 
     def calc() -> Any:
