@@ -15,6 +15,8 @@ def test_bb_macd_dmi_extended_helpers() -> None:
     assert len(macd) == len(signal) == len(hist) == len(close)
     plus, minus, adx = ta.dmi([10, 11, 13, 14, 13, 15], [9, 9, 10, 11, 10, 12], close, 3, 3)
     assert len(plus) == len(minus) == len(adx) == len(close)
+    assert is_na(plus[2])
+    assert math.isclose(plus[3], 12.5)
     assert any(not is_na(v) for v in adx)
 
 
@@ -33,7 +35,8 @@ def test_supertrend_direction_tv_sign_convention() -> None:
     low = [9, 10, 11, 12, 13, 29, 30]
     close = [9.5, 10.5, 11.5, 12.5, 13.5, 29.5, 30.5]
     _, direction = ta.supertrend(1.0, 2, high=high, low=low, close=close)
-    # TV: -1 is uptrend/green
+    # TV: -1 is uptrend/green, +1 is downtrend/red. During ATR warmup TV emits +1.
+    assert direction[0] == 1
     assert any(d == -1 for d in direction if not is_na(d))
     assert all(d in (na, 1, -1) for d in direction)
 

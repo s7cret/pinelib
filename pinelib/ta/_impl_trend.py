@@ -77,9 +77,12 @@ class _DmiState:
         h = float(high)
         low_value = float(low)
         if is_na(self.prev_h):
-            plus_dm = 0.0
-            minus_dm = 0.0
-            tr_val = h - low_value
+            # TradingView ta.dmi() does not seed DI/TR with a synthetic first bar.
+            # The first bar has no previous high/low/close, so DM and TR are na;
+            # ta.rma() then starts warming up from the second bar.
+            plus_dm = na
+            minus_dm = na
+            tr_val = na
         else:
             up = h - float(self.prev_h)
             down = float(self.prev_l) - low_value
@@ -124,17 +127,19 @@ def dmi(
         raise PineRuntimeError("ta.dmi() currently supports batch sequences only")
     di_length = _validate_length(di_length)
     adx_smoothing = _validate_length(adx_smoothing)
-    plus_dm: list[float] = []
-    minus_dm: list[float] = []
-    trs: list[float] = []
+    plus_dm: list[Any] = []
+    minus_dm: list[Any] = []
+    trs: list[Any] = []
     prev_h: Any = na
     prev_l: Any = na
     prev_c: Any = na
     for h, low_value, c in zip(high, low, close, strict=True):
         if is_na(prev_h):
-            plus_dm.append(0.0)
-            minus_dm.append(0.0)
-            trs.append(float(h) - float(low_value))
+            # The first DMI sample has no previous bar. Pine's ta.dmi() feeds na
+            # into the RMA warmup here rather than seeding with 0 / high-low.
+            plus_dm.append(na)
+            minus_dm.append(na)
+            trs.append(na)
         else:
             up = float(h) - float(prev_h)
             down = float(prev_l) - float(low_value)
@@ -190,10 +195,17 @@ class _SupertrendState:
     prev_st: Any = na
     direction: int = 0
     prev_close: Any = na
+    seen_bars: int = 0
 
     def update(self, high: Any, low: Any, close: Any, atr_val: Any) -> tuple[Any, int]:
         if is_na(atr_val):
-            return na, 0
+            # TradingView ta.supertrend() exposes bearish direction (1) while ATR
+            # warms up. Its line is 0 on the first bar, then na until ATR is ready.
+            line = 0.0 if self.seen_bars == 0 else na
+            self.seen_bars += 1
+            self.prev_close = close
+            return line, 1
+        self.seen_bars += 1
         h = float(high)
         low_value = float(low)
         c = float(close)
@@ -260,8 +272,8 @@ def supertrend(
     prev_st: Any = na
     for i, (h, low_value, c, a) in enumerate(zip(high, low, close, atrs, strict=True)):
         if is_na(a):
-            line.append(na)
-            direction.append(na)
+            line.append(0.0 if i == 0 else na)
+            direction.append(1)
             continue
         hl2 = (float(h) + float(low_value)) / 2
         bub = hl2 + factor * float(a)
