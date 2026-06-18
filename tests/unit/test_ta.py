@@ -147,6 +147,53 @@ def test_stateful_highest_lowest_only_advance_when_call_executes() -> None:
     assert observed == [(12.0, 7.0), (15.0, 6.0)]
 
 
+def test_highest_lowest_tv_lazy_state_uses_branch_local_call_history() -> None:
+    runtime = _runtime()
+    lazy_observed: list[tuple[float, float]] = []
+    rolling_observed: list[tuple[float, float]] = []
+
+    for index, (high, low, should_call) in enumerate(
+        [
+            (10.0, 9.0, False),
+            (12.0, 7.0, True),
+            (99.0, 1.0, False),
+            (15.0, 6.0, True),
+        ]
+    ):
+        runtime.begin_bar(_bar(index, close=low, high=high, low=low))
+        rolling_observed.append(
+            (
+                ta.highest(runtime.high, 3, runtime=runtime, state_id="mixed_high"),
+                ta.lowest(runtime.low, 3, runtime=runtime, state_id="mixed_low"),
+            )
+        )
+        if should_call:
+            lazy_observed.append(
+                (
+                    ta.highest(
+                        runtime.high,
+                        3,
+                        runtime=runtime,
+                        state_id="mixed_high",
+                        tv_lazy_state=True,
+                    ),
+                    ta.lowest(
+                        runtime.low,
+                        3,
+                        runtime=runtime,
+                        state_id="mixed_low",
+                        tv_lazy_state=True,
+                    ),
+                )
+            )
+        runtime.end_bar()
+
+    assert rolling_observed == [(10.0, 9.0), (12.0, 7.0), (99.0, 1.0), (99.0, 1.0)]
+    # The tv_lazy_state namespace must not share the ordinary rolling state_id:
+    # the skipped bar with high=99/low=1 must not leak into lazy branch results.
+    assert lazy_observed == [(12.0, 7.0), (15.0, 6.0)]
+
+
 def test_ta_rejects_bool_sources_and_unstable_state_lengths() -> None:
     with pytest.raises(PineTypeError):
         ta.sma([True], 1)

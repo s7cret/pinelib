@@ -98,13 +98,19 @@ def macd(
 
 
 def highest(
-    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+    source: Any,
+    length: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+    tv_lazy_state: bool = False,
 ) -> Any:
     length = _validate_length(length)
     if runtime is not None:
         if state_id is None:
             raise PineRuntimeError("ta.highest() runtime mode requires state_id")
-        state = _state(runtime, state_id, lambda: _HighestState(length), _HighestState)
+        effective_state_id = f"{state_id}:tv_lazy" if tv_lazy_state else state_id
+        state = _state(runtime, effective_state_id, lambda: _HighestState(length), _HighestState)
         if state.length != length:
             raise PineRuntimeError("ta.highest() length must remain stable for a state_id")
         return state.update(_current(source, "highest"))
@@ -124,13 +130,19 @@ def highest(
 
 
 def lowest(
-    source: Any, length: int, *, runtime: PineRuntime | None = None, state_id: str | None = None
+    source: Any,
+    length: int,
+    *,
+    runtime: PineRuntime | None = None,
+    state_id: str | None = None,
+    tv_lazy_state: bool = False,
 ) -> Any:
     length = _validate_length(length)
     if runtime is not None:
         if state_id is None:
             raise PineRuntimeError("ta.lowest() runtime mode requires state_id")
-        state = _state(runtime, state_id, lambda: _LowestState(length), _LowestState)
+        effective_state_id = f"{state_id}:tv_lazy" if tv_lazy_state else state_id
+        state = _state(runtime, effective_state_id, lambda: _LowestState(length), _LowestState)
         if state.length != length:
             raise PineRuntimeError("ta.lowest() length must remain stable for a state_id")
         return state.update(_current(source, "lowest"))
