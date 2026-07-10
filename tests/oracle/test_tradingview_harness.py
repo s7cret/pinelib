@@ -6,8 +6,11 @@ import math
 import subprocess
 import sys
 from collections.abc import Iterable, Mapping, Sequence
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
+
+import pytest
 
 from pinelib import ta
 from pinelib.core.bar import Bar
@@ -95,26 +98,43 @@ def _manifest() -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(MANIFEST_PATH.read_text(encoding="utf-8")))
 
 
-def test_tradingview_oracle_manifest_counts_verified_and_blocked_cases_without_pending() -> None:
+def test_tradingview_oracle_manifest_has_at_least_30_distinct_evaluated_assertions() -> None:
     manifest = _manifest()
     cases = manifest["cases"]
+    fixtures = manifest["fixtures"]
     statuses = {case["status"] for case in cases}
+    assertion_ids = [case["assertion_id"] for case in cases]
+    target_signatures = [
+        json.dumps(
+            [case["fixture_id"], case["evidence_source"], case["target"]],
+            sort_keys=True,
+        )
+        for case in cases
+    ]
+
+    assert manifest["schema_version"] == "2.0"
+    assert len(cases) >= 30
+    assert len(assertion_ids) == len(set(assertion_ids))
+    assert len(target_signatures) == len(set(target_signatures))
     assert statuses <= {"oracle_verified", "golden_synthetic", "platform_blocked"}
     assert "pending_external_oracle" not in statuses
 
     for case in cases:
-        case_dir = MANIFEST_PATH.parent / case["id"]
-        for evidence_file in case.get("evidence_files", []):
+        fixture = fixtures[case["fixture_id"]]
+        case_dir = MANIFEST_PATH.parent / case["fixture_id"]
+        assert case["evidence_source"] == case["target"]["source"]
+        for evidence_file in fixture.get("evidence_files", []):
             assert (case_dir / evidence_file).is_file()
         if case["status"] == "oracle_verified":
-            assert case.get("oracle_source", "").startswith("TradingView")
-            for required_file in case["required_files"]:
+            assert fixture.get("oracle_source", "").startswith("TradingView")
+            for required_file in fixture["required_files"]:
                 assert (case_dir / required_file).is_file()
         elif case["status"] == "platform_blocked":
             assert case.get("blocked_reason", "").strip()
             assert case.get("blocked_by", "").strip()
             assert all(
-                not (case_dir / required_file).exists() for required_file in case["required_files"]
+                not (case_dir / required_file).exists()
+                for required_file in fixture["required_files"]
             )
 
     result = subprocess.run(
@@ -130,13 +150,124 @@ def test_tradingview_oracle_manifest_counts_verified_and_blocked_cases_without_p
         case["status"] == "platform_blocked" for case in cases
     )
     assert summary["pending_external_oracle"] == 0
+    assert summary["assertions_evaluated"] == len(cases)
+    assert summary["evidence_fixtures"] == len(fixtures)
+
+
+def _minimal_assertion_manifest(tmp_path: Path) -> dict[str, Any]:
+    fixture_dir = tmp_path / "real_fixture"
+    fixture_dir.mkdir(exist_ok=True)
+    (fixture_dir / "expected.csv").write_text("bar_index,value\n0,1\n1,2\n2,2\n", encoding="utf-8")
+    (fixture_dir / "evidence.json").write_text("{}\n", encoding="utf-8")
+    (fixture_dir / "oracle_script.pine").write_text("//@version=6\n", encoding="utf-8")
+    return {
+        "schema_version": "2.0",
+        "contract_version": "1.4",
+        "minimum_assertions": 1,
+        "fixtures": {
+            "real_fixture": {
+                "required_files": ["expected.csv"],
+                "evidence_files": ["evidence.json", "oracle_script.pine"],
+                "oracle_source": "TradingView test oracle",
+            }
+        },
+        "cases": [
+            {
+                "id": "value_column",
+                "assertion_id": "value_column",
+                "fixture_id": "real_fixture",
+                "evidence_source": "expected.csv",
+                "status": "oracle_verified",
+                "target": {
+                    "kind": "csv_column",
+                    "source": "expected.csv",
+                    "column": "value",
+                    "min_rows": 2,
+                    "min_non_empty": 2,
+                    "min_distinct": 2,
+                },
+            }
+        ],
+    }
+
+
+def test_tradingview_runner_rejects_duplicate_assertion_ids_and_targets(tmp_path: Path) -> None:
+    from scripts import run_tv_golden_suite as tv_suite
+
+    duplicate_id = _minimal_assertion_manifest(tmp_path)
+    second = deepcopy(duplicate_id["cases"][0])
+    second["id"] = "second_case"
+    duplicate_id["cases"].append(second)
+    with pytest.raises(SystemExit, match="Duplicate assertion_id"):
+        tv_suite.validate_manifest(duplicate_id, fixtures_root=tmp_path)
+
+    duplicate_target = _minimal_assertion_manifest(tmp_path)
+    second = deepcopy(duplicate_target["cases"][0])
+    second["id"] = "second_case"
+    second["assertion_id"] = "second_assertion"
+    duplicate_target["cases"].append(second)
+    with pytest.raises(SystemExit, match="Duplicate assertion target"):
+        tv_suite.validate_manifest(duplicate_target, fixtures_root=tmp_path)
+
+
+def test_tradingview_runner_rejects_vacuous_or_unmet_assertions(tmp_path: Path) -> None:
+    from scripts import run_tv_golden_suite as tv_suite
+
+    vacuous = _minimal_assertion_manifest(tmp_path)
+    vacuous["cases"][0]["target"]["min_non_empty"] = 0
+    with pytest.raises(SystemExit, match="min_non_empty must be positive"):
+        tv_suite.validate_manifest(vacuous, fixtures_root=tmp_path)
+
+    unmet = _minimal_assertion_manifest(tmp_path)
+    unmet["cases"][0]["target"]["min_rows"] = 3
+    unmet["cases"][0]["target"]["min_non_empty"] = 3
+    unmet["cases"][0]["target"]["min_distinct"] = 3
+    with pytest.raises(SystemExit, match="expected at least 3 distinct"):
+        tv_suite.validate_manifest(unmet, fixtures_root=tmp_path)
+
+
+def test_tradingview_runner_rejects_unsupported_assertion_kinds(tmp_path: Path) -> None:
+    from scripts import run_tv_golden_suite as tv_suite
+
+    manifest = _minimal_assertion_manifest(tmp_path)
+    manifest["cases"][0]["target"]["kind"] = "metadata_only_alias"
+    with pytest.raises(SystemExit, match="Unsupported assertion kind"):
+        tv_suite.validate_manifest(manifest, fixtures_root=tmp_path)
+
+
+def test_tradingview_runner_confines_fixture_ids_and_rejects_symlink_sources(
+    tmp_path: Path,
+) -> None:
+    from scripts import run_tv_golden_suite as tv_suite
+
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.csv"
+    outside.write_text("bar_index,value\n0,1\n1,2\n", encoding="utf-8")
+    symlink_manifest = _minimal_assertion_manifest(tmp_path)
+    escaped = tmp_path / "real_fixture" / "escaped.csv"
+    escaped.symlink_to(outside)
+    fixture = symlink_manifest["fixtures"]["real_fixture"]
+    fixture["required_files"] = ["escaped.csv"]
+    case = symlink_manifest["cases"][0]
+    case["evidence_source"] = "escaped.csv"
+    case["target"]["source"] = "escaped.csv"
+    with pytest.raises(SystemExit, match="must not use symlinks"):
+        tv_suite.validate_manifest(symlink_manifest, fixtures_root=tmp_path)
+
+    traversal_manifest = _minimal_assertion_manifest(tmp_path)
+    traversal_fixture = traversal_manifest["fixtures"].pop("real_fixture")
+    traversal_manifest["fixtures"]["../outside_fixture"] = traversal_fixture
+    traversal_manifest["cases"][0]["fixture_id"] = "../outside_fixture"
+    with pytest.raises(SystemExit, match="must stay inside"):
+        tv_suite.validate_manifest(traversal_manifest, fixtures_root=tmp_path)
 
 
 def test_calc_on_every_tick_supplied_ticks_is_platform_blocked_not_pending() -> None:
     case_dir = FIXTURES / "calc_on_every_tick_supplied_ticks"
+    manifest = _manifest()
     case = next(
-        case for case in _manifest()["cases"] if case["id"] == "calc_on_every_tick_supplied_ticks"
+        case for case in manifest["cases"] if case["id"] == "calc_on_every_tick_supplied_ticks"
     )
+    fixture = manifest["fixtures"][case["fixture_id"]]
     evidence = json.loads((case_dir / "evidence.json").read_text(encoding="utf-8"))
 
     assert case["status"] == "platform_blocked"
@@ -146,7 +277,9 @@ def test_calc_on_every_tick_supplied_ticks_is_platform_blocked_not_pending() -> 
     assert "No ticks.csv" in evidence["hard_rule_note"]
     assert "historical bars contain no tick data" in evidence["last_attempt_summary"][0]
     assert "not a deterministic supplied synthetic tick stream" in evidence["blocker"]
-    assert all(not (case_dir / required_file).exists() for required_file in case["required_files"])
+    assert all(
+        not (case_dir / required_file).exists() for required_file in fixture["required_files"]
+    )
 
 
 def test_session_time_time_close_timeframe_guard_matches_tradingview_daily_time_values() -> None:
