@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import csv
 from pathlib import Path
 
-import contextlib
 import pytest
 
 from pinelib import string as pstr
