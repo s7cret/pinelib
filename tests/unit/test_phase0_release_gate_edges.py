@@ -37,6 +37,16 @@ def test_core_types_falls_back_when_marketdata_provider_is_unavailable(
     assert module.TimeframeInfo.from_string("1").interval_ms == 60_000
 
 
+def test_wheel_smoke_uses_isolated_pep517_builder() -> None:
+    root = Path(__file__).resolve().parents[2]
+    script = (root / "scripts" / "wheel_smoke.sh").read_text(encoding="utf-8")
+
+    assert '"$PYTHON" -m build --wheel' in script
+    assert "pip wheel" not in script
+    assert "--no-build-isolation" not in script
+    assert "--no-isolation" not in script
+
+
 def test_timefunc_unknown_higher_timeframe_bucket_returns_none() -> None:
     runtime = PineRuntime(SymbolInfo("TEST:ABC"), TimeframeInfo.from_string("1"))
     runtime.begin_bar(Bar(time=0, open=1.0, high=2.0, low=0.5, close=1.5))
