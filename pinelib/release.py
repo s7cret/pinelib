@@ -39,16 +39,16 @@ def validate(root: str | Path = ".") -> ReleaseReport:
     errors: list[str] = []
     if _pyproject_version(base) != PACKAGE_VERSION:
         errors.append("pyproject.toml version does not match pinelib.version.PACKAGE_VERSION")
-    if PACKAGE_VERSION != "4.0.0":
-        errors.append("PineLib release package should be version 4.0.0")
-    if not (base / "README.md").read_text(encoding="utf-8").count("4.0.0"):
-        errors.append("README.md does not mention release 4.0.0")
+    if PACKAGE_VERSION != "4.0.1":
+        errors.append("PineLib release package should be version 4.0.1")
+    if not (base / "README.md").read_text(encoding="utf-8").count(PACKAGE_VERSION):
+        errors.append(f"README.md does not mention release {PACKAGE_VERSION}")
     if not (base / "CHANGELOG.md").is_file():
         errors.append("CHANGELOG.md is missing")
     else:
         changelog = (base / "CHANGELOG.md").read_text(encoding="utf-8")
-        if "4.0.0" not in changelog:
-            errors.append("CHANGELOG.md does not contain 4.0.0")
+        if PACKAGE_VERSION not in changelog:
+            errors.append(f"CHANGELOG.md does not contain {PACKAGE_VERSION}")
     docs = {path.relative_to(base).as_posix() for path in (base / "docs").glob("*.md")}
     missing_docs = sorted(CANONICAL_DOCS - docs)
     extra_docs = sorted(docs - CANONICAL_DOCS)

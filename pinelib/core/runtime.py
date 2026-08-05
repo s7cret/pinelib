@@ -227,40 +227,124 @@ class PineRuntime:
     def restore_state(self, state: object) -> None:
         if not isinstance(state, dict):
             raise PineRuntimeError("PineRuntime restore_state() expects a dict snapshot")
-        series_state = state.get("series", {})
+        required_fields = {
+            "bar_index",
+            "current_bar",
+            "chart_bars",
+            "series",
+            "indicator_state",
+            "barstate",
+            "request_depth",
+            "request_security_cache",
+            "request_lower_tf_cache",
+            "request_data_end_ms",
+            "lower_tf_metadata_log",
+            "plot_recorder",
+            "visual",
+            "request_namespace",
+        }
+        allowed_fields = required_fields | {"varip_state"}
+        missing = sorted(required_fields - state.keys())
+        unknown = sorted(state.keys() - allowed_fields)
+        if missing or unknown:
+            raise PineRuntimeError(
+                "PineRuntime snapshot schema mismatch: " f"missing={missing!r}, unknown={unknown!r}"
+            )
+        series_state = state["series"]
         if not isinstance(series_state, dict):
-            raise PineRuntimeError("PineRuntime snapshot is missing series state")
-        self.bar_index = int(state.get("bar_index", -1))
-        self.current_bar = copy.deepcopy(state.get("current_bar"))
-        self.chart_bars = copy.deepcopy(state.get("chart_bars", []))
+            raise PineRuntimeError("PineRuntime snapshot series must be a dict")
+        expected_series = set(self.series_registry)
+        snapshot_series = set(series_state)
+        if snapshot_series != expected_series:
+            raise PineRuntimeError(
+                "PineRuntime snapshot series mismatch: "
+                f"missing={sorted(expected_series - snapshot_series)!r}, "
+                f"unknown={sorted(snapshot_series - expected_series)!r}"
+            )
         for name, payload in series_state.items():
-            if name not in self.series_registry or not isinstance(payload, dict):
-                continue
+            if not isinstance(payload, dict) or set(payload) != {"current", "history"}:
+                raise PineRuntimeError(
+                    f"PineRuntime snapshot series {name!r} must contain current/history"
+                )
+            if not isinstance(payload["history"], list):
+                raise PineRuntimeError(
+                    f"PineRuntime snapshot series {name!r} history must be a list"
+                )
+        bar_index = state["bar_index"]
+        if isinstance(bar_index, bool) or not isinstance(bar_index, int):
+            raise PineRuntimeError("PineRuntime snapshot bar_index must be an integer")
+        current_bar = state["current_bar"]
+        if current_bar is not None and not isinstance(current_bar, Bar):
+            raise PineRuntimeError("PineRuntime snapshot current_bar must be a Bar or None")
+        chart_bars = state["chart_bars"]
+        if not isinstance(chart_bars, list) or not all(isinstance(bar, Bar) for bar in chart_bars):
+            raise PineRuntimeError("PineRuntime snapshot chart_bars must be a list of Bar")
+        dict_fields = (
+            "indicator_state",
+            "request_security_cache",
+            "request_lower_tf_cache",
+        )
+        for field_name in dict_fields:
+            if not isinstance(state[field_name], dict):
+                raise PineRuntimeError(f"PineRuntime snapshot {field_name} must be a dict")
+        if "varip_state" in state and not isinstance(state["varip_state"], dict):
+            raise PineRuntimeError("PineRuntime snapshot varip_state must be a dict")
+        if not isinstance(state["barstate"], BarStateInfo):
+            raise PineRuntimeError("PineRuntime snapshot barstate must be BarStateInfo")
+        request_depth = state["request_depth"]
+        if (
+            isinstance(request_depth, bool)
+            or not isinstance(request_depth, int)
+            or request_depth < 0
+        ):
+            raise PineRuntimeError(
+                "PineRuntime snapshot request_depth must be a non-negative integer"
+            )
+        request_data_end_ms = state["request_data_end_ms"]
+        if request_data_end_ms is not None and (
+            isinstance(request_data_end_ms, bool) or not isinstance(request_data_end_ms, int)
+        ):
+            raise PineRuntimeError(
+                "PineRuntime snapshot request_data_end_ms must be an integer or None"
+            )
+        if not isinstance(state["lower_tf_metadata_log"], list):
+            raise PineRuntimeError("PineRuntime snapshot lower_tf_metadata_log must be a list")
+        if not isinstance(state["plot_recorder"], PlotRecorder):
+            raise PineRuntimeError("PineRuntime snapshot plot_recorder must be a PlotRecorder")
+        if not isinstance(state["visual"], VisualRecorder):
+            raise PineRuntimeError("PineRuntime snapshot visual must be a VisualRecorder")
+        request_namespace = state["request_namespace"]
+        if request_namespace is not None and not isinstance(request_namespace, str):
+            raise PineRuntimeError(
+                "PineRuntime snapshot request_namespace must be a string or None"
+            )
+        try:
+            validated = copy.deepcopy(state)
+        except Exception as exc:
+            raise PineRuntimeError(
+                f"PineRuntime snapshot cannot be detached: {type(exc).__name__}: {exc}"
+            ) from exc
+
+        self.bar_index = bar_index
+        self.current_bar = validated["current_bar"]
+        self.chart_bars = validated["chart_bars"]
+        validated_series = validated["series"]
+        for name, payload in validated_series.items():
             series = self.series_registry[name]
-            series._current = copy.deepcopy(payload.get("current", na))
-            history = payload.get("history", [])
-            series._history = copy.deepcopy(history if isinstance(history, list) else [])
-        self.indicator_state = copy.deepcopy(state.get("indicator_state", {}))
-        if "varip_state" in state:
-            self.varip_state = copy.deepcopy(state.get("varip_state", {}))
-        self.barstate = copy.deepcopy(state.get("barstate", BarStateInfo()))
-        self.request_depth = int(state.get("request_depth", 0))
-        security_cache = state.get("request_security_cache", {})
-        self.request_security_cache = copy.deepcopy(
-            security_cache if isinstance(security_cache, dict) else {}
-        )
-        lower_tf_cache = state.get("request_lower_tf_cache", {})
-        self.request_lower_tf_cache = copy.deepcopy(
-            lower_tf_cache if isinstance(lower_tf_cache, dict) else {}
-        )
-        request_data_end_ms = state.get("request_data_end_ms")
-        self.request_data_end_ms = (
-            int(request_data_end_ms) if request_data_end_ms is not None else None
-        )
-        self.lower_tf_metadata_log = copy.deepcopy(state.get("lower_tf_metadata_log", []))
-        self.plot_recorder = copy.deepcopy(state.get("plot_recorder", PlotRecorder()))
-        self.visual = copy.deepcopy(state.get("visual", self.visual))
-        self.request_namespace = state.get("request_namespace")
+            series._current = payload["current"]
+            series._history = payload["history"]
+        self.indicator_state = validated["indicator_state"]
+        if "varip_state" in validated:
+            self.varip_state = validated["varip_state"]
+        self.barstate = validated["barstate"]
+        self.request_depth = request_depth
+        self.request_security_cache = validated["request_security_cache"]
+        self.request_lower_tf_cache = validated["request_lower_tf_cache"]
+        self.request_data_end_ms = request_data_end_ms
+        self.lower_tf_metadata_log = validated["lower_tf_metadata_log"]
+        self.plot_recorder = validated["plot_recorder"]
+        self.visual = validated["visual"]
+        self.request_namespace = request_namespace
 
     def get_varip_state(self, state_id: str, factory: Any) -> object:
         if state_id not in self.varip_state:

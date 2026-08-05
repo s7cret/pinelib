@@ -19,7 +19,7 @@ mkdir -p "$INSTALL_DIR"
 PYTHONPATH="$INSTALL_DIR" "$PYTHON" - <<'PY'
 from pinelib import Bar, PineRuntime, StrategyContext, SymbolInfo, TimeframeInfo, run_generated_strategy
 import pinelib
-assert pinelib.PACKAGE_VERSION == "4.0.0"
+assert pinelib.PACKAGE_VERSION == "4.0.1"
 class Generated:
     def on_bar(self, runtime, strategy):
         strategy.entry("L", "long", qty=1)

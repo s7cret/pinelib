@@ -40,13 +40,14 @@ def _minimal_release_root(tmp_path: Path) -> Path:
     (root / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
     (root / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
     (root / "pyproject.toml").write_text(
-        '[project]\nname = "pinelib"\nversion = "4.0.0"\n',
+        f'[project]\nname = "pinelib"\nversion = "{PACKAGE_VERSION}"\n',
         encoding="utf-8",
     )
     return root
 
 
 def test_module_entrypoint_prints_version_and_contract(capsys: pytest.CaptureFixture[str]) -> None:
+    assert PACKAGE_VERSION == "4.0.1"
     assert pinelib_main(["--version"]) == 0
     assert PACKAGE_VERSION in capsys.readouterr().out
     assert pinelib_main([]) == 0
@@ -110,6 +111,14 @@ def test_release_validate_and_cli(tmp_path: Path, capsys: pytest.CaptureFixture[
     output = tmp_path / "release.json"
     assert release_main(["--root", str(root), "--json", str(output)]) == 0
     assert json.loads(output.read_text(encoding="utf-8"))["ok"] is True
+
+
+def test_release_artifact_validation_scripts_target_current_version() -> None:
+    selftest = Path("scripts/check_release_artifact_selftest.py").read_text()
+    integrity = Path("scripts/check_release_integrity.py").read_text()
+
+    assert 'PACKAGE_VERSION = "4.0.1"' in selftest
+    assert 'default="pinelib-4.0.1.zip"' in integrity
 
 
 def test_release_validate_reports_missing_docs(tmp_path: Path) -> None:

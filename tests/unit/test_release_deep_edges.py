@@ -377,8 +377,8 @@ def test_core_marketdata_runtime_and_time_edges(monkeypatch: pytest.MonkeyPatch)
         runtime.restore_state(object())
     with pytest.raises(PineRuntimeError):
         runtime.restore_state({"series": object()})
-    runtime.restore_state({"series": {"missing": {}}, "request_data_end_ms": "123"})
-    assert runtime.request_data_end_ms == 123
+    with pytest.raises(PineRuntimeError, match="snapshot schema mismatch"):
+        runtime.restore_state({"series": {"missing": {}}, "request_data_end_ms": "123"})
     with pytest.raises(PineRuntimeError):
         runtime.series("close", "int")
     with pytest.raises(PineRuntimeError):
@@ -1331,8 +1331,8 @@ def test_release_remaining_coverage_edges(tmp_path: Path) -> None:
     report = release_validate(bad_root)
     assert any("CHANGELOG" in error for error in report.errors)
     with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(release_mod, "PACKAGE_VERSION", "4.0.1")
-        assert any("version 4.0.0" in error for error in release_mod.validate(bad_root).errors)
+        monkeypatch.setattr(release_mod, "PACKAGE_VERSION", "9.9.9")
+        assert any("version 4.0.1" in error for error in release_mod.validate(bad_root).errors)
     with pytest.MonkeyPatch.context() as monkeypatch:
 
         class BadDistribution:

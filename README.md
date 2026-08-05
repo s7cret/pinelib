@@ -1,8 +1,8 @@
-# PineLib 4.0.0
+# PineLib 4.0.1
 
 > Deterministic Python runtime foundation for AST2Python-generated Pine-compatible modules.
 
-[![Version](https://img.shields.io/badge/version-4.0.0-blue)](https://github.com/s7cret/pinelib) [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://github.com/s7cret/pinelib) [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/s7cret/pinelib)
+[![Version](https://img.shields.io/badge/version-4.0.1-blue)](https://github.com/s7cret/pinelib) [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://github.com/s7cret/pinelib) [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/s7cret/pinelib)
 
 
 **GitHub description:** PineLib provides Pine-style series, bar lifecycle, inputs, request helpers, strategy intent APIs, TA helpers, visual recorders, and runtime primitives for generated OpenPine modules.
@@ -48,7 +48,7 @@ python -m pip install -e '.[dev]'
 Install from GitHub tag:
 
 ```bash
-python -m pip install 'git+https://github.com/s7cret/pinelib.git@v4.0.0'
+python -m pip install 'git+https://github.com/s7cret/pinelib.git@v4.0.1'
 ```
 
 Optional market-data integration:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.1
+
+- Published the hardened OpenPine 4.0.1 stack while preserving `runtime_contract_v1_4`.
+- Aligned package, release validator, documentation, and immutable consumer metadata.
+
 ## 4.0.0
 
 - Aligned PineLib with the OpenPine 4.x runtime toolchain.
