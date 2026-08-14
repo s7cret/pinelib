@@ -23,7 +23,7 @@ Issues = "https://github.com/s7cret/pinelib/issues"
 
 [project.optional-dependencies]
 marketdata = [
-  "marketdata-provider @ git+https://github.com/s7cret/marketdata-provider.git@c943348f88f8af52b11a2c9fbcaca1b8e1d7e244",
+  "marketdata-provider @ git+https://github.com/s7cret/marketdata-provider.git@b868ace65524f5c3bf62498f667db411e299a4ce",
 ]
 dev = [
   "black>=25.0.0",
