@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinelib"
-version = "4.0.1"
+version = "4.0.2"
 description = "PineLib runtime foundation for generated Pine-compatible Python modules"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ Issues = "https://github.com/s7cret/pinelib/issues"
 
 [project.optional-dependencies]
 marketdata = [
-  "marketdata-provider @ git+https://github.com/s7cret/marketdata-provider.git@83a242c493aac7a7c1d1a4c042ce4dcb688a6eb3",
+  "marketdata-provider @ git+https://github.com/s7cret/marketdata-provider.git@c943348f88f8af52b11a2c9fbcaca1b8e1d7e244",
 ]
 dev = [
   "black>=25.0.0",

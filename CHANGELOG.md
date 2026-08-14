@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.2
+
+- Pinned the optimized MarketData Provider 4.0.2 release while preserving `runtime_contract_v1_4`.
+- Refreshed release, wheel-smoke, archive-integrity, and metadata evidence for the coordinated OpenPine 4.0.2 stack.
+
 ## 4.0.1
 
 - Published the hardened OpenPine 4.0.1 stack while preserving `runtime_contract_v1_4`.

@@ -1332,7 +1332,7 @@ def test_release_remaining_coverage_edges(tmp_path: Path) -> None:
     assert any("CHANGELOG" in error for error in report.errors)
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(release_mod, "PACKAGE_VERSION", "9.9.9")
-        assert any("version 4.0.1" in error for error in release_mod.validate(bad_root).errors)
+        assert any("version 4.0.2" in error for error in release_mod.validate(bad_root).errors)
     with pytest.MonkeyPatch.context() as monkeypatch:
 
         class BadDistribution:
