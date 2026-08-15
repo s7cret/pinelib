@@ -171,9 +171,7 @@ def test_precomputed_values_and_nested_security_diagnostic() -> None:
 def test_strict_5x_uses_current_bar_index() -> None:
     chart = _bars([0, 3_600_000], 3_600_000)
     requested = _bars([0, 3_600_000], 3_600_000, [10.0, 20.0])
-    provider = InMemoryDataProvider(
-        {("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): requested}
-    )
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): requested})
     legacy = PineRuntime(
         SymbolInfo("TEST:AAA", timezone="UTC"),
         TimeframeInfo.from_string("60"),

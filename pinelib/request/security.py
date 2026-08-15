@@ -345,11 +345,7 @@ def security(
         index = runtime.bar_index
     else:
         # LEGACY_4X keeps the historical +1 offset so 4.0.2 fixtures replay.
-        index = (
-            runtime.bar_index + 1
-            if runtime.current_bar is not None
-            else runtime.bar_index
-        )
+        index = runtime.bar_index + 1 if runtime.current_bar is not None else runtime.bar_index
     if index < 0 or index >= len(merged):
         return na
     return merged[index]
