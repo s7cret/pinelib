@@ -1,5 +1,6 @@
 from pinelib.errors import StrategyLedgerUnavailableError
 from pinelib.strategy.context import StrategyContext
+from pinelib.strategy.intents import IntentEvent, IntentTape
 from pinelib.strategy.models import (
     Direction,
     Fill,
@@ -21,6 +22,8 @@ __all__ = [
     "OrderStatus",
     "OrderType",
     "RiskRule",
+    "IntentEvent",
+    "IntentTape",
     "StrategyContext",
     "StrategyDeclaration",
     "StrategyLedgerUnavailableError",

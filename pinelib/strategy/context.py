@@ -10,6 +10,7 @@ from pinelib.errors import (
     PineStrategyError,
     StrategyLedgerUnavailableError,
 )
+from pinelib.strategy.intents import IntentTape, make_intent
 from pinelib.strategy.models import (
     Direction,
     Order,
@@ -59,6 +60,7 @@ class StrategyContext:
         self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
+        self.intent_tape = IntentTape()
 
     @property
     def closedtrades(self) -> _StrategyScalarSeries:
@@ -210,6 +212,7 @@ class StrategyContext:
         self._add_order(
             id, direction, qty, limit, stop, "entry", comment=comment, source_map=source_map
         )
+        self._record_intent("entry", id, qty=qty, limit=limit, stop=stop, comment=comment)
 
     def order(
         self,
@@ -230,6 +233,16 @@ class StrategyContext:
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
+        self._record_intent(
+            "order",
+            id,
+            qty=qty,
+            limit=limit,
+            stop=stop,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            comment=comment,
+        )
 
     def exit(
         self,
@@ -265,6 +278,16 @@ class StrategyContext:
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
         self.pending_orders.append(order)
+        self._record_intent(
+            "exit",
+            id,
+            qty=qty,
+            limit=limit,
+            stop=stop,
+            from_entry=from_entry,
+            oca_type="reduce",
+            comment=comment,
+        )
 
     def close(
         self,
@@ -290,6 +313,7 @@ class StrategyContext:
         order.from_entry = id
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent("close", f"close:{id}", qty=qty, from_entry=id, comment=comment)
 
     def close_all(
         self,
@@ -310,17 +334,20 @@ class StrategyContext:
         )
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent("close", "close_all", comment=comment)
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
         del source_map
         for order in self.pending_orders:
             if order.id == id or order.parent_exit_id == id:
                 order.status = "cancelled"
+        self._record_intent("cancel", id)
 
     def cancel_all(self, *, source_map: object | None = None) -> None:
         del source_map
         for order in self.pending_orders:
             order.status = "cancelled"
+        self._record_intent("cancel_all", "*")
 
     def accept_orders_from_generated_code(self) -> None:
         return None
@@ -358,6 +385,33 @@ class StrategyContext:
         raise PineStrategyError(
             "calc_on_every_tick=True requires BacktestEngine realtime tick execution",
             code=PL_UNSUPPORTED_STRATEGY_SETTING,
+        )
+
+    def _record_intent(
+        self,
+        kind: str,
+        order_id: str,
+        *,
+        qty: object = None,
+        limit: object = None,
+        stop: object = None,
+        from_entry: str | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        comment: str | None = None,
+    ) -> None:
+        self.intent_tape.record(
+            make_intent(
+                kind=kind,
+                order_id=order_id,
+                qty=qty,
+                limit=limit,
+                stop=stop,
+                from_entry=from_entry,
+                oca_name=oca_name,
+                oca_type=oca_type,
+                comment=comment,
+            )
         )
 
     def _add_order(
