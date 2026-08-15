@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pinelib.core.bar import Bar
 from pinelib.core.na import na
+from pinelib.core.semantic_profile import security_lookup_index
 from pinelib.core.types import parse_timeframe_to_ms
 from pinelib.errors import (
     PL_UNSUPPORTED_NESTED_SECURITY,
@@ -37,7 +38,9 @@ def _provider_get_bars(
     extra = getattr(getattr(runtime, "config", None), "extra", {}) or {}
     if "exchange" in params:
         kwargs["exchange"] = (
-            extra.get("exchange") or getattr(runtime.syminfo, "exchange", None) or "binance"
+            extra.get("exchange")
+            or getattr(runtime.syminfo, "exchange", None)
+            or "binance"
         )
     if "market" in params:
         kwargs["market"] = extra.get("market_type") or extra.get("market") or "spot"
@@ -121,11 +124,15 @@ def merge_requested_series_to_chart_bars(
     lookahead: LookaheadMode | str = "barmerge.lookahead_off",
 ) -> list[Any]:
     if len(requested_values) != len(requested_bars):
-        raise PineRequestError("requested_values length must match requested_bars length")
+        raise PineRequestError(
+            "requested_values length must match requested_bars length"
+        )
     if gaps not in {"barmerge.gaps_on", "barmerge.gaps_off"}:
         raise PineRequestError(f"Unsupported request.security gaps mode: {gaps}")
     if lookahead not in {"barmerge.lookahead_on", "barmerge.lookahead_off"}:
-        raise PineRequestError(f"Unsupported request.security lookahead mode: {lookahead}")
+        raise PineRequestError(
+            f"Unsupported request.security lookahead mode: {lookahead}"
+        )
 
     cache: dict[str, Any] = {}
     return list(
@@ -167,10 +174,12 @@ def _append_merged_requested_values(
     ):
         requested_times = [bar.time for bar in requested_bars]
         requested_closes = [
-            bar.time_close if bar.time_close is not None else bar.time for bar in requested_bars
+            bar.time_close if bar.time_close is not None else bar.time
+            for bar in requested_bars
         ]
         effective_closes = [
-            _effective_close_time(bar, requested_bars, i) for i, bar in enumerate(requested_bars)
+            _effective_close_time(bar, requested_bars, i)
+            for i, bar in enumerate(requested_bars)
         ]
         cache["requested_times"] = requested_times
         cache["requested_closes"] = requested_closes
@@ -183,7 +192,9 @@ def _append_merged_requested_values(
 
     for chart_bar in chart_bars[start_index:]:
         value: Any = na
-        chart_close = chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
+        chart_close = (
+            chart_bar.time_close if chart_bar.time_close is not None else chart_bar.time
+        )
         if lookahead == "barmerge.lookahead_on" and gaps == "barmerge.gaps_off":
             while (
                 lookahead_on_gaps_off_index < len(requested_values)
@@ -340,11 +351,7 @@ def security(
         gaps=gaps,
         lookahead=lookahead,
     )
-    # The +1 offset is kept for backward compatibility.
-    # It returns merged[bar_index + 1] (next chart bar's HTF value) instead of
-    # merged[bar_index] (current chart bar's HTF value). This is incorrect
-    # but the existing tests depend on it.
-    index = runtime.bar_index + 1 if runtime.current_bar is not None else runtime.bar_index
+    index = security_lookup_index(runtime)
     if index < 0 or index >= len(merged):
         return na
     return merged[index]
@@ -422,7 +429,9 @@ def security_lower_tf(
 
     del currency, ignore_invalid_timeframe
     if calc_bars_count is not None and calc_bars_count < 0:
-        raise PineRequestError("request.security_lower_tf calc_bars_count must be non-negative")
+        raise PineRequestError(
+            "request.security_lower_tf calc_bars_count must be non-negative"
+        )
     if runtime.request_depth > 0 and not runtime.config.supports_nested_security:
         runtime.config.emit_diagnostic(
             PL_UNSUPPORTED_NESTED_SECURITY,
@@ -459,7 +468,11 @@ def security_lower_tf(
             raise PineRequestError(
                 "request.security_lower_tf requires runtime.data_provider or runtime.intrabar_provider"  # noqa: E501
             )
-        query_start = runtime.chart_bars[0].time if runtime.chart_bars else runtime.current_bar.time
+        query_start = (
+            runtime.chart_bars[0].time
+            if runtime.chart_bars
+            else runtime.current_bar.time
+        )
         query_end = _bar_close_time(runtime.current_bar)
         request_end = getattr(runtime, "request_data_end_ms", None) or query_end
         cache_key = (
@@ -486,7 +499,9 @@ def security_lower_tf(
             selected_bars = [bar for bar in selected_bars if bar.volume != 0]
 
     record_metadata = bool(
-        getattr(getattr(runtime, "config", None), "extra", {}).get("record_lower_tf_metadata", True)
+        getattr(getattr(runtime, "config", None), "extra", {}).get(
+            "record_lower_tf_metadata", True
+        )
     )
     if record_metadata and hasattr(runtime, "lower_tf_metadata_log"):
         metadata = LowerTfQueryMetadata(
@@ -530,7 +545,9 @@ def security_lower_tf(
             "request.security_lower_tf expression must be callable or a value sequence"
         )
 
-    child = runtime.spawn_child_context(symbol=symbol, timeframe=timeframe, namespace=state_id)
+    child = runtime.spawn_child_context(
+        symbol=symbol, timeframe=timeframe, namespace=state_id
+    )
     child.request_depth = runtime.request_depth + 1
     values = []
     for bar in selected_bars:
