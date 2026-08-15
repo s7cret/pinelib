@@ -10,6 +10,7 @@ from pinelib.errors import (
     PineStrategyError,
     StrategyLedgerUnavailableError,
 )
+from pinelib.strategy.intents import IntentEvent, IntentTape
 from pinelib.strategy.models import (
     Direction,
     Order,
@@ -54,6 +55,7 @@ class StrategyContext:
         self.qty_step = self.declaration.qty_step
         self.qty_rounding_mode = self.declaration.qty_rounding_mode
         self.pending_orders: list[Order] = []
+        self.intent_tape = IntentTape()
         self.risk_rules: list[RiskRule] = []
         self._closedtrades = _StrategyScalarSeries(0)
         self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
@@ -230,6 +232,7 @@ class StrategyContext:
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
+        self._record_intent(order)
 
     def exit(
         self,
@@ -265,6 +268,7 @@ class StrategyContext:
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
         self.pending_orders.append(order)
+        self._record_intent(order)
 
     def close(
         self,
@@ -290,6 +294,7 @@ class StrategyContext:
         order.from_entry = id
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent(order)
 
     def close_all(
         self,
@@ -310,6 +315,7 @@ class StrategyContext:
         )
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent(order)
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
         del source_map
@@ -372,11 +378,11 @@ class StrategyContext:
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        self.pending_orders.append(
-            self._make_order(
-                id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
-            )
+        order = self._make_order(
+            id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
         )
+        self.pending_orders.append(order)
+        self._record_intent(order)
 
     def _make_order(
         self,
@@ -584,6 +590,28 @@ class StrategyContext:
                 f"strategy.{name} requires a StrategyLedgerView supplied by BacktestEngine"
             )
         return self._strategy_ledger_view
+
+    def _record_intent(self, order: Order) -> None:
+        self.intent_tape.record(
+            IntentEvent(
+                schema_id="openpine.intent.v2",
+                kind=order.kind,
+                order_id=order.id,
+                direction=order.direction,
+                qty=order.qty,
+                limit=order.limit,
+                stop=order.stop,
+                from_entry=order.from_entry,
+                comment=order.comment,
+                bar_index=order.created_bar_index,
+                time=order.created_time,
+                extra={
+                    "type": order.type,
+                    "oca_name": order.oca_name,
+                    "qty_percent": order.qty_percent,
+                },
+            )
+        )
 
     def _emit(self, runtime: PineRuntime | None, code: str, message: str, **extra: object) -> None:
         target = runtime.config if runtime is not None else self._diagnostics_target
