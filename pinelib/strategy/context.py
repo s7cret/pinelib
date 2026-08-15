@@ -10,6 +10,7 @@ from pinelib.errors import (
     PineStrategyError,
     StrategyLedgerUnavailableError,
 )
+from pinelib.strategy.intent_tape import IntentTape
 from pinelib.strategy.models import (
     Direction,
     Order,
@@ -32,6 +33,8 @@ class StrategyContext:
 
     def __init__(self, **kwargs: Any) -> None:
         strategy_ledger_view = kwargs.pop("strategy_ledger_view", None)
+        intent_run_id = str(kwargs.pop("intent_run_id", "run"))
+        intent_strategy_id = str(kwargs.pop("intent_strategy_id", "strategy"))
         self.declaration = StrategyDeclaration(**kwargs)
         self.initial_capital = float(self.declaration.initial_capital)
         self.currency = self.declaration.currency
@@ -59,6 +62,7 @@ class StrategyContext:
         self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
+        self.intent_tape = IntentTape(run_id=intent_run_id, strategy_id=intent_strategy_id)
 
     @property
     def closedtrades(self) -> _StrategyScalarSeries:
@@ -230,6 +234,17 @@ class StrategyContext:
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
+        self._record_intent(
+            "order",
+            command_id=id,
+            qty=qty,
+            stop=stop,
+            limit=limit,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            comment=comment,
+            source_map=source_map,
+        )
 
     def exit(
         self,
@@ -265,6 +280,16 @@ class StrategyContext:
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
         self.pending_orders.append(order)
+        self._record_intent(
+            "exit",
+            command_id=id,
+            qty=qty,
+            stop=stop,
+            limit=limit,
+            from_entry=from_entry,
+            comment=comment,
+            source_map=source_map,
+        )
 
     def close(
         self,
@@ -290,6 +315,14 @@ class StrategyContext:
         order.from_entry = id
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent(
+            "close",
+            command_id=f"close:{id}",
+            qty=qty,
+            from_entry=id,
+            comment=comment,
+            source_map=source_map,
+        )
 
     def close_all(
         self,
@@ -310,17 +343,23 @@ class StrategyContext:
         )
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent(
+            "close",
+            command_id="close_all",
+            comment=comment,
+            source_map=source_map,
+        )
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
-        del source_map
         for order in self.pending_orders:
             if order.id == id or order.parent_exit_id == id:
                 order.status = "cancelled"
+        self._record_intent("cancel", command_id=id, source_map=source_map)
 
     def cancel_all(self, *, source_map: object | None = None) -> None:
-        del source_map
         for order in self.pending_orders:
             order.status = "cancelled"
+        self._record_intent("cancel_all", command_id="*", source_map=source_map)
 
     def accept_orders_from_generated_code(self) -> None:
         return None
@@ -376,6 +415,15 @@ class StrategyContext:
             self._make_order(
                 id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
             )
+        )
+        self._record_intent(
+            kind,
+            command_id=id,
+            qty=qty,
+            stop=stop,
+            limit=limit,
+            comment=comment,
+            source_map=source_map,
         )
 
     def _make_order(
@@ -516,21 +564,64 @@ class StrategyContext:
 
     def risk_allow_entry_in(self, direction: str) -> None:
         self.risk_rules.append(RiskRule("allow_entry_in", direction=direction))
+        self._record_intent("risk", command_id=f"allow_entry_in:{direction}")
 
     def risk_max_drawdown(self, value: float, type: str) -> None:
         self.risk_rules.append(RiskRule("max_drawdown", float(value), type))
+        self._record_intent("risk", command_id="max_drawdown", qty=value)
 
     def risk_max_intraday_loss(self, value: float, type: str) -> None:
         self.risk_rules.append(RiskRule("max_intraday_loss", float(value), type))
+        self._record_intent("risk", command_id="max_intraday_loss", qty=value)
 
     def risk_max_position_size(self, value: float, type: str = "fixed") -> None:
         self.risk_rules.append(RiskRule("max_position_size", float(value), type))
+        self._record_intent("risk", command_id="max_position_size", qty=value)
 
     def risk_max_cons_loss_days(self, value: float, type: str = "fixed") -> None:
         self.risk_rules.append(RiskRule("max_cons_loss_days", float(value), type))
+        self._record_intent("risk", command_id="max_cons_loss_days", qty=value)
 
     def risk_max_intraday_filled_orders(self, value: float, type: str = "fixed") -> None:
         self.risk_rules.append(RiskRule("max_intraday_filled_orders", float(value), type))
+        self._record_intent("risk", command_id="max_intraday_filled_orders", qty=value)
+
+    def _record_intent(
+        self,
+        kind: str,
+        *,
+        command_id: str,
+        qty: object = None,
+        stop: object = None,
+        limit: object = None,
+        from_entry: str | None = None,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
+        comment: str | None = None,
+        source_map: object | None = None,
+    ) -> None:
+        runtime = self._runtime
+        bar_index = runtime.bar_index if runtime is not None else 0
+        bar_time = (
+            runtime.current_bar.time
+            if runtime is not None and runtime.current_bar is not None
+            else None
+        )
+        span = None if source_map is None else {"node": str(source_map)}
+        self.intent_tape.record(
+            kind,
+            command_id=command_id,
+            qty=qty,
+            stop=stop,
+            limit=limit,
+            from_entry=from_entry,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            comment=comment,
+            bar_index=bar_index,
+            bar_open_time_utc_ms=bar_time,
+            source_span=span,
+        )
 
     def _ledger_indexed_or_na(self, method_name: str, index: int | float) -> Any:
         from pinelib.core.na import na

@@ -22,6 +22,7 @@ from pinelib.backtest import (
     snapshot_from_state,
 )
 from pinelib.compat.marketdata import InstrumentKey, InvalidTimeframeError, parse_timeframe
+from pinelib.compat.v4 import Fill, Trade
 from pinelib.core.bar import Bar, to_contract_bar
 from pinelib.core.na import fixnan, na
 from pinelib.core.operators import pine_range
@@ -77,7 +78,7 @@ from pinelib.request.security import (
     security,
     security_lower_tf,
 )
-from pinelib.strategy import Fill, StrategyContext, Trade
+from pinelib.strategy import StrategyContext
 from pinelib.strategy.models import _StrategyScalarSeries
 from pinelib.ta._impl_channels import kcw, ta_range, wpr
 from pinelib.ta._impl_core import (

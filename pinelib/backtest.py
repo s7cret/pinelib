@@ -6,20 +6,19 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Protocol, TypedDict, cast, runtime_checkable
 
+from pinelib.compat.v4 import Fill, Trade
 from pinelib.core.bar import Bar
 from pinelib.core.runtime import PineRuntime
 from pinelib.core.types import TickUpdate
 from pinelib.errors import PineGoldenMismatchError, PineRuntimeError, StrategyLedgerUnavailableError
 from pinelib.strategy import (
     Direction,
-    Fill,
     Order,
     OrderKind,
     OrderStatus,
     OrderType,
     RiskRule,
     StrategyContext,
-    Trade,
 )
 
 

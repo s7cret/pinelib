@@ -97,13 +97,11 @@ from pinelib.request import (
     security_lower_tf,
 )
 from pinelib.strategy import (
-    Fill,
     Order,
     RiskRule,
     StrategyContext,
     StrategyDeclaration,
     StrategyLedgerView,
-    Trade,
 )
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 from pinelib.visual import PineObjectId, VisualEvent, VisualRecorder
@@ -115,7 +113,6 @@ __all__ = [
     "Bar",
     "BarStateInfo",
     "DataProvider",
-    "Fill",
     "InMemoryDataProvider",
     "InputMetadata",
     "InputRegistry",
@@ -168,7 +165,6 @@ __all__ = [
     "SymbolInfo",
     "TickUpdate",
     "TimeframeInfo",
-    "Trade",
     "TradingViewIndicatorFixture",
     "TradingViewSampleContract",
     "TypeInfo",
