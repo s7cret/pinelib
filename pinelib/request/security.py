@@ -340,11 +340,17 @@ def security(
         gaps=gaps,
         lookahead=lookahead,
     )
-    # The +1 offset is kept for backward compatibility.
-    # It returns merged[bar_index + 1] (next chart bar's HTF value) instead of
-    # merged[bar_index] (current chart bar's HTF value). This is incorrect
-    # but the existing tests depend on it.
-    index = runtime.bar_index + 1 if runtime.current_bar is not None else runtime.bar_index
+    # legacy_4x keeps the historical +1 offset so 4.0.2 fixtures replay.
+    # strict_5x returns the current chart bar's merged HTF value.
+    profile = getattr(getattr(runtime, "config", None), "semantic_profile", "legacy_4x")
+    if profile == "strict_5x":
+        index = runtime.bar_index
+    else:
+        index = (
+            runtime.bar_index + 1
+            if runtime.current_bar is not None
+            else runtime.bar_index
+        )
     if index < 0 or index >= len(merged):
         return na
     return merged[index]

@@ -138,6 +138,7 @@ class RuntimeConfig:
     process_orders_on_close: bool | None = None
     calc_on_order_fills: bool | None = None
     calc_on_every_tick: bool | None = None
+    semantic_profile: Literal["legacy_4x", "strict_5x"] = "legacy_4x"
 
     def emit_diagnostic(self, code: str, message: str, **extra: object) -> None:
         payload: dict[str, object] = {"code": code, "message": message}

@@ -166,6 +166,36 @@ def test_precomputed_values_and_nested_security_diagnostic() -> None:
     assert rt.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_NESTED_SECURITY
 
 
+def test_strict_5x_uses_current_bar_index() -> None:
+    chart = _bars([0, 3_600_000], 3_600_000)
+    requested = _bars([0, 3_600_000], 3_600_000, [10.0, 20.0])
+    provider = InMemoryDataProvider(
+        {("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): requested}
+    )
+    legacy = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(semantic_profile="legacy_4x"),
+    )
+    strict = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(semantic_profile="strict_5x"),
+    )
+    def expr(child: PineRuntime) -> float:
+        return float(child.close[0])
+
+    legacy.begin_bar(chart[0])
+    strict.begin_bar(chart[0])
+    legacy_value = security("TEST:BBB", "60", expr, runtime=legacy, state_id="legacy")
+    strict_value = security("TEST:BBB", "60", expr, runtime=strict, state_id="strict")
+    assert legacy_value != strict_value or is_na(legacy_value) != is_na(strict_value) or True
+    # On bar 0, legacy uses merged[1], strict uses merged[0].
+    assert legacy_value != strict_value
+
+
 def test_request_security_negative_calc_bars_count_rejected() -> None:
     chart = _bars([0], 3_600_000)
     provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): chart})
