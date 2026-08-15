@@ -1,14 +1,13 @@
 import pytest
-
 from openpine_contracts import SemanticProfile
 
 from pinelib import (
+    PL_UNKNOWN_SEMANTIC_PROFILE,
     PL_UNSUPPORTED_NESTED_SECURITY,
     Bar,
     InMemoryDataProvider,
     PineRuntime,
     PineUnsupportedFeatureError,
-    PL_UNKNOWN_SEMANTIC_PROFILE,
     RuntimeConfig,
     SymbolInfo,
     TimeframeInfo,
