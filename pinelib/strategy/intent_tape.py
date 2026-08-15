@@ -52,6 +52,7 @@ class IntentTape:
         self.phase = phase
         self._events: list[dict[str, Any]] = []
         self._seq = 0
+        self._by_key: dict[str, dict[str, Any]] = {}
 
     @property
     def events(self) -> tuple[Mapping[str, Any], ...]:
@@ -78,9 +79,12 @@ class IntentTape:
         source_span: dict[str, object] | None = None,
         origin_command_kind: str | None = None,
     ) -> Mapping[str, Any]:
-        self._seq += 1
         kind_value = str(kind)
         idempotency_key = f"{self.run_id}:{self.strategy_id}:{kind_value}:{command_id}:{bar_index}"
+        existing = self._by_key.get(idempotency_key)
+        if existing is not None:
+            return existing
+        self._seq += 1
         payload: dict[str, Any] = {
             "schema_id": "openpine.intent.v2",
             "schema_version": "2.0.0-rc.1",
@@ -116,4 +120,5 @@ class IntentTape:
         payload["content_hash"] = content_hash(unsigned, schema_id="openpine.intent.v2")
         validate_payload("openpine.intent.v2", payload)
         self._events.append(payload)
+        self._by_key[idempotency_key] = payload
         return payload

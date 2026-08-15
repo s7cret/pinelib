@@ -76,8 +76,8 @@ def test_duplicate_command_keeps_stable_idempotency_key() -> None:
     ctx.entry("L", "long", qty=1)
     ctx.entry("L", "long", qty=1)
     keys = [event["idempotency_key"] for event in ctx.intent_tape.events]
-    assert keys[0] == keys[1]
-    assert len(ctx.intent_tape.events) == 2
+    assert len(ctx.intent_tape.events) == 1
+    assert keys == [keys[0]]
 
 
 def test_intent_tape_records_runtime_span_and_remaining_commands() -> None:
