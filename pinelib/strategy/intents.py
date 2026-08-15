@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from openpine_contracts import IntentKind, decimal_string
 from openpine_contracts.errors import MoneyError

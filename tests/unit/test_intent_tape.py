@@ -1,7 +1,8 @@
+from openpine_contracts.errors import MoneyError
+
 from pinelib.core.bar import Bar
 from pinelib.errors import PineStrategyError
 from pinelib.strategy.context import StrategyContext
-from openpine_contracts.errors import MoneyError
 
 
 def test_entry_records_intent_not_fill() -> None:
