@@ -1,11 +1,14 @@
 import pytest
 
+from openpine_contracts import SemanticProfile
+
 from pinelib import (
     PL_UNSUPPORTED_NESTED_SECURITY,
     Bar,
     InMemoryDataProvider,
     PineRuntime,
     PineUnsupportedFeatureError,
+    PL_UNKNOWN_SEMANTIC_PROFILE,
     RuntimeConfig,
     SymbolInfo,
     TimeframeInfo,
@@ -28,7 +31,7 @@ def _runtime(provider: InMemoryDataProvider) -> PineRuntime:
         SymbolInfo("TEST:AAA", timezone="UTC"),
         TimeframeInfo.from_string("60"),
         data_provider=provider,
-        config=RuntimeConfig(),
+        config=RuntimeConfig(semantic_profile=SemanticProfile.LEGACY_4X),
     )
 
 
@@ -164,6 +167,51 @@ def test_precomputed_values_and_nested_security_diagnostic() -> None:
         security("TEST:BBB", "60", [42.0], runtime=rt, state_id="nested")
     assert excinfo.value.code == PL_UNSUPPORTED_NESTED_SECURITY
     assert rt.config.diagnostics[-1]["code"] == PL_UNSUPPORTED_NESTED_SECURITY
+
+
+def test_strict_5x_uses_current_bar_index() -> None:
+    chart = _bars([0, 3_600_000], 3_600_000)
+    requested = _bars([0, 3_600_000], 3_600_000, [10.0, 20.0])
+    provider = InMemoryDataProvider(
+        {("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): requested}
+    )
+    legacy = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(semantic_profile=SemanticProfile.LEGACY_4X),
+    )
+    strict = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(semantic_profile=SemanticProfile.STRICT_5X),
+    )
+
+    def expr(child: PineRuntime) -> float:
+        return float(child.close[0])
+
+    legacy.begin_bar(chart[0])
+    strict.begin_bar(chart[0])
+    legacy_value = security("TEST:BBB", "60", expr, runtime=legacy, state_id="legacy")
+    strict_value = security("TEST:BBB", "60", expr, runtime=strict, state_id="strict")
+    assert RuntimeConfig().semantic_profile is SemanticProfile.STRICT_5X
+    assert legacy_value != strict_value
+
+
+def test_unknown_semantic_profile_fail_closed() -> None:
+    chart = _bars([0], 3_600_000)
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): chart})
+    rt = PineRuntime(
+        SymbolInfo("TEST:AAA", timezone="UTC"),
+        TimeframeInfo.from_string("60"),
+        data_provider=provider,
+        config=RuntimeConfig(semantic_profile="not_a_profile"),  # type: ignore[arg-type]
+    )
+    rt.begin_bar(chart[0])
+    with pytest.raises(PineUnsupportedFeatureError) as excinfo:
+        security("TEST:BBB", "60", [1.0], runtime=rt, state_id="bad")
+    assert excinfo.value.code == PL_UNKNOWN_SEMANTIC_PROFILE
 
 
 def test_request_security_negative_calc_bars_count_rejected() -> None:

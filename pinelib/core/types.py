@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from openpine_contracts import SemanticProfile
+
 try:
     from marketdata_provider.contracts import InvalidTimeframeError, parse_timeframe
 except ModuleNotFoundError:
@@ -138,6 +140,26 @@ class RuntimeConfig:
     process_orders_on_close: bool | None = None
     calc_on_order_fills: bool | None = None
     calc_on_every_tick: bool | None = None
+    semantic_profile: SemanticProfile = SemanticProfile.STRICT_5X
+
+    def resolve_semantic_profile(self) -> SemanticProfile:
+        from pinelib.errors import PL_UNKNOWN_SEMANTIC_PROFILE, PineUnsupportedFeatureError
+
+        profile = self.semantic_profile
+        if isinstance(profile, SemanticProfile):
+            return profile
+        if isinstance(profile, str):
+            try:
+                return SemanticProfile(profile)
+            except ValueError as exc:
+                raise PineUnsupportedFeatureError(
+                    f"unknown semantic profile: {profile}",
+                    code=PL_UNKNOWN_SEMANTIC_PROFILE,
+                ) from exc
+        raise PineUnsupportedFeatureError(
+            "missing semantic profile",
+            code=PL_UNKNOWN_SEMANTIC_PROFILE,
+        )
 
     def emit_diagnostic(self, code: str, message: str, **extra: object) -> None:
         payload: dict[str, object] = {"code": code, "message": message}
