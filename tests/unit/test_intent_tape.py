@@ -57,6 +57,7 @@ def test_intent_tape_records_all_command_kinds_without_floats() -> None:
         assert not any(isinstance(value, float) for value in event.values())
     assert ctx.intent_tape.events[0]["qty"] == "1.25"
     assert ctx.intent_tape.events[0]["limit"] == "10.5"
+    assert ctx.intent_tape.events[0]["origin_command_kind"] == "entry.long"
     assert ctx.intent_tape.events[1]["oca_name"] == "g"
 
 

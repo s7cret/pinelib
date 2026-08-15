@@ -244,6 +244,7 @@ class StrategyContext:
             oca_type=oca_type,
             comment=comment,
             source_map=source_map,
+            origin_command_kind=f"order.{direction}",
         )
 
     def exit(
@@ -424,6 +425,7 @@ class StrategyContext:
             limit=limit,
             comment=comment,
             source_map=source_map,
+            origin_command_kind=f"{kind}.{direction}",
         )
 
     def _make_order(
@@ -599,6 +601,7 @@ class StrategyContext:
         oca_type: str | None = None,
         comment: str | None = None,
         source_map: object | None = None,
+        origin_command_kind: str | None = None,
     ) -> None:
         runtime = self._runtime
         bar_index = runtime.bar_index if runtime is not None else 0
@@ -621,6 +624,7 @@ class StrategyContext:
             bar_index=bar_index,
             bar_open_time_utc_ms=bar_time,
             source_span=span,
+            origin_command_kind=origin_command_kind,
         )
 
     def _ledger_indexed_or_na(self, method_name: str, index: int | float) -> Any:
