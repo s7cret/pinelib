@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-
 from openpine_contracts import SemanticProfile
+
 from pinelib import (
     Bar,
     InMemoryDataProvider,
@@ -53,9 +53,7 @@ def test_legacy_artifact_reader_assigns_legacy_explicitly() -> None:
 def test_security_offset_differs_by_profile() -> None:
     chart = _bars([0, 3_600_000, 7_200_000], 3_600_000)
     requested = _bars([0, 7_200_000], 7_200_000, [100.0, 200.0])
-    provider = InMemoryDataProvider(
-        {("TEST:AAA", "60"): chart, ("TEST:BBB", "120"): requested}
-    )
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "120"): requested})
 
     def _run(profile: SemanticProfile) -> list[object]:
         rt = PineRuntime(

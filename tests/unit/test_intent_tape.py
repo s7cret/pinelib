@@ -106,7 +106,7 @@ def test_intent_tape_records_runtime_span_and_remaining_commands() -> None:
 def test_contracts_pin_is_exact_git_sha() -> None:
     text = Path("pyproject.toml").read_text(encoding="utf-8")
     assert "openpine-contracts @ git+https://github.com/s7cret/openpine-contracts.git@" in text
-    assert "51e32ebaaf02eecb81443e8ca7e89b2543cb25a3" in text
+    assert "af9ecbc455e9af83cdc609f6b6ff85c40fb6c8bb" in text
 
 
 def test_intent_tape_decimal_helpers() -> None:

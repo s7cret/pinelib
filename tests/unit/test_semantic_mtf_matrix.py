@@ -47,13 +47,9 @@ def _rt(
     )
 
 
-def _series(
-    profile: SemanticProfile, timeframe: str, requested: list[Bar]
-) -> list[object]:
+def _series(profile: SemanticProfile, timeframe: str, requested: list[Bar]) -> list[object]:
     chart = _bars([0, HOUR, 2 * HOUR], HOUR)
-    provider = InMemoryDataProvider(
-        {("TEST:AAA", "60"): chart, ("TEST:BBB", timeframe): requested}
-    )
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", timeframe): requested})
     rt = _rt(provider, profile=profile)
     out: list[object] = []
     for bar in chart:
@@ -129,9 +125,7 @@ def test_first_bar_is_na_last_bar_defined_for_htf() -> None:
 
 def test_nested_security_fail_closed() -> None:
     chart = _bars([0], HOUR)
-    provider = InMemoryDataProvider(
-        {("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): chart}
-    )
+    provider = InMemoryDataProvider({("TEST:AAA", "60"): chart, ("TEST:BBB", "60"): chart})
     rt = _rt(provider)
     rt.begin_bar(chart[0])
     rt.request_depth = 1

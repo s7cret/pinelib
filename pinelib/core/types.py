@@ -81,12 +81,8 @@ class TimeframeInfo:
         isminutes = normalized.isdigit() or (
             parsed.unit == "minute" if parsed is not None else False
         )
-        isdaily = (
-            parsed.unit == "day" if parsed is not None else normalized.endswith("D")
-        )
-        isweekly = (
-            parsed.unit == "week" if parsed is not None else normalized.endswith("W")
-        )
+        isdaily = parsed.unit == "day" if parsed is not None else normalized.endswith("D")
+        isweekly = parsed.unit == "week" if parsed is not None else normalized.endswith("W")
         ismonthly = parsed.unit == "month" if parsed is not None else normalized == "M"
         if normalized.isdigit():
             multiplier = int(normalized)
