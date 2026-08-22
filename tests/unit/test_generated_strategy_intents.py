@@ -11,6 +11,7 @@ from pinelib import (
 )
 
 BASE = 1704067200000
+COMMIT = "801b908e0ba53d1387cfd032cb6d29aa53ba0ca0"
 
 
 def bars() -> list[Bar]:
@@ -42,7 +43,11 @@ def test_generated_strategy_runner_records_intents_without_broker_execution() ->
                 strategy.exit("XL", "L", qty_percent=50, profit=4, loss=2)
                 strategy.close("L", qty_percent=25, immediately=True)
 
-    strategy = StrategyContext(process_orders_on_close=True)
+    strategy = StrategyContext(
+        process_orders_on_close=True,
+        intent_producer_commit=COMMIT,
+        intent_strict_production=True,
+    )
     result = run_generated_strategy(GeneratedLikeStrategy(), runtime(), strategy, bars())
 
     assert [snapshot.order_intents_count for snapshot in result.snapshots] == [1, 3]
@@ -81,3 +86,46 @@ def test_generated_strategy_runner_records_intents_without_broker_execution() ->
     assert close_intent["from_entry"] == "L"
     assert close_intent["qty_percent"] == 25
     assert close_intent["immediate"] is True
+
+
+def test_broker_projection_hook_runs_before_each_interactive_callback() -> None:
+    seen_equity: list[float] = []
+    hook_calls: list[float] = []
+
+    class Ledger:
+        def __init__(self, equity: float) -> None:
+            self.equity = equity
+
+    class InteractiveStrategy:
+        def on_bar(self, _rt: PineRuntime, strategy: StrategyContext) -> None:
+            seen_equity.append(strategy.equity)
+
+    def project(rt: PineRuntime, _strategy: StrategyContext) -> Ledger:
+        value = float(rt.close.current)
+        hook_calls.append(value)
+        return Ledger(value)
+
+    from pinelib.core.types import TickUpdate
+
+    strategy = StrategyContext(
+        calc_on_every_tick=True,
+        intent_producer_commit=COMMIT,
+        intent_strict_production=True,
+    )
+    tick_values = [10.5, 11.0]
+    run_generated_strategy(
+        InteractiveStrategy(),
+        runtime(),
+        strategy,
+        bars()[:1],
+        realtime_ticks=[
+            [
+                TickUpdate(tick_values[0], 1.0, BASE + 1, False),
+                TickUpdate(tick_values[1], 1.0, BASE + 2, True),
+            ]
+        ],
+        broker_projection_callback=project,
+    )
+
+    assert hook_calls == tick_values
+    assert seen_equity == tick_values

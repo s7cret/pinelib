@@ -19,6 +19,7 @@ from pinelib.strategy import (
     OrderType,
     RiskRule,
     StrategyContext,
+    StrategyLedgerView,
 )
 
 
@@ -240,6 +241,9 @@ def run_generated_strategy(
     schedule: StrategySchedule | None = None,
     realtime_ticks: Iterable[Iterable[TickUpdate]] | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    broker_projection_callback: (
+        Callable[[PineRuntime, StrategyContext], StrategyLedgerView] | None
+    ) = None,
 ) -> BacktestResult:
     """Run generated-like code bar-by-bar using PineRuntime + StrategyContext.
 
@@ -277,14 +281,25 @@ def run_generated_strategy(
                 active_bar = runtime.current_bar
                 if active_bar is None:
                     raise PineRuntimeError("runtime did not set current_bar")
-                _run_strategy_pass(callback, runtime, strategy)
+                _run_strategy_pass(
+                    callback,
+                    runtime,
+                    strategy,
+                    broker_projection_callback=broker_projection_callback,
+                )
             else:
                 runtime.begin_realtime_bar(bar)
                 for idx, tick in enumerate(bar_ticks):
                     if idx == len(bar_ticks) - 1 and not tick.is_final:
                         tick = TickUpdate(tick.price, tick.volume, tick.time, True)
                     runtime.update_realtime_tick(tick)
-                    callback(runtime, strategy)
+                    _run_strategy_pass(
+                        callback,
+                        runtime,
+                        strategy,
+                        recalc_iteration=idx,
+                        broker_projection_callback=broker_projection_callback,
+                    )
         else:
             runtime.begin_bar(bar)
             runtime.set_last_confirmed_history(idx == last_confirmed_history_index)
@@ -293,7 +308,13 @@ def run_generated_strategy(
             active_bar = runtime.current_bar
             if active_bar is None:  # defensive; begin_bar guarantees this
                 raise PineRuntimeError("runtime did not set current_bar")
-            _run_strategy_pass(callback, runtime, strategy)
+            _run_strategy_pass(
+                callback,
+                runtime,
+                strategy,
+                broker_projection_callback=broker_projection_callback,
+            )
+        strategy.commit_intents_for_current_bar()
         runtime.end_bar()
         snapshots.append(snapshot_from_state(runtime, strategy))
         strategy.commit_scalar_history()
@@ -308,7 +329,15 @@ def _run_strategy_pass(
     callback: Callable[[PineRuntime, StrategyContext], None],
     runtime: PineRuntime,
     strategy: StrategyContext,
+    *,
+    recalc_iteration: int = 0,
+    broker_projection_callback: (
+        Callable[[PineRuntime, StrategyContext], StrategyLedgerView] | None
+    ) = None,
 ) -> None:
+    if broker_projection_callback is not None:
+        strategy.attach_strategy_ledger_view(broker_projection_callback(runtime, strategy))
+    strategy.begin_intent_callback(phase="BAR_BEGIN", recalc_iteration=recalc_iteration)
     callback(runtime, strategy)
 
 

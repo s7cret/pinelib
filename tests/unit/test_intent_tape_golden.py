@@ -12,10 +12,19 @@ def test_intent_tape_golden_cancel_all() -> None:
     tape = IntentTape(
         run_id="run-g",
         strategy_id="strat-g",
-        producer_commit="deadbeef",
-        phase="score",
+        series_id="series-g",
+        instrument_id="TEST:GOLDEN",
+        timeframe="60",
+        producer_commit="801b908e0ba53d1387cfd032cb6d29aa53ba0ca0",
+        strict_production=True,
     )
-    event = tape.record(IntentKind.CANCEL_ALL, command_id="all", bar_index=0)
+    tape.begin_callback(
+        bar_index=0,
+        bar_open_time_utc_ms=0,
+        phase="BAR_COMMIT",
+        recalc_iteration=0,
+    )
+    event = tape.record(IntentKind.CANCEL_ALL, command_id="all")
     validate_payload("openpine.intent.v2", event)
     expected = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert event == expected
