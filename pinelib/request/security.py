@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pinelib.core.bar import Bar
 from pinelib.core.na import na
+from pinelib.core.semantic_profile import security_lookup_index
 from pinelib.core.types import parse_timeframe_to_ms
 from pinelib.errors import (
     PL_UNSUPPORTED_NESTED_SECURITY,
@@ -340,11 +341,7 @@ def security(
         gaps=gaps,
         lookahead=lookahead,
     )
-    # The +1 offset is kept for backward compatibility.
-    # It returns merged[bar_index + 1] (next chart bar's HTF value) instead of
-    # merged[bar_index] (current chart bar's HTF value). This is incorrect
-    # but the existing tests depend on it.
-    index = runtime.bar_index + 1 if runtime.current_bar is not None else runtime.bar_index
+    index = security_lookup_index(runtime)
     if index < 0 or index >= len(merged):
         return na
     return merged[index]

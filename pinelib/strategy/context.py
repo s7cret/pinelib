@@ -10,6 +10,7 @@ from pinelib.errors import (
     PineStrategyError,
     StrategyLedgerUnavailableError,
 )
+from pinelib.strategy.intent_context import IntentContextMixin
 from pinelib.strategy.models import (
     Direction,
     Order,
@@ -22,7 +23,7 @@ from pinelib.strategy.models import (
 )
 
 
-class StrategyContext:
+class StrategyContext(IntentContextMixin):
     """Pine strategy API facade.
 
     PineLib owns generated-code API compatibility and records order/risk
@@ -32,6 +33,14 @@ class StrategyContext:
 
     def __init__(self, **kwargs: Any) -> None:
         strategy_ledger_view = kwargs.pop("strategy_ledger_view", None)
+        intent_run_id = str(kwargs.pop("intent_run_id", "run"))
+        intent_strategy_id = str(kwargs.pop("intent_strategy_id", "strategy"))
+        intent_series_id = str(kwargs.pop("intent_series_id", "series"))
+        intent_instrument_id = str(kwargs.pop("intent_instrument_id", "instrument"))
+        intent_timeframe = str(kwargs.pop("intent_timeframe", "unspecified"))
+        intent_producer_commit = kwargs.pop("intent_producer_commit", None)
+        intent_strict_production = bool(kwargs.pop("intent_strict_production", False))
+        intent_stack_id = str(kwargs.pop("intent_stack_id", "openpine-5.0"))
         self.declaration = StrategyDeclaration(**kwargs)
         self.initial_capital = float(self.declaration.initial_capital)
         self.currency = self.declaration.currency
@@ -59,6 +68,16 @@ class StrategyContext:
         self._strategy_ledger_view: StrategyLedgerView | None = strategy_ledger_view
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
+        self._initialize_intent_context(
+            run_id=intent_run_id,
+            strategy_id=intent_strategy_id,
+            series_id=intent_series_id,
+            instrument_id=intent_instrument_id,
+            timeframe=intent_timeframe,
+            producer_commit=intent_producer_commit,
+            stack_id=intent_stack_id,
+            strict_production=intent_strict_production,
+        )
 
     @property
     def closedtrades(self) -> _StrategyScalarSeries:
@@ -151,6 +170,7 @@ class StrategyContext:
         runtime.visual.max_counts["box"] = self.declaration.max_boxes_count
         self._sync_runtime_strategy_flags(runtime)
         self._validate_settings(runtime)
+        self._attach_intent_runtime_identity(runtime)
 
     def attach_strategy_ledger_view(self, ledger_view: StrategyLedgerView) -> None:
         self._strategy_ledger_view = ledger_view
@@ -204,11 +224,22 @@ class StrategyContext:
         limit: float | None = None,
         stop: float | None = None,
         *,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
         self._add_order(
-            id, direction, qty, limit, stop, "entry", comment=comment, source_map=source_map
+            id,
+            direction,
+            qty,
+            limit,
+            stop,
+            "entry",
+            oca_name=oca_name,
+            oca_type=oca_type,
+            comment=comment,
+            source_map=source_map,
         )
 
     def order(
@@ -230,6 +261,20 @@ class StrategyContext:
         order.oca_name = oca_name
         order.oca_type = oca_type
         self.pending_orders.append(order)
+        self._record_intent(
+            "order",
+            command_id=id,
+            order_id=id,
+            direction=direction,
+            qty=qty if qty is not None else self.default_qty_value,
+            stop=stop,
+            limit=limit,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            comment=comment,
+            source_map=source_map,
+            origin_command_kind=f"order.{direction}",
+        )
 
     def exit(
         self,
@@ -265,6 +310,23 @@ class StrategyContext:
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
         self.pending_orders.append(order)
+        self._record_intent(
+            "exit",
+            command_id=id,
+            order_id=id,
+            qty=qty,
+            qty_percent=qty_percent,
+            stop=stop,
+            limit=limit,
+            profit=profit,
+            loss=loss,
+            trail_price=trail_price,
+            trail_points=trail_points,
+            trail_offset=trail_offset,
+            from_entry=from_entry,
+            comment=comment,
+            source_map=source_map,
+        )
 
     def close(
         self,
@@ -290,6 +352,16 @@ class StrategyContext:
         order.from_entry = id
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent(
+            "close",
+            command_id=f"close:{id}",
+            qty=qty,
+            qty_percent=qty_percent,
+            from_entry=id,
+            immediately=immediately,
+            comment=comment,
+            source_map=source_map,
+        )
 
     def close_all(
         self,
@@ -310,17 +382,24 @@ class StrategyContext:
         )
         order.immediate = immediately
         self.pending_orders.append(order)
+        self._record_intent(
+            "close_all",
+            command_id="close_all",
+            immediately=immediately,
+            comment=comment,
+            source_map=source_map,
+        )
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
-        del source_map
         for order in self.pending_orders:
             if order.id == id or order.parent_exit_id == id:
                 order.status = "cancelled"
+        self._record_intent("cancel", command_id=id, order_id=id, source_map=source_map)
 
     def cancel_all(self, *, source_map: object | None = None) -> None:
-        del source_map
         for order in self.pending_orders:
             order.status = "cancelled"
+        self._record_intent("cancel_all", command_id="*", source_map=source_map)
 
     def accept_orders_from_generated_code(self) -> None:
         return None
@@ -369,13 +448,30 @@ class StrategyContext:
         stop: float | None,
         kind: OrderKind,
         *,
+        oca_name: str | None = None,
+        oca_type: str | None = None,
         comment: str | None = None,
         source_map: object | None = None,
     ) -> None:
-        self.pending_orders.append(
-            self._make_order(
-                id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
-            )
+        order = self._make_order(
+            id, direction, qty, limit, stop, kind, comment=comment, source_map=source_map
+        )
+        order.oca_name = oca_name
+        order.oca_type = oca_type
+        self.pending_orders.append(order)
+        self._record_intent(
+            kind,
+            command_id=id,
+            order_id=id,
+            direction=direction,
+            qty=qty if qty is not None else self.default_qty_value,
+            stop=stop,
+            limit=limit,
+            oca_name=oca_name,
+            oca_type=oca_type,
+            comment=comment,
+            source_map=source_map,
+            origin_command_kind=f"{kind}.{direction}",
         )
 
     def _make_order(
@@ -513,24 +609,6 @@ class StrategyContext:
 
     def opentrades_entry_bar_index(self, index: int | float) -> int | type:
         return self._ledger_indexed_or_na("opentrades_entry_bar_index", index)
-
-    def risk_allow_entry_in(self, direction: str) -> None:
-        self.risk_rules.append(RiskRule("allow_entry_in", direction=direction))
-
-    def risk_max_drawdown(self, value: float, type: str) -> None:
-        self.risk_rules.append(RiskRule("max_drawdown", float(value), type))
-
-    def risk_max_intraday_loss(self, value: float, type: str) -> None:
-        self.risk_rules.append(RiskRule("max_intraday_loss", float(value), type))
-
-    def risk_max_position_size(self, value: float, type: str = "fixed") -> None:
-        self.risk_rules.append(RiskRule("max_position_size", float(value), type))
-
-    def risk_max_cons_loss_days(self, value: float, type: str = "fixed") -> None:
-        self.risk_rules.append(RiskRule("max_cons_loss_days", float(value), type))
-
-    def risk_max_intraday_filled_orders(self, value: float, type: str = "fixed") -> None:
-        self.risk_rules.append(RiskRule("max_intraday_filled_orders", float(value), type))
 
     def _ledger_indexed_or_na(self, method_name: str, index: int | float) -> Any:
         from pinelib.core.na import na

@@ -50,7 +50,9 @@ from pinelib.errors import (
     PL_MARGIN_LIQUIDATION_DIAGNOSTIC,
     PL_MISSING_INTRABAR_DATA,
     PL_REFERENCE_HISTORY_UNSUPPORTED,
+    PL_SEMANTIC_PROFILE_REQUIRED,
     PL_SESSION_PARSE_ERROR,
+    PL_UNKNOWN_SEMANTIC_PROFILE,
     PL_UNSUPPORTED_LOWER_TF_SECURITY,
     PL_UNSUPPORTED_NESTED_SECURITY,
     PL_UNSUPPORTED_REALTIME_TICK,
@@ -97,13 +99,11 @@ from pinelib.request import (
     security_lower_tf,
 )
 from pinelib.strategy import (
-    Fill,
     Order,
     RiskRule,
     StrategyContext,
     StrategyDeclaration,
     StrategyLedgerView,
-    Trade,
 )
 from pinelib.version import PACKAGE_VERSION, RUNTIME_CONTRACT_VERSION
 from pinelib.visual import PineObjectId, VisualEvent, VisualRecorder
@@ -115,7 +115,6 @@ __all__ = [
     "Bar",
     "BarStateInfo",
     "DataProvider",
-    "Fill",
     "InMemoryDataProvider",
     "InputMetadata",
     "InputRegistry",
@@ -125,6 +124,8 @@ __all__ = [
     "PACKAGE_VERSION",
     "PL_DATA_FORMAT_ERROR",
     "PL_HISTORY_NOT_ALLOWED",
+    "PL_SEMANTIC_PROFILE_REQUIRED",
+    "PL_UNKNOWN_SEMANTIC_PROFILE",
     "PL_INPUT_VALIDATION_ERROR",
     "PL_MARGIN_FIELDS_DIAGNOSTIC",
     "PL_MARGIN_LIQUIDATION_DIAGNOSTIC",
@@ -168,7 +169,6 @@ __all__ = [
     "SymbolInfo",
     "TickUpdate",
     "TimeframeInfo",
-    "Trade",
     "TradingViewIndicatorFixture",
     "TradingViewSampleContract",
     "TypeInfo",

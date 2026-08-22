@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from openpine_contracts import SemanticProfile
+
 try:
     from marketdata_provider.contracts import InvalidTimeframeError, parse_timeframe
 except ModuleNotFoundError:
@@ -138,6 +140,16 @@ class RuntimeConfig:
     process_orders_on_close: bool | None = None
     calc_on_order_fills: bool | None = None
     calc_on_every_tick: bool | None = None
+    semantic_profile: SemanticProfile = SemanticProfile.LEGACY_4X
+
+    def __post_init__(self) -> None:
+        from pinelib.core.semantic_profile import resolve_semantic_profile
+
+        object.__setattr__(
+            self,
+            "semantic_profile",
+            resolve_semantic_profile(self.semantic_profile, source="runtime"),
+        )
 
     def emit_diagnostic(self, code: str, message: str, **extra: object) -> None:
         payload: dict[str, object] = {"code": code, "message": message}

@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.0.0rc3
+
+- Emits immutable, complete `openpine.intent.v2` 2.1 events with direct identities.
+- Adds per-callback broker projection updates while preserving intent-only authority.
+
 ## 4.0.2
 
 - Pinned the optimized MarketData Provider 4.0.2 release while preserving `runtime_contract_v1_4`.

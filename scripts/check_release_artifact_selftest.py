@@ -9,7 +9,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_VERSION = "4.0.2"
+PACKAGE_VERSION = "5.0.0rc3"
 
 
 def _run(cmd: list[str], cwd: Path) -> None:
