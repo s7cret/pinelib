@@ -47,6 +47,7 @@ _COMPAT_STACK_ID = content_hash(
     schema_id="pinelib.intent.compat.v4",
 )
 _SCHEMA_PROPERTIES = frozenset(get_schema(SCHEMA_ID)["properties"])
+_SEMANTIC_EVENT_ID_EXCLUDED_FIELDS = frozenset({"event_id", "content_hash"})
 _T = TypeVar("_T")
 
 
@@ -337,7 +338,7 @@ class IntentTape:
         key = (bar_index, bar_open_time_utc_ms)
         self._committed_bars.add(key)
 
-    def _delivery_ids(
+    def _delivery_key(
         self,
         *,
         bar_index: int,
@@ -347,7 +348,7 @@ class IntentTape:
         kind: str,
         command_id: str,
         invocation_ordinal: int,
-    ) -> tuple[str, str]:
+    ) -> str:
         delivery_identity = {
             "execution_context_hash": self.execution_context_hash,
             "stack_id": self.stack_id,
@@ -366,10 +367,18 @@ class IntentTape:
             "invocation_ordinal": invocation_ordinal,
         }
         digest = content_hash(delivery_identity, schema_id=SCHEMA_ID).removeprefix("sha256:")
-        return (
-            f"intent-event:sha256:{digest}",
-            f"intent-delivery:sha256:{digest}",
-        )
+        return f"intent-delivery:sha256:{digest}"
+
+    @staticmethod
+    def _semantic_event_id(payload: Mapping[str, Any]) -> str:
+        """Hash the complete event while excluding only self-referential hashes."""
+
+        semantic_content = {
+            key: _deep_thaw(value)
+            for key, value in payload.items()
+            if key not in _SEMANTIC_EVENT_ID_EXCLUDED_FIELDS
+        }
+        return f"intent-event:{content_hash(semantic_content, schema_id=SCHEMA_ID)}"
 
     def record(
         self,
@@ -469,7 +478,7 @@ class IntentTape:
                 raise ValueError("invocation_ordinal must be a nonnegative integer")
             ordinal = invocation_ordinal
 
-        event_id, idempotency_key = self._delivery_ids(
+        idempotency_key = self._delivery_key(
             bar_index=event_bar_index,
             bar_open_time_utc_ms=event_bar_time,
             phase=event_phase,
@@ -491,7 +500,6 @@ class IntentTape:
             "created_at_utc_ms": event_bar_time,
             "serializer_id": SERIALIZER_ID,
             "content_hash_alg": CONTENT_HASH_ALG,
-            "event_id": event_id,
             "sequence": sequence,
             "command_id": command_value,
             "kind": kind_value,
@@ -540,6 +548,7 @@ class IntentTape:
             risk_unit=risk_unit,
             risk_scope=risk_scope,
         )
+        payload["event_id"] = self._semantic_event_id(payload)
         sealed = seal_content_hash(payload, schema_id=SCHEMA_ID)
         validate_payload(SCHEMA_ID, sealed)
 

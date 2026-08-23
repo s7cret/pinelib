@@ -270,7 +270,6 @@ class StrategyContext(IntentContextMixin):
         )
         order.oca_name = oca_name
         order.oca_type = oca_type
-        self.pending_orders.append(order)
         self._record_intent(
             "order",
             command_id=id,
@@ -284,6 +283,7 @@ class StrategyContext(IntentContextMixin):
             comment=comment,
             source_map=source_map,
         )
+        self.pending_orders.append(order)
 
     def exit(
         self,
@@ -318,7 +318,6 @@ class StrategyContext(IntentContextMixin):
         order.oca_type = "reduce"
         order.trail_activation = trail_price if trail_price is not None else trail_points
         order.trail_offset = trail_offset
-        self.pending_orders.append(order)
         self._record_intent(
             "exit",
             command_id=id,
@@ -336,6 +335,7 @@ class StrategyContext(IntentContextMixin):
             comment=comment,
             source_map=source_map,
         )
+        self.pending_orders.append(order)
 
     def close(
         self,
@@ -360,7 +360,6 @@ class StrategyContext(IntentContextMixin):
         order.qty_percent = qty_percent
         order.from_entry = id
         order.immediate = immediately
-        self.pending_orders.append(order)
         self._record_intent(
             "close",
             command_id=f"close:{id}",
@@ -371,6 +370,7 @@ class StrategyContext(IntentContextMixin):
             comment=comment,
             source_map=source_map,
         )
+        self.pending_orders.append(order)
 
     def close_all(
         self,
@@ -390,7 +390,6 @@ class StrategyContext(IntentContextMixin):
             source_map=source_map,
         )
         order.immediate = immediately
-        self.pending_orders.append(order)
         self._record_intent(
             "close_all",
             command_id="close_all",
@@ -398,17 +397,18 @@ class StrategyContext(IntentContextMixin):
             comment=comment,
             source_map=source_map,
         )
+        self.pending_orders.append(order)
 
     def cancel(self, id: str, *, source_map: object | None = None) -> None:
+        self._record_intent("cancel", command_id=id, order_id=id, source_map=source_map)
         for order in self.pending_orders:
             if order.id == id or order.parent_exit_id == id:
                 order.status = "cancelled"
-        self._record_intent("cancel", command_id=id, order_id=id, source_map=source_map)
 
     def cancel_all(self, *, source_map: object | None = None) -> None:
+        self._record_intent("cancel_all", command_id="*", source_map=source_map)
         for order in self.pending_orders:
             order.status = "cancelled"
-        self._record_intent("cancel_all", command_id="*", source_map=source_map)
 
     def accept_orders_from_generated_code(self) -> None:
         return None
@@ -467,7 +467,6 @@ class StrategyContext(IntentContextMixin):
         )
         order.oca_name = oca_name
         order.oca_type = oca_type
-        self.pending_orders.append(order)
         self._record_intent(
             kind,
             command_id=id,
@@ -481,6 +480,7 @@ class StrategyContext(IntentContextMixin):
             comment=comment,
             source_map=source_map,
         )
+        self.pending_orders.append(order)
 
     def _make_order(
         self,

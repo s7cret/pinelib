@@ -100,7 +100,7 @@ class IntentContextMixin:
         )
 
     def risk_allow_entry_in(self, direction: str) -> None:
-        self.risk_rules.append(RiskRule("allow_entry_in", direction=direction))
+        rule = RiskRule("allow_entry_in", direction=direction)
         self._record_intent(
             "risk",
             command_id="allow_entry_in",
@@ -109,9 +109,10 @@ class IntentContextMixin:
             risk_unit=direction,
             risk_scope="entries",
         )
+        self.risk_rules.append(rule)
 
     def risk_max_drawdown(self, value: float, type: str) -> None:
-        self.risk_rules.append(RiskRule("max_drawdown", float(value), type))
+        rule = RiskRule("max_drawdown", float(value), type)
         self._record_intent(
             "risk",
             command_id="max_drawdown",
@@ -120,9 +121,10 @@ class IntentContextMixin:
             risk_unit=type,
             risk_scope="strategy",
         )
+        self.risk_rules.append(rule)
 
     def risk_max_intraday_loss(self, value: float, type: str) -> None:
-        self.risk_rules.append(RiskRule("max_intraday_loss", float(value), type))
+        rule = RiskRule("max_intraday_loss", float(value), type)
         self._record_intent(
             "risk",
             command_id="max_intraday_loss",
@@ -131,9 +133,10 @@ class IntentContextMixin:
             risk_unit=type,
             risk_scope="intraday",
         )
+        self.risk_rules.append(rule)
 
     def risk_max_position_size(self, value: float, type: str = "fixed") -> None:
-        self.risk_rules.append(RiskRule("max_position_size", float(value), type))
+        rule = RiskRule("max_position_size", float(value), type)
         self._record_intent(
             "risk",
             command_id="max_position_size",
@@ -142,9 +145,10 @@ class IntentContextMixin:
             risk_unit=type,
             risk_scope="strategy",
         )
+        self.risk_rules.append(rule)
 
     def risk_max_cons_loss_days(self, value: float, type: str = "fixed") -> None:
-        self.risk_rules.append(RiskRule("max_cons_loss_days", float(value), type))
+        rule = RiskRule("max_cons_loss_days", float(value), type)
         self._record_intent(
             "risk",
             command_id="max_cons_loss_days",
@@ -153,9 +157,10 @@ class IntentContextMixin:
             risk_unit=type,
             risk_scope="strategy",
         )
+        self.risk_rules.append(rule)
 
     def risk_max_intraday_filled_orders(self, value: float, type: str = "fixed") -> None:
-        self.risk_rules.append(RiskRule("max_intraday_filled_orders", float(value), type))
+        rule = RiskRule("max_intraday_filled_orders", float(value), type)
         self._record_intent(
             "risk",
             command_id="max_intraday_filled_orders",
@@ -164,6 +169,7 @@ class IntentContextMixin:
             risk_unit=type,
             risk_scope="intraday",
         )
+        self.risk_rules.append(rule)
 
     def _record_intent(
         self,

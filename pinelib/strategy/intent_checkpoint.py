@@ -109,7 +109,7 @@ def restore_intent_tape_state(tape: IntentTape, state: object) -> None:
         key = event.get("idempotency_key")
         if not isinstance(key, str) or key in by_key:
             raise ValueError("IntentTape checkpoint idempotency keys must be unique strings")
-        expected_event_id, expected_key = tape._delivery_ids(
+        expected_key = tape._delivery_key(
             bar_index=event["bar_index"],
             bar_open_time_utc_ms=event["bar_open_time_utc_ms"],
             phase=event["phase"],
@@ -118,8 +118,10 @@ def restore_intent_tape_state(tape: IntentTape, state: object) -> None:
             command_id=event["command_id"],
             invocation_ordinal=ordinals[sequence],
         )
-        if event.get("event_id") != expected_event_id or key != expected_key:
+        if key != expected_key:
             raise ValueError("IntentTape checkpoint event delivery identity is invalid")
+        if event.get("event_id") != tape._semantic_event_id(event):
+            raise ValueError("IntentTape checkpoint event semantic identity is invalid")
         frozen = cast(FrozenDict, _deep_freeze(event))
         events.append(frozen)
         by_key[key] = frozen
