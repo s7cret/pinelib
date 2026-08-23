@@ -15,6 +15,8 @@ def test_runtime_rollback_snapshot_can_preserve_varip_between_ticks() -> None:
     assert isinstance(varip, dict)
     varip["count"] = 1
     checkpoint = rt.export_state(include_varip=False)
+    assert checkpoint["varip_policy"] == "preserve_existing"
+    assert "varip_state" not in checkpoint
 
     rt.update_realtime_tick(TickUpdate(price=12, volume=1, time=30))
     rt.get_varip_state("counter", dict)["count"] = 2

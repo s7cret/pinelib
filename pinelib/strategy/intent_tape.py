@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import math
 import os
-import re
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any, TypeVar
 
-from openpine_contracts import IntentKind, decimal_string, get_schema, validate_payload
+from openpine_contracts import (
+    IntentKind,
+    decimal_string,
+    get_schema,
+    validate_payload,
+)
 from openpine_contracts.hashing import (
     CONTENT_HASH_ALG,
     SERIALIZER_ID,
@@ -15,27 +19,33 @@ from openpine_contracts.hashing import (
     seal_content_hash,
 )
 
-SCHEMA_ID = "openpine.intent.v2"
-SCHEMA_VERSION = "2.1.0"
-PRODUCER_VERSION = "5.0.0-rc.3"
-PINE_DOUBLE_DECIMAL_POLICY = "ieee754-binary64-shortest-round-trip-v1"
-_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
-_SOURCE_SPAN_FIELDS = (
-    "start_offset",
-    "end_offset",
-    "start_line",
-    "start_col",
-    "end_line",
-    "end_col",
+from pinelib.execution_context import ExecutionContext
+from pinelib.strategy.intent_validation import (
+    direction as _direction,
 )
-_DEFAULT_SOURCE_SPAN: dict[str, int] = {
-    "start_offset": 0,
-    "end_offset": 0,
-    "start_line": 1,
-    "start_col": 0,
-    "end_line": 1,
-    "end_col": 0,
+from pinelib.strategy.intent_validation import (
+    reject_unrelated_business_fields as _reject_unrelated_business_fields,
+)
+from pinelib.strategy.intent_validation import (
+    source_span as _source_span,
+)
+
+SCHEMA_ID = "openpine.intent.v2"
+SCHEMA_VERSION = "2.2.0"
+PRODUCER_VERSION = "5.0.0-rc.4"
+PINE_DOUBLE_DECIMAL_POLICY = "ieee754-binary64-shortest-round-trip-v1"
+_STRICT_GENERIC_IDENTITIES = {
+    "run_id": {"run"},
+    "strategy_id": {"strategy"},
+    "series_id": {"series"},
+    "instrument_id": {"instrument"},
+    "timeframe": {"unspecified"},
 }
+_COMPAT_PRODUCER_COMMIT = "0" * 40
+_COMPAT_STACK_ID = content_hash(
+    {"compatibility_profile": "pinelib.compat.v4"},
+    schema_id="pinelib.intent.compat.v4",
+)
 _SCHEMA_PROPERTIES = frozenset(get_schema(SCHEMA_ID)["properties"])
 _T = TypeVar("_T")
 
@@ -118,20 +128,8 @@ def _nonempty(value: object, *, field: str) -> str:
     return text
 
 
-def _source_span(value: Mapping[str, object] | object | None) -> dict[str, int]:
-    if not isinstance(value, Mapping) or not all(field in value for field in _SOURCE_SPAN_FIELDS):
-        return dict(_DEFAULT_SOURCE_SPAN)
-    span: dict[str, int] = {}
-    for field in _SOURCE_SPAN_FIELDS:
-        raw = value[field]
-        if isinstance(raw, bool) or not isinstance(raw, int):
-            raise TypeError(f"source_span.{field} must be an integer")
-        span[field] = raw
-    return span
-
-
 class IntentTape:
-    """Append-only, immutable producer for ``openpine.intent.v2`` 2.1.0.
+    """Append-only, immutable producer for ``openpine.intent.v2`` 2.2.0.
 
     ``begin_callback`` creates a deterministic invocation-ordinal scope. Replaying
     the same callback therefore returns the same events, while two invocations of
@@ -150,33 +148,83 @@ class IntentTape:
         producer: str = "pinelib",
         producer_version: str = PRODUCER_VERSION,
         producer_commit: str | None = None,
-        stack_id: str = "openpine-5.0",
+        stack_id: str | None = None,
         semantic_profile: str = "strict_5x",
         phase: str = "BAR_COMMIT",
         strict_production: bool = False,
+        execution_context: ExecutionContext | Mapping[str, Any] | None = None,
     ) -> None:
+        context = None if execution_context is None else ExecutionContext.coerce(execution_context)
+        if strict_production and context is None:
+            raise ValueError("strict production IntentTape requires execution_context")
+
         resolved_commit = producer_commit or os.environ.get("PINELIB_PRODUCER_COMMIT")
         if resolved_commit is None:
-            resolved_commit = "development"
-        if strict_production and _GIT_COMMIT_RE.fullmatch(resolved_commit) is None:
-            raise ValueError(
-                "strict production producer_commit must be exactly 40 lowercase "
-                "hexadecimal characters"
+            resolved_commit = (
+                context.pinelib_commit if context is not None else _COMPAT_PRODUCER_COMMIT
             )
+        resolved_stack_id = (
+            str(context["stack_id"])
+            if stack_id is None and context is not None
+            else (_COMPAT_STACK_ID if stack_id is None else stack_id)
+        )
 
-        self.run_id = _nonempty(run_id, field="run_id")
-        self.strategy_id = _nonempty(strategy_id, field="strategy_id")
-        self.series_id = _nonempty(series_id, field="series_id")
-        self.instrument_id = _nonempty(instrument_id, field="instrument_id")
-        self.timeframe = _nonempty(timeframe, field="timeframe")
+        supplied_identity = {
+            "run_id": _nonempty(run_id, field="run_id"),
+            "strategy_id": _nonempty(strategy_id, field="strategy_id"),
+            "series_id": _nonempty(series_id, field="series_id"),
+            "instrument_id": _nonempty(instrument_id, field="instrument_id"),
+            "timeframe": _nonempty(timeframe, field="timeframe"),
+            "semantic_profile": _nonempty(semantic_profile, field="semantic_profile"),
+            "producer_commit": _nonempty(resolved_commit, field="producer_commit"),
+            "stack_id": _nonempty(resolved_stack_id, field="stack_id"),
+        }
+        if strict_production:
+            assert context is not None
+            if producer != "pinelib":
+                raise ValueError("strict intent producer must be pinelib")
+            if producer_version != PRODUCER_VERSION:
+                raise ValueError(f"strict intent producer_version must be {PRODUCER_VERSION}")
+            expected_identity = {
+                "run_id": context["run_id"],
+                "strategy_id": context["strategy_id"],
+                "series_id": context["series_id"],
+                "instrument_id": context["instrument_id"],
+                "timeframe": context["timeframe"],
+                "semantic_profile": context["semantic_profile"],
+                "producer_commit": context.pinelib_commit,
+                "stack_id": context["stack_id"],
+            }
+            for field, expected in expected_identity.items():
+                actual = supplied_identity[field]
+                if actual != expected:
+                    raise ValueError(
+                        f"strict intent {field} must match execution_context: "
+                        f"expected {expected!r}, got {actual!r}"
+                    )
+            for field, sentinels in _STRICT_GENERIC_IDENTITIES.items():
+                if supplied_identity[field] in sentinels:
+                    raise ValueError(f"strict intent {field} cannot use a generic identity")
+            # The validated ExecutionContext schema already proves exact nonzero
+            # commit and stack-hash shapes; equality above binds the event producer
+            # to those admitted values without a second, drifting validator.
+
+        self.run_id = supplied_identity["run_id"]
+        self.strategy_id = supplied_identity["strategy_id"]
+        self.series_id = supplied_identity["series_id"]
+        self.instrument_id = supplied_identity["instrument_id"]
+        self.timeframe = supplied_identity["timeframe"]
         self.producer = _nonempty(producer, field="producer")
         self.producer_version = _nonempty(producer_version, field="producer_version")
-        self.producer_commit = _nonempty(resolved_commit, field="producer_commit")
-        self.stack_id = _nonempty(stack_id, field="stack_id")
-        self.semantic_profile = _nonempty(semantic_profile, field="semantic_profile")
+        self.producer_commit = supplied_identity["producer_commit"]
+        self.stack_id = supplied_identity["stack_id"]
+        self.semantic_profile = supplied_identity["semantic_profile"]
         self.strict_production = strict_production
+        self._execution_context = context
+        self.execution_context_hash = None if context is None else context.content_hash
 
         self._events: list[FrozenDict] = []
+        self._event_ordinals: list[int] = []
         self._by_key: dict[str, FrozenDict] = {}
         self._committed_bars: set[tuple[int, int]] = set()
         self._callback_bar_index = 0
@@ -189,11 +237,41 @@ class IntentTape:
     def events(self) -> tuple[Mapping[str, Any], ...]:
         return tuple(self._public_event(event) for event in self._events)
 
+    @property
+    def execution_context(self) -> ExecutionContext | None:
+        return self._execution_context
+
     def content_hash(self) -> str:
         return content_hash(
             {"events": [_deep_thaw(event) for event in self._events]},
             schema_id=SCHEMA_ID,
         )
+
+    def _identity_state(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "strategy_id": self.strategy_id,
+            "series_id": self.series_id,
+            "instrument_id": self.instrument_id,
+            "timeframe": self.timeframe,
+            "producer": self.producer,
+            "producer_version": self.producer_version,
+            "producer_commit": self.producer_commit,
+            "stack_id": self.stack_id,
+            "semantic_profile": self.semantic_profile,
+            "strict_production": self.strict_production,
+            "execution_context_hash": self.execution_context_hash,
+        }
+
+    def export_state(self) -> dict[str, object]:
+        from pinelib.strategy.intent_checkpoint import export_intent_tape_state
+
+        return export_intent_tape_state(self)
+
+    def restore_state(self, state: object) -> None:
+        from pinelib.strategy.intent_checkpoint import restore_intent_tape_state
+
+        restore_intent_tape_state(self, state)
 
     def set_series_identity(
         self,
@@ -214,6 +292,15 @@ class IntentTape:
             ),
         )
         current = (self.series_id, self.instrument_id, self.timeframe, self.semantic_profile)
+        if self.strict_production and self._execution_context is not None:
+            expected = (
+                self._execution_context["series_id"],
+                self._execution_context["instrument_id"],
+                self._execution_context["timeframe"],
+                self._execution_context["semantic_profile"],
+            )
+            if identity != expected:
+                raise ValueError("strict intent series identity must match execution_context")
         if self._events and identity != current:
             raise RuntimeError("intent series identity cannot change after the first event")
         self.series_id, self.instrument_id, self.timeframe, self.semantic_profile = identity
@@ -250,6 +337,40 @@ class IntentTape:
         key = (bar_index, bar_open_time_utc_ms)
         self._committed_bars.add(key)
 
+    def _delivery_ids(
+        self,
+        *,
+        bar_index: int,
+        bar_open_time_utc_ms: int,
+        phase: str,
+        recalc_iteration: int,
+        kind: str,
+        command_id: str,
+        invocation_ordinal: int,
+    ) -> tuple[str, str]:
+        delivery_identity = {
+            "execution_context_hash": self.execution_context_hash,
+            "stack_id": self.stack_id,
+            "producer_commit": self.producer_commit,
+            "run_id": self.run_id,
+            "strategy_id": self.strategy_id,
+            "series_id": self.series_id,
+            "instrument_id": self.instrument_id,
+            "timeframe": self.timeframe,
+            "bar_index": bar_index,
+            "bar_open_time_utc_ms": bar_open_time_utc_ms,
+            "phase": _nonempty(phase, field="phase"),
+            "recalc_iteration": recalc_iteration,
+            "kind": kind,
+            "command_id": command_id,
+            "invocation_ordinal": invocation_ordinal,
+        }
+        digest = content_hash(delivery_identity, schema_id=SCHEMA_ID).removeprefix("sha256:")
+        return (
+            f"intent-event:sha256:{digest}",
+            f"intent-delivery:sha256:{digest}",
+        )
+
     def record(
         self,
         kind: IntentKind | str,
@@ -284,7 +405,36 @@ class IntentTape:
         origin_command_kind: str | None = None,
         invocation_ordinal: int | None = None,
     ) -> Mapping[str, Any]:
+        if price is not None:
+            raise ValueError("price is not an allowed openpine.intent.v2 2.2 field")
+        if origin_command_kind is not None:
+            raise ValueError("origin_command_kind is not an allowed openpine.intent.v2 2.2 field")
         kind_value = str(kind)
+        _reject_unrelated_business_fields(
+            kind_value,
+            {
+                "order_id": order_id,
+                "direction": direction,
+                "qty": qty,
+                "qty_percent": qty_percent,
+                "stop": stop,
+                "limit": limit,
+                "profit": profit,
+                "loss": loss,
+                "trail_price": trail_price,
+                "trail_points": trail_points,
+                "trail_offset": trail_offset,
+                "from_entry": from_entry,
+                "oca_name": oca_name,
+                "oca_type": oca_type,
+                "comment": comment,
+                "immediately": immediately,
+                "risk_rule": risk_rule,
+                "risk_value": risk_value,
+                "risk_unit": risk_unit,
+                "risk_scope": risk_scope,
+            },
+        )
         command_value = _nonempty(command_id, field="command_id")
         event_bar_index = self._callback_bar_index if bar_index is None else bar_index
         event_bar_time = (
@@ -307,9 +457,9 @@ class IntentTape:
             )
 
         ordinal_key = (kind_value, command_value)
-        if invocation_ordinal is None:
+        automatic_ordinal = invocation_ordinal is None
+        if automatic_ordinal:
             ordinal = self._invocation_counts.get(ordinal_key, 0)
-            self._invocation_counts[ordinal_key] = ordinal + 1
         else:
             if (
                 isinstance(invocation_ordinal, bool)
@@ -319,24 +469,15 @@ class IntentTape:
                 raise ValueError("invocation_ordinal must be a nonnegative integer")
             ordinal = invocation_ordinal
 
-        delivery_identity = {
-            "run_id": self.run_id,
-            "strategy_id": self.strategy_id,
-            "series_id": self.series_id,
-            "instrument_id": self.instrument_id,
-            "timeframe": self.timeframe,
-            "bar_index": event_bar_index,
-            "bar_open_time_utc_ms": event_bar_time,
-            "phase": _nonempty(event_phase, field="phase"),
-            "recalc_iteration": event_recalc,
-            "kind": kind_value,
-            "command_id": command_value,
-            "invocation_ordinal": ordinal,
-        }
-        delivery_hash = content_hash(delivery_identity, schema_id=SCHEMA_ID)
-        digest = delivery_hash.removeprefix("sha256:")
-        idempotency_key = f"intent-delivery:sha256:{digest}"
-        event_id = f"intent-event:sha256:{digest}"
+        event_id, idempotency_key = self._delivery_ids(
+            bar_index=event_bar_index,
+            bar_open_time_utc_ms=event_bar_time,
+            phase=event_phase,
+            recalc_iteration=event_recalc,
+            kind=kind_value,
+            command_id=command_value,
+            invocation_ordinal=ordinal,
+        )
         existing = self._by_key.get(idempotency_key)
         sequence = existing["sequence"] if existing is not None else len(self._events)
 
@@ -364,11 +505,15 @@ class IntentTape:
             "phase": _nonempty(event_phase, field="phase"),
             "recalc_iteration": event_recalc,
             "semantic_profile": self.semantic_profile,
-            "source_span": _source_span(source_span),
+            "source_span": _source_span(
+                source_span,
+                strict_production=self.strict_production,
+                expected_source_hash=(
+                    None if self._execution_context is None else self._execution_context.source_hash
+                ),
+            ),
             "idempotency_key": idempotency_key,
         }
-        if origin_command_kind is not None:
-            payload["origin_command_kind"] = str(origin_command_kind)
 
         self._add_business_fields(
             payload,
@@ -378,7 +523,6 @@ class IntentTape:
             direction=direction,
             qty=qty,
             qty_percent=qty_percent,
-            price=price,
             stop=stop,
             limit=limit,
             profit=profit,
@@ -404,11 +548,16 @@ class IntentTape:
                 raise ValueError(
                     "conflicting repeated delivery for the same intent invocation ordinal"
                 )
+            if automatic_ordinal:
+                self._invocation_counts[ordinal_key] = ordinal + 1
             return self._public_event(existing)
 
         frozen = _deep_freeze(sealed)
         self._events.append(frozen)
+        self._event_ordinals.append(ordinal)
         self._by_key[idempotency_key] = frozen
+        if automatic_ordinal:
+            self._invocation_counts[ordinal_key] = ordinal + 1
         return self._public_event(frozen)
 
     @staticmethod
@@ -437,7 +586,6 @@ class IntentTape:
         direction: str | None,
         qty: object,
         qty_percent: object,
-        price: object,
         stop: object,
         limit: object,
         profit: object,
@@ -461,9 +609,8 @@ class IntentTape:
             payload.update(
                 {
                     "order_id": _nonempty(order_id, field="order_id"),
-                    "direction": direction,
+                    "direction": _direction(direction),
                     "qty": _dec(qty),
-                    "price": _dec(price),
                     "stop": _dec(stop),
                     "limit": _dec(limit),
                     "oca_name": oca_name,
@@ -480,11 +627,21 @@ class IntentTape:
                     "from_entry": _nonempty(from_entry, field="from_entry"),
                     "stop": _dec(stop),
                     "limit": _dec(limit),
+                    "oca_name": oca_name,
                     "comment": comment,
                 }
             )
             IntentTape._optional_decimal(payload, "qty", qty)
             IntentTape._optional_decimal(payload, "qty_percent", qty_percent)
+            for field, value in {
+                "profit": _dec(profit),
+                "loss": _dec(loss),
+                "trail_price": _dec(trail_price),
+                "trail_points": _dec(trail_points),
+                "trail_offset": _dec(trail_offset),
+            }.items():
+                if field in _SCHEMA_PROPERTIES and value is not None:
+                    payload[field] = value
         elif kind == IntentKind.CLOSE:
             if from_entry is None:
                 raise ValueError("close intent requires a direct from_entry target")
@@ -509,22 +666,6 @@ class IntentTape:
             payload["risk_value"] = _dec(risk_value)
             payload["risk_unit"] = _nonempty(risk_unit, field="risk_unit")
             payload["risk_scope"] = _nonempty(risk_scope, field="risk_scope")
-        else:
-            raise ValueError(f"unsupported intent kind: {kind!r}")
-
-        # Optional exit values stay direct contract fields; never encode or recover
-        # them by parsing command/idempotency keys.
-        extension_values = {
-            "profit": _dec(profit),
-            "loss": _dec(loss),
-            "trail_price": _dec(trail_price),
-            "trail_points": _dec(trail_points),
-            "trail_offset": _dec(trail_offset),
-        }
-        for field, value in extension_values.items():
-            if field in _SCHEMA_PROPERTIES and value is not None:
-                payload[field] = value
-
         # Keep command_id direct and opaque. It is never parsed to reconstruct an
         # order target, risk rule, direction, unit, or scope.
         assert payload["command_id"] == command_id

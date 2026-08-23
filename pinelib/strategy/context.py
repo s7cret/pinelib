@@ -33,14 +33,9 @@ class StrategyContext(IntentContextMixin):
 
     def __init__(self, **kwargs: Any) -> None:
         strategy_ledger_view = kwargs.pop("strategy_ledger_view", None)
-        intent_run_id = str(kwargs.pop("intent_run_id", "run"))
-        intent_strategy_id = str(kwargs.pop("intent_strategy_id", "strategy"))
-        intent_series_id = str(kwargs.pop("intent_series_id", "series"))
-        intent_instrument_id = str(kwargs.pop("intent_instrument_id", "instrument"))
-        intent_timeframe = str(kwargs.pop("intent_timeframe", "unspecified"))
-        intent_producer_commit = kwargs.pop("intent_producer_commit", None)
-        intent_strict_production = bool(kwargs.pop("intent_strict_production", False))
-        intent_stack_id = str(kwargs.pop("intent_stack_id", "openpine-5.0"))
+        from pinelib.strategy.intent_setup import pop_intent_setup
+
+        intent = pop_intent_setup(kwargs)
         self.declaration = StrategyDeclaration(**kwargs)
         self.initial_capital = float(self.declaration.initial_capital)
         self.currency = self.declaration.currency
@@ -69,14 +64,15 @@ class StrategyContext(IntentContextMixin):
         self._diagnostics_target: object | None = None
         self._runtime: PineRuntime | None = None
         self._initialize_intent_context(
-            run_id=intent_run_id,
-            strategy_id=intent_strategy_id,
-            series_id=intent_series_id,
-            instrument_id=intent_instrument_id,
-            timeframe=intent_timeframe,
-            producer_commit=intent_producer_commit,
-            stack_id=intent_stack_id,
-            strict_production=intent_strict_production,
+            run_id=intent.run_id,
+            strategy_id=intent.strategy_id,
+            series_id=intent.series_id,
+            instrument_id=intent.instrument_id,
+            timeframe=intent.timeframe,
+            producer_commit=intent.producer_commit,
+            stack_id=intent.stack_id,
+            strict_production=intent.strict_production,
+            execution_context=intent.execution_context,
         )
 
     @property
@@ -161,7 +157,21 @@ class StrategyContext(IntentContextMixin):
     def commit_scalar_history(self) -> None:
         self._closedtrades.commit_current()
 
+    def export_state(self) -> dict[str, object]:
+        from pinelib.strategy.strategy_checkpoint import export_strategy_state
+
+        return export_strategy_state(self)
+
+    def restore_state(self, state: object) -> None:
+        from pinelib.strategy.strategy_checkpoint import restore_strategy_state
+
+        restore_strategy_state(self, state)
+
     def attach_runtime(self, runtime: PineRuntime) -> None:
+        execution_context = self.intent_tape.execution_context
+        if self.intent_tape.strict_production:
+            assert execution_context is not None
+            execution_context.assert_runtime_identity(runtime.syminfo, runtime.timeframe)
         runtime.strategy = self
         self._runtime = runtime
         self._diagnostics_target = runtime.config
@@ -273,7 +283,6 @@ class StrategyContext(IntentContextMixin):
             oca_type=oca_type,
             comment=comment,
             source_map=source_map,
-            origin_command_kind=f"order.{direction}",
         )
 
     def exit(
@@ -471,7 +480,6 @@ class StrategyContext(IntentContextMixin):
             oca_type=oca_type,
             comment=comment,
             source_map=source_map,
-            origin_command_kind=f"{kind}.{direction}",
         )
 
     def _make_order(

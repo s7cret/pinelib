@@ -30,7 +30,7 @@ def check(archive: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate PineLib release archive integrity")
-    parser.add_argument("archive", nargs="?", default="pinelib-5.0.0rc3.zip")
+    parser.add_argument("archive", nargs="?", default="pinelib-5.0.0rc4.zip")
     args = parser.parse_args()
     check(ROOT / args.archive)
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from pinelib.core.bar import Bar
-from pinelib.core.inputs import InputRegistry
+from pinelib.core.inputs import InputMetadata, InputRegistry
 from pinelib.core.na import na
 from pinelib.core.series import Series
 from pinelib.core.timefunc import TimeFunctions
@@ -190,6 +190,28 @@ class PineRuntime:
     def set_last_confirmed_history(self, value: bool = True) -> None:
         self.barstate = replace(self.barstate, islastconfirmedhistory=value)
 
+    def _runtime_identity_state(self) -> dict[str, object]:
+        config = self.config
+        return {
+            "contract_version": self.contract_version,
+            "symbol_info": self.symbol_info,
+            "timeframe": self.timeframe,
+            "bar_index_offset": self.bar_index_offset,
+            "config": {
+                "supports_nested_security": config.supports_nested_security,
+                "strict_tv_parity": config.strict_tv_parity,
+                "reference_history_mode": config.reference_history_mode,
+                "max_recalculations_per_bar": config.max_recalculations_per_bar,
+                "allow_incomplete_bar_time_close": config.allow_incomplete_bar_time_close,
+                "diagnostics_as_errors": config.diagnostics_as_errors,
+                "extra": copy.deepcopy(config.extra),
+                "process_orders_on_close": config.process_orders_on_close,
+                "calc_on_order_fills": config.calc_on_order_fills,
+                "calc_on_every_tick": config.calc_on_every_tick,
+                "semantic_profile": config.semantic_profile,
+            },
+        }
+
     def export_state(self, *, include_varip: bool = True) -> dict[str, object]:
         """Export a detached runtime checkpoint.
 
@@ -199,16 +221,25 @@ class PineRuntime:
         """
 
         snapshot = {
+            "runtime_identity": copy.deepcopy(self._runtime_identity_state()),
+            "varip_policy": "included" if include_varip else "preserve_existing",
             "bar_index": self.bar_index,
             "current_bar": copy.deepcopy(self.current_bar),
             "chart_bars": copy.deepcopy(self.chart_bars),
             "series": {
                 name: {
+                    "dtype": series.dtype,
+                    "initial": copy.deepcopy(series.initial),
+                    "type_info": copy.deepcopy(series.type_info),
                     "current": copy.deepcopy(series._current),
                     "history": copy.deepcopy(series._history),
+                    "between_bars": series._between_bars,
                 }
                 for name, series in self.series_registry.items()
             },
+            "commit_order": list(self.commit_order),
+            "input_metadata": copy.deepcopy(self.inputs.metadata),
+            "config_diagnostics": copy.deepcopy(self.config.diagnostics),
             "indicator_state": copy.deepcopy(self.indicator_state),
             "barstate": copy.deepcopy(self.barstate),
             "request_depth": self.request_depth,
@@ -228,10 +259,15 @@ class PineRuntime:
         if not isinstance(state, dict):
             raise PineRuntimeError("PineRuntime restore_state() expects a dict snapshot")
         required_fields = {
+            "runtime_identity",
+            "varip_policy",
             "bar_index",
             "current_bar",
             "chart_bars",
             "series",
+            "commit_order",
+            "input_metadata",
+            "config_diagnostics",
             "indicator_state",
             "barstate",
             "request_depth",
@@ -250,26 +286,86 @@ class PineRuntime:
             raise PineRuntimeError(
                 "PineRuntime snapshot schema mismatch: " f"missing={missing!r}, unknown={unknown!r}"
             )
+        if state["runtime_identity"] != self._runtime_identity_state():
+            raise PineRuntimeError("PineRuntime snapshot identity does not match runtime")
+        varip_policy = state["varip_policy"]
+        if varip_policy not in {"included", "preserve_existing"}:
+            raise PineRuntimeError("PineRuntime snapshot varip_policy is invalid")
+        if (varip_policy == "included") != ("varip_state" in state):
+            raise PineRuntimeError(
+                "PineRuntime snapshot varip_policy does not match varip_state presence"
+            )
         series_state = state["series"]
         if not isinstance(series_state, dict):
             raise PineRuntimeError("PineRuntime snapshot series must be a dict")
-        expected_series = set(self.series_registry)
+        existing_series = set(self.series_registry)
         snapshot_series = set(series_state)
-        if snapshot_series != expected_series:
+        if not existing_series <= snapshot_series:
             raise PineRuntimeError(
                 "PineRuntime snapshot series mismatch: "
-                f"missing={sorted(expected_series - snapshot_series)!r}, "
-                f"unknown={sorted(snapshot_series - expected_series)!r}"
+                f"missing={sorted(existing_series - snapshot_series)!r}"
             )
         for name, payload in series_state.items():
-            if not isinstance(payload, dict) or set(payload) != {"current", "history"}:
+            if not isinstance(payload, dict) or set(payload) != {
+                "dtype",
+                "initial",
+                "type_info",
+                "current",
+                "history",
+                "between_bars",
+            }:
                 raise PineRuntimeError(
-                    f"PineRuntime snapshot series {name!r} must contain current/history"
+                    f"PineRuntime snapshot series {name!r} must contain "
+                    "dtype/initial/type_info/current/history/between_bars"
+                )
+            dtype = payload["dtype"]
+            type_info = payload["type_info"]
+            if not isinstance(dtype, str) or not dtype:
+                raise PineRuntimeError(
+                    f"PineRuntime snapshot series {name!r} dtype must be nonempty"
+                )
+            if type_info is not None and not isinstance(type_info, TypeInfo):
+                raise PineRuntimeError(
+                    f"PineRuntime snapshot series {name!r} type_info is malformed"
+                )
+            existing = self.series_registry.get(name)
+            if existing is not None and (
+                existing.dtype != dtype
+                or existing.initial != payload["initial"]
+                or existing.type_info != type_info
+            ):
+                raise PineRuntimeError(
+                    f"PineRuntime snapshot series {name!r} metadata does not match runtime"
                 )
             if not isinstance(payload["history"], list):
                 raise PineRuntimeError(
                     f"PineRuntime snapshot series {name!r} history must be a list"
                 )
+            if not isinstance(payload["between_bars"], bool):
+                raise PineRuntimeError(
+                    f"PineRuntime snapshot series {name!r} between_bars must be bool"
+                )
+        commit_order = state["commit_order"]
+        if (
+            not isinstance(commit_order, list)
+            or any(not isinstance(name, str) for name in commit_order)
+            or len(commit_order) != len(set(commit_order))
+            or set(commit_order) != snapshot_series
+        ):
+            raise PineRuntimeError(
+                "PineRuntime snapshot commit_order must identify every series exactly once"
+            )
+        input_metadata = state["input_metadata"]
+        if not isinstance(input_metadata, dict) or any(
+            not isinstance(name, str) or not isinstance(value, InputMetadata)
+            for name, value in input_metadata.items()
+        ):
+            raise PineRuntimeError("PineRuntime snapshot input_metadata is malformed")
+        config_diagnostics = state["config_diagnostics"]
+        if not isinstance(config_diagnostics, list) or any(
+            not isinstance(item, dict) for item in config_diagnostics
+        ):
+            raise PineRuntimeError("PineRuntime snapshot config_diagnostics is malformed")
         bar_index = state["bar_index"]
         if isinstance(bar_index, bool) or not isinstance(bar_index, int):
             raise PineRuntimeError("PineRuntime snapshot bar_index must be an integer")
@@ -328,13 +424,26 @@ class PineRuntime:
         self.bar_index = bar_index
         self.current_bar = validated["current_bar"]
         self.chart_bars = validated["chart_bars"]
+        self.commit_order = validated["commit_order"]
+        self.inputs.metadata = validated["input_metadata"]
+        self.config.diagnostics = validated["config_diagnostics"]
         validated_series = validated["series"]
         for name, payload in validated_series.items():
-            series = self.series_registry[name]
+            series = self.series_registry.get(name)
+            if series is None:
+                series = Series[Any](
+                    name=name,
+                    dtype=payload["dtype"],
+                    initial=payload["initial"],
+                    type_info=payload["type_info"],
+                    runtime_config=self.config,
+                )
+                self.series_registry[name] = series
             series._current = payload["current"]
             series._history = payload["history"]
+            series._between_bars = payload["between_bars"]
         self.indicator_state = validated["indicator_state"]
-        if "varip_state" in validated:
+        if varip_policy == "included":
             self.varip_state = validated["varip_state"]
         self.barstate = validated["barstate"]
         self.request_depth = request_depth
@@ -344,6 +453,7 @@ class PineRuntime:
         self.lower_tf_metadata_log = validated["lower_tf_metadata_log"]
         self.plot_recorder = validated["plot_recorder"]
         self.visual = validated["visual"]
+        self.visual.config = self.config
         self.request_namespace = request_namespace
 
     def get_varip_state(self, state_id: str, factory: Any) -> object:

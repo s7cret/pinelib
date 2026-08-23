@@ -86,7 +86,7 @@ def test_runtime_restore_rejects_incomplete_or_unknown_series_snapshot() -> None
 
     unknown = rt.export_state()
     unknown["series"]["invented"] = {"current": 1, "history": []}
-    with pytest.raises(PineRuntimeError, match="series mismatch"):
+    with pytest.raises(PineRuntimeError, match="series 'invented'"):
         rt.restore_state(unknown)
 
 
@@ -135,7 +135,7 @@ def test_runtime_restore_rejects_all_invalid_snapshot_field_shapes() -> None:
 
     cases = [
         (field("series", []), "series must be a dict"),
-        (malformed_series, "must contain current/history"),
+        (malformed_series, "must contain .*current/history"),
         (malformed_history, "history must be a list"),
         (field("current_bar", object()), "current_bar"),
         (field("chart_bars", [object()]), "chart_bars"),

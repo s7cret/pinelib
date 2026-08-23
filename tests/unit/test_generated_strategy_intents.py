@@ -9,9 +9,20 @@ from pinelib import (
     TimeframeInfo,
     run_generated_strategy,
 )
+from tests.rc4_fixtures import COMMIT, execution_context
 
 BASE = 1704067200000
-COMMIT = "801b908e0ba53d1387cfd032cb6d29aa53ba0ca0"
+
+
+def _execution_context() -> dict[str, object]:
+    return execution_context(
+        series_id="TEST:AAA:60",
+        instrument_id="TEST:AAA",
+        exchange="TEST",
+        market="stock",
+        symbol="AAA",
+        timeframe="60",
+    )
 
 
 def bars() -> list[Bar]:
@@ -23,9 +34,18 @@ def bars() -> list[Bar]:
 
 def runtime() -> PineRuntime:
     return PineRuntime(
-        SymbolInfo("TEST:AAA", mintick=0.01),
+        SymbolInfo(
+            "TEST:AAA",
+            timezone="UTC",
+            session="regular",
+            mintick=0.01,
+            exchange="TEST",
+            type="stock",
+            currency="USD",
+            pointvalue=1.0,
+        ),
         TimeframeInfo.from_string("60"),
-        config=RuntimeConfig(),
+        config=RuntimeConfig(semantic_profile="strict_5x"),
     )
 
 
@@ -47,6 +67,7 @@ def test_generated_strategy_runner_records_intents_without_broker_execution() ->
         process_orders_on_close=True,
         intent_producer_commit=COMMIT,
         intent_strict_production=True,
+        intent_execution_context=_execution_context(),
     )
     result = run_generated_strategy(GeneratedLikeStrategy(), runtime(), strategy, bars())
 
@@ -111,6 +132,7 @@ def test_broker_projection_hook_runs_before_each_interactive_callback() -> None:
         calc_on_every_tick=True,
         intent_producer_commit=COMMIT,
         intent_strict_production=True,
+        intent_execution_context=_execution_context(),
     )
     tick_values = [10.5, 11.0]
     run_generated_strategy(

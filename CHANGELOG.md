@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.0rc4
+
+- Requires a validated, hash-verified `ExecutionContext` for strict production intents.
+- Emits exact per-kind `openpine.intent.v2` 2.2 payloads with explicit source provenance.
+- Adds deterministic checkpoint/restore for intent, strategy, and Pine runtime state.
+
 ## 5.0.0rc3
 
 - Emits immutable, complete `openpine.intent.v2` 2.1 events with direct identities.

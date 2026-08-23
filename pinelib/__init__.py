@@ -73,6 +73,7 @@ from pinelib.errors import (
     PineUnsupportedFeatureError,
     StrategyLedgerUnavailableError,
 )
+from pinelib.execution_context import ExecutionContext
 from pinelib.io import load_bars, load_bars_csv, load_bars_parquet
 from pinelib.math import pine_abs, pine_max, pine_min, pine_round, pine_sum
 from pinelib.parity import (
@@ -115,6 +116,7 @@ __all__ = [
     "Bar",
     "BarStateInfo",
     "DataProvider",
+    "ExecutionContext",
     "InMemoryDataProvider",
     "InputMetadata",
     "InputRegistry",

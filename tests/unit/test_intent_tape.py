@@ -19,16 +19,9 @@ from pinelib.strategy.intent_tape import (
     _nonempty,
     _source_span,
 )
+from tests.rc4_fixtures import COMMIT, execution_context, known_source_span
 
-COMMIT = "801b908e0ba53d1387cfd032cb6d29aa53ba0ca0"
-SPAN = {
-    "start_offset": 10,
-    "end_offset": 20,
-    "start_line": 2,
-    "start_col": 3,
-    "end_line": 2,
-    "end_col": 13,
-}
+SPAN = known_source_span()
 
 
 def _tape(**kwargs: Any) -> IntentTape:
@@ -39,7 +32,7 @@ def _tape(**kwargs: Any) -> IntentTape:
         "instrument_id": "NASDAQ:AAPL",
         "timeframe": "60",
         "producer_commit": COMMIT,
-        "strict_production": True,
+        "strict_production": False,
     }
     defaults.update(kwargs)
     return IntentTape(**defaults)
@@ -78,7 +71,7 @@ def test_compat_v4_keeps_fill_trade() -> None:
     assert lot.entry_id == "L"
 
 
-def test_intent_tape_emits_complete_v21_envelope_and_supported_business_fields() -> None:
+def test_intent_tape_emits_complete_v22_envelope_and_supported_business_fields() -> None:
     tape = _tape()
     tape.begin_callback(
         bar_index=7,
@@ -97,7 +90,6 @@ def test_intent_tape_emits_complete_v21_envelope_and_supported_business_fields()
             oca_name="entries",
             oca_type="cancel",
             source_span=SPAN,
-            origin_command_kind="entry.long",
         ),
         tape.record(
             IntentKind.ORDER,
@@ -147,8 +139,8 @@ def test_intent_tape_emits_complete_v21_envelope_and_supported_business_fields()
     assert [event["sequence"] for event in events] == list(range(len(events)))
     for event in events:
         validate_payload("openpine.intent.v2", event)
-        assert event["schema_version"] == "2.1.0"
-        assert event["producer_version"] == "5.0.0-rc.3"
+        assert event["schema_version"] == "2.2.0"
+        assert event["producer_version"] == "5.0.0-rc.4"
         assert event["producer_commit"] == COMMIT
         assert event["series_id"] == "series-1"
         assert event["instrument_id"] == "NASDAQ:AAPL"
@@ -164,11 +156,11 @@ def test_intent_tape_emits_complete_v21_envelope_and_supported_business_fields()
         assert verify_content_hash(event)
         assert not _contains_float(event)
 
-    assert events[0]["direction"] == "long"
+    assert events[0]["direction"] == "LONG"
     assert events[0]["qty"] == "1.25"
     assert events[0]["limit"] == "10.5"
     assert events[0]["oca_name"] == "entries"
-    assert events[1]["direction"] == "short"
+    assert events[1]["direction"] == "SHORT"
     assert events[2]["from_entry"] == "L"
     assert events[2]["qty_percent"] == "50"
     assert events[3]["immediately"] is True
@@ -280,10 +272,19 @@ def test_bar_commit_freezes_all_events_for_bar() -> None:
 
 
 def test_strict_production_requires_supplied_exact_git_commit() -> None:
-    with pytest.raises(ValueError, match="40 lowercase hexadecimal"):
-        _tape(producer_commit="unknown")
-    with pytest.raises(ValueError, match="40 lowercase hexadecimal"):
-        _tape(producer_commit="deadbeef")
+    context = execution_context()
+    with pytest.raises(ValueError, match="producer_commit"):
+        _tape(
+            producer_commit="unknown",
+            strict_production=True,
+            execution_context=context,
+        )
+    with pytest.raises(ValueError, match="producer_commit"):
+        _tape(
+            producer_commit="deadbeef",
+            strict_production=True,
+            execution_context=context,
+        )
 
 
 def test_context_records_direct_fields_and_explicit_close_all() -> None:
@@ -295,6 +296,16 @@ def test_context_records_direct_fields_and_explicit_close_all() -> None:
         intent_timeframe="1",
         intent_producer_commit=COMMIT,
         intent_strict_production=True,
+        intent_execution_context=execution_context(
+            run_id="run-2",
+            strategy_id="strat-2",
+            series_id="series-2",
+            instrument_id="BINANCE:BTCUSDT",
+            exchange="BINANCE",
+            market="spot",
+            symbol="BTCUSDT",
+            timeframe="1",
+        ),
     )
     ctx.entry(
         "L",
@@ -310,7 +321,7 @@ def test_context_records_direct_fields_and_explicit_close_all() -> None:
 
     entry, close_all, cancel, risk = ctx.intent_tape.events
     assert entry["order_id"] == "L"
-    assert entry["direction"] == "long"
+    assert entry["direction"] == "LONG"
     assert entry["oca_name"] == "entry-group"
     assert close_all["kind"] == IntentKind.CLOSE_ALL
     assert close_all["immediately"] is True

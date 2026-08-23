@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from pinelib.core.runtime import PineRuntime
+from pinelib.execution_context import ExecutionContext
 from pinelib.strategy.intent_tape import IntentTape
+from pinelib.strategy.intent_validation import unknown_source_provenance
 from pinelib.strategy.models import Direction, RiskRule
 
 
@@ -29,7 +34,8 @@ class IntentContextMixin:
         timeframe: str,
         producer_commit: object | None,
         strict_production: bool,
-        stack_id: str,
+        stack_id: str | None,
+        execution_context: ExecutionContext | Mapping[str, Any] | None,
     ) -> None:
         self._intent_series_id_explicit = series_id != "series"
         self._intent_instrument_id_explicit = instrument_id != "instrument"
@@ -45,6 +51,7 @@ class IntentContextMixin:
             producer_commit=None if producer_commit is None else str(producer_commit),
             stack_id=stack_id,
             strict_production=strict_production,
+            execution_context=execution_context,
         )
 
     def _attach_intent_runtime_identity(self, runtime: PineRuntime) -> None:
@@ -184,7 +191,6 @@ class IntentContextMixin:
         risk_unit: str | None = None,
         risk_scope: str | None = None,
         source_map: object | None = None,
-        origin_command_kind: str | None = None,
     ) -> None:
         bar_index, bar_time = self._intent_bar_identity()
         self.intent_tape.record(
@@ -214,8 +220,7 @@ class IntentContextMixin:
             bar_open_time_utc_ms=bar_time,
             phase=self._intent_phase,
             recalc_iteration=self._intent_recalc_iteration,
-            source_span=source_map,
-            origin_command_kind=origin_command_kind,
+            source_span=(unknown_source_provenance() if source_map is None else source_map),
         )
 
     def _intent_bar_identity(self) -> tuple[int, int]:
