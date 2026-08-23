@@ -37,9 +37,9 @@ jobs:
       - name: Compile
         run: python -m compileall -q pinelib tests scripts
       - name: Lint
-        run: python -m ruff check .
+        run: python -m ruff check pinelib tests scripts
       - name: Format
-        run: python -m black --check .
+        run: python -m black --check pinelib tests scripts
       - name: Typecheck
         run: python -m mypy pinelib
       - name: Test
