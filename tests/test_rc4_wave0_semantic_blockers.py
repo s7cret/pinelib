@@ -583,9 +583,7 @@ def test_runtime_checkpoint_rejects_cross_instrument_or_timeframe_restore() -> N
     assert target.visual.events == []
 
 
-@pytest.mark.parametrize(
-    "tickerid", ["binance:spot:BTCUSDT", "binance/spot/BTCUSDT"]
-)
+@pytest.mark.parametrize("tickerid", ["binance:spot:BTCUSDT", "binance/spot/BTCUSDT"])
 def test_symbol_ticker_uses_last_component_of_canonical_instrument_id(
     tickerid: str,
 ) -> None:
