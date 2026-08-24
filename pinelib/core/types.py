@@ -41,7 +41,7 @@ class SymbolInfo:
 
     @property
     def ticker(self) -> str:
-        return self.tickerid.split(":", 1)[-1]
+        return self.tickerid.rsplit(":", 1)[-1]
 
 
 @dataclass(frozen=True, slots=True)

@@ -581,3 +581,8 @@ def test_runtime_checkpoint_rejects_cross_instrument_or_timeframe_restore() -> N
     assert target.current_bar is None
     assert all(not series._history for series in target.series_registry.values())
     assert target.visual.events == []
+
+
+def test_symbol_ticker_uses_last_component_of_canonical_instrument_id() -> None:
+    symbol = SymbolInfo(tickerid="binance:spot:BTCUSDT")
+    assert symbol.ticker == "BTCUSDT"
