@@ -8,6 +8,7 @@ def test_contracts_pin_and_catalog() -> None:
     ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert '"openpine-contracts==5.0.0rc4"' in text
     assert "openpine-contracts @ git+" not in text
-    assert "33b6e2a70f5442e5210de907f724739cf07c64bd" in ci
+    assert "bb1a56181e37c6f0ff7a60366d9a550103fcb8df" in ci
+    assert "33b6e2a70f5442e5210de907f724739cf07c64bd" not in ci
     assert __version__ == "5.0.0rc4"
     assert "openpine.intent.v2" in list_schema_ids()

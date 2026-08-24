@@ -72,7 +72,13 @@ context = seal_content_hash(
             {"name": name, "version": "5.0.0rc4", "content_hash": hash_b}
             for name in components
         ],
-        "schema_hashes": {"openpine.intent.v2": hash_b},
+        "schema_hashes": {
+            "openpine.execution_context.v1": hash_a,
+            "openpine.worker.protocol.v2": hash_b,
+            "openpine.checkpoint.v1": hash_c,
+            "openpine.checkpoint.proof.v1": hash_d,
+            "openpine.intent.v2": hash_b,
+        },
         "generated_artifact_hash": hash_b,
         "source_hash": hash_c,
         "emitted_module_hash": hash_d,
@@ -93,8 +99,11 @@ context = seal_content_hash(
         "warmup_policy": "CALC_ONLY",
         "score_policy": "ALL_BARS",
         "end_policy": "LIQUIDATE_ON_LAST_BAR",
-        "capabilities": ["closed_bar"],
+        "capabilities": ["closed_bar", "deterministic_clock"],
         "producer_commits": {name: commit for name in components},
+        "policy_registry_version": "openpine.policies.rc4.v1",
+        "schema_registry_version": "openpine.schemas.rc4.v1",
+        "capability_registry_version": "openpine.capabilities.rc4.v1",
     },
     schema_id="openpine.execution_context.v1",
 )

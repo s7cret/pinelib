@@ -56,6 +56,9 @@ def execution_context(
         "schema_hashes": {
             "openpine.intent.v2": HASH_B,
             "openpine.execution_context.v1": HASH_C,
+            "openpine.worker.protocol.v2": HASH_B,
+            "openpine.checkpoint.v1": HASH_C,
+            "openpine.checkpoint.proof.v1": HASH_D,
         },
         "generated_artifact_hash": HASH_B,
         "source_hash": HASH_C,
@@ -77,8 +80,11 @@ def execution_context(
         "warmup_policy": "CALC_ONLY",
         "score_policy": "ALL_BARS",
         "end_policy": "LIQUIDATE_ON_LAST_BAR",
-        "capabilities": ["closed_bar", "checkpoint_v1"],
+        "capabilities": ["closed_bar", "deterministic_clock", "checkpoint_v1"],
         "producer_commits": {name: COMMIT for name in STACK_COMPONENTS},
+        "policy_registry_version": "openpine.policies.rc4.v1",
+        "schema_registry_version": "openpine.schemas.rc4.v1",
+        "capability_registry_version": "openpine.capabilities.rc4.v1",
     }
     payload.update(overrides)
     sealed = seal_content_hash(payload, schema_id="openpine.execution_context.v1")
