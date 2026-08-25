@@ -36,7 +36,7 @@ from pinelib import (
 )
 import pinelib
 
-assert pinelib.PACKAGE_VERSION == "5.0.0rc4"
+assert pinelib.PACKAGE_VERSION == "5.0.0rc5"
 
 commit = "801b908e0ba53d1387cfd032cb6d29aa53ba0ca0"
 hash_a = "sha256:" + ("a" * 64)
@@ -58,7 +58,7 @@ context = seal_content_hash(
         "schema_id": "openpine.execution_context.v1",
         "schema_version": "1.0.0",
         "producer": "pinelib-wheel-smoke",
-        "producer_version": "5.0.0-rc.4",
+        "producer_version": "5.0.0-rc.5",
         "producer_commit": commit,
         "stack_id": hash_d,
         "created_at_utc_ms": 0,
@@ -69,7 +69,7 @@ context = seal_content_hash(
         "session_id": "wheel-smoke-session",
         "stack_manifest_hash": hash_d,
         "wheel_identities": [
-            {"name": name, "version": "5.0.0rc4", "content_hash": hash_b}
+            {"name": name, "version": "5.0.0rc5", "content_hash": hash_b}
             for name in components
         ],
         "schema_hashes": {

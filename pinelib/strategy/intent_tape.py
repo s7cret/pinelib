@@ -32,7 +32,7 @@ from pinelib.strategy.intent_validation import (
 
 SCHEMA_ID = "openpine.intent.v2"
 SCHEMA_VERSION = "2.2.0"
-PRODUCER_VERSION = "5.0.0-rc.4"
+PRODUCER_VERSION = "5.0.0-rc.5"
 PINE_DOUBLE_DECIMAL_POLICY = "ieee754-binary64-shortest-round-trip-v1"
 _STRICT_GENERIC_IDENTITIES = {
     "run_id": {"run"},

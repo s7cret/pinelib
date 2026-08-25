@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinelib"
-version = "5.0.0rc4"
+version = "5.0.0rc5"
 description = "PineLib runtime foundation for generated Pine-compatible Python modules"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{name = "OpenPine maintainers"}]
 dependencies = [
-  "openpine-contracts==5.0.0rc4",
+  "openpine-contracts==5.0.0rc5",
 ]
 
 
@@ -25,7 +25,7 @@ Issues = "https://github.com/s7cret/pinelib/issues"
 
 [project.optional-dependencies]
 marketdata = [
-  "marketdata-provider==5.0.0rc4",
+  "marketdata-provider==5.0.0rc5",
 ]
 dev = [
   "black>=25.0.0",

@@ -39,7 +39,7 @@ def execution_context(
         "schema_id": "openpine.execution_context.v1",
         "schema_version": "1.0.0",
         "producer": "pinelib-tests",
-        "producer_version": "5.0.0-rc.4",
+        "producer_version": "5.0.0-rc.5",
         "producer_commit": COMMIT,
         "stack_id": HASH_D,
         "created_at_utc_ms": 0,
@@ -50,7 +50,7 @@ def execution_context(
         "session_id": f"session:{run_id}",
         "stack_manifest_hash": HASH_D,
         "wheel_identities": [
-            {"name": name, "version": "5.0.0rc4", "content_hash": HASH_B}
+            {"name": name, "version": "5.0.0rc5", "content_hash": HASH_B}
             for name in STACK_COMPONENTS
         ],
         "schema_hashes": {

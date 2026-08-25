@@ -47,7 +47,7 @@ def _minimal_release_root(tmp_path: Path) -> Path:
 
 
 def test_module_entrypoint_prints_version_and_contract(capsys: pytest.CaptureFixture[str]) -> None:
-    assert PACKAGE_VERSION == "5.0.0rc4"
+    assert PACKAGE_VERSION == "5.0.0rc5"
     assert pinelib_main(["--version"]) == 0
     assert PACKAGE_VERSION in capsys.readouterr().out
     assert pinelib_main([]) == 0
@@ -117,8 +117,8 @@ def test_release_artifact_validation_scripts_target_current_version() -> None:
     selftest = Path("scripts/check_release_artifact_selftest.py").read_text()
     integrity = Path("scripts/check_release_integrity.py").read_text()
 
-    assert 'PACKAGE_VERSION = "5.0.0rc4"' in selftest
-    assert 'default="pinelib-5.0.0rc4.zip"' in integrity
+    assert 'PACKAGE_VERSION = "5.0.0rc5"' in selftest
+    assert 'default="pinelib-5.0.0rc5.zip"' in integrity
 
 
 def test_release_validate_reports_missing_docs(tmp_path: Path) -> None:

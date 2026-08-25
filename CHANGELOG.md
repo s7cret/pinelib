@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.0.0rc5
+
+- Advances the coordinated eight-repository release candidate identity to RC.5.
+- Pins the RC.5 Contracts catalog while preserving Intent v2 and runtime semantics.
+
 ## 5.0.0rc4
 
 - Requires a validated, hash-verified `ExecutionContext` for strict production intents.

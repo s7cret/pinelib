@@ -39,8 +39,8 @@ def validate(root: str | Path = ".") -> ReleaseReport:
     errors: list[str] = []
     if _pyproject_version(base) != PACKAGE_VERSION:
         errors.append("pyproject.toml version does not match pinelib.version.PACKAGE_VERSION")
-    if PACKAGE_VERSION != "5.0.0rc4":
-        errors.append("PineLib release package should be version 5.0.0rc4")
+    if PACKAGE_VERSION != "5.0.0rc5":
+        errors.append("PineLib release package should be version 5.0.0rc5")
     if not (base / "README.md").read_text(encoding="utf-8").count(PACKAGE_VERSION):
         errors.append(f"README.md does not mention release {PACKAGE_VERSION}")
     if not (base / "CHANGELOG.md").is_file():

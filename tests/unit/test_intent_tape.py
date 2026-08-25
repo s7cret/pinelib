@@ -140,7 +140,7 @@ def test_intent_tape_emits_complete_v22_envelope_and_supported_business_fields()
     for event in events:
         validate_payload("openpine.intent.v2", event)
         assert event["schema_version"] == "2.2.0"
-        assert event["producer_version"] == "5.0.0-rc.4"
+        assert event["producer_version"] == "5.0.0-rc.5"
         assert event["producer_commit"] == COMMIT
         assert event["series_id"] == "series-1"
         assert event["instrument_id"] == "NASDAQ:AAPL"

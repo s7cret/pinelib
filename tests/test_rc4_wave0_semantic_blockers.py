@@ -58,7 +58,7 @@ def _execution_context(**overrides: Any) -> dict[str, Any]:
         "schema_id": "openpine.execution_context.v1",
         "schema_version": "1.0.0",
         "producer": "pinelib-tests",
-        "producer_version": "5.0.0-rc.4",
+        "producer_version": "5.0.0-rc.5",
         "producer_commit": COMMIT,
         "stack_id": HASH_D,
         "created_at_utc_ms": 0,
@@ -69,7 +69,7 @@ def _execution_context(**overrides: Any) -> dict[str, Any]:
         "session_id": "session-rc4-wave0",
         "stack_manifest_hash": HASH_D,
         "wheel_identities": [
-            {"name": name, "version": "5.0.0rc4", "content_hash": HASH_B}
+            {"name": name, "version": "5.0.0rc5", "content_hash": HASH_B}
             for name in STACK_COMPONENTS
         ],
         "schema_hashes": {
@@ -203,7 +203,7 @@ def test_execution_context_content_hash_is_verified() -> None:
 def test_execution_context_requires_running_pinelib_wheel_version() -> None:
     context = _execution_context()
     context["wheel_identities"] = [
-        {**identity, "version": "5.0.0rc5"} if identity["name"] == "pinelib" else identity
+        {**identity, "version": "5.0.0rc4"} if identity["name"] == "pinelib" else identity
         for identity in context["wheel_identities"]
     ]
     context = seal_content_hash(context, schema_id="openpine.execution_context.v1")
@@ -274,7 +274,7 @@ def test_intent_v22_uses_exact_kind_payload_and_canonical_direction() -> None:
 
     validate_payload("openpine.intent.v2", event)
     assert event["schema_version"] == "2.2.0"
-    assert event["producer_version"] == "5.0.0-rc.4"
+    assert event["producer_version"] == "5.0.0-rc.5"
     assert event["direction"] == "LONG"
     assert "price" not in event
     assert "origin_command_kind" not in event
