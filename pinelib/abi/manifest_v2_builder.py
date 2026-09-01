@@ -371,6 +371,7 @@ def build_manifest_v2(
             state_model = target.state_model
             capabilities = list(target.capabilities)
         elif delegation is not None:
+            overload_id = str(official_row["symbol_id"]) + "#canonical"
             state_model = "EXTERNAL_CAPABILITY"
         else:
             diagnostic = f"PL2001 {name} has no admitted PineLib or delegated target"
@@ -384,7 +385,7 @@ def build_manifest_v2(
                 "overload_id": overload_id,
                 "producer_overload_ids": (
                     [str(official_row["symbol_id"]) + "#canonical"]
-                    if target is not None
+                    if target is not None or delegation is not None
                     else []
                 ),
                 "disposition": disposition,

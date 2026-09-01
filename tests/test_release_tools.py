@@ -8,6 +8,8 @@ import sys
 import tarfile
 from pathlib import Path
 
+from pinelib.abi.builder import build_manifest
+
 ROOT = Path(__file__).resolve().parents[1]
 BUILDER = ROOT / "tools" / "build_deterministic_sdist.py"
 SCANNER = ROOT / "tools" / "forbidden_scan.py"
@@ -128,3 +130,19 @@ def test_forbidden_scan_records_exact_package_root_command() -> None:
     assert report["pass"] is True
     assert report["command"] == ["tools/forbidden_scan.py", "--root", "pinelib"]
     assert report["scan_root"] == "pinelib"
+
+
+def test_every_delegated_target_has_exact_canonical_overload_identity() -> None:
+    rows = build_manifest()["rows"]
+    assert isinstance(rows, list)
+    delegated = [
+        row
+        for row in rows
+        if isinstance(row, dict) and row["disposition"] == "TARGET_DELEGATED"
+    ]
+
+    assert delegated
+    for row in delegated:
+        canonical = f"{row['symbol_id']}#canonical"
+        assert row["overload_id"] == canonical
+        assert row["producer_overload_ids"] == [canonical]

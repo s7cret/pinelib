@@ -65,13 +65,12 @@ def test_restore_rejects_non_contiguous_transcript_sequences():
         RuntimeSession(language()).restore(forged.to_dict())
 
 
-def test_aborted_callback_consumes_sequence_and_checkpoint_restores():
+def test_aborted_callback_does_not_consume_sequence_and_checkpoint_restores():
     runtime = RuntimeSession(language())
     runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0)).abort()
 
-    assert runtime.sequence == 0
-    with pytest.raises(PineRuntimeError):
-        runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0))
+    assert runtime.sequence == -1
+    runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0)).commit()
 
     restored = RuntimeSession(language())
     restored.restore(runtime.checkpoint().to_dict())

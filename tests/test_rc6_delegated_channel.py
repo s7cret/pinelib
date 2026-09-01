@@ -189,7 +189,48 @@ def test_abort_discards_transaction_local_delegated_outputs_without_running_hand
     assert result.aborted is True
     assert result.delegated_outputs == ()
     assert seen == []
-    assert "delegated_outputs" not in runtime.transcript.entries[-1]
+    assert runtime.sequence == -1
+    assert runtime.transcript.entries == []
+
+
+def test_abort_does_not_consume_domain_sequence_or_change_committed_hash() -> None:
+    runtime = RuntimeSession(language())
+    before = runtime.state_hash
+
+    runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0)).abort()
+
+    assert runtime.sequence == -1
+    assert runtime.state_hash == before
+    assert runtime.transcript.entries == []
+
+    committed = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0)).commit()
+    assert runtime.sequence == 0
+    assert committed.state_hash == runtime.state_hash
+
+
+def test_delegated_handler_observes_a_closed_transaction() -> None:
+    observed_codes: list[str | None] = []
+    tx = None
+
+    def handle(_: DelegatedInvocation) -> object:
+        assert tx is not None
+        with pytest.raises(PineRuntimeError) as error:
+            tx.set_series("reentrant", 1)
+        observed_codes.append(error.value.code)
+        return "prepared"
+
+    dispatcher = DelegatedCapabilityDispatcher(
+        {(OWNER, SCHEMA_ID, CAPABILITY_ID): handle}
+    )
+    runtime = RuntimeSession(language(), delegated_dispatcher=dispatcher)
+    tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0))
+    dispatch_entry(tx, entry_id="L")
+
+    result = tx.commit()
+
+    assert observed_codes == [PL_RUNTIME_TRANSACTION_CLOSED]
+    assert [output.value for output in result.delegated_outputs] == ["prepared"]
+    assert "reentrant" not in runtime.series
 
 
 def test_commit_handler_failure_aborts_and_releases_runtime_transaction() -> None:
@@ -207,8 +248,9 @@ def test_commit_handler_failure_aborts_and_releases_runtime_transaction() -> Non
         tx.commit()
 
     assert error.value.code == PL_DELEGATED_HANDLER_FAILURE
-    assert runtime.transcript.entries[-1]["committed"] is False
-    next_tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 1))
+    assert runtime.sequence == -1
+    assert runtime.transcript.entries == []
+    next_tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0))
     next_tx.abort()
 
 

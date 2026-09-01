@@ -484,6 +484,9 @@ class RuntimeTransaction:
 
     def commit(self) -> CallbackResult:
         self._check()
+        # Prevent delegated preparation code from re-entering or mutating the
+        # transaction while commit is being resolved.
+        self.closed = True
         dispatcher = self.session.delegated_dispatcher
         try:
             if self._delegated_invocations and dispatcher is None:
@@ -500,10 +503,8 @@ class RuntimeTransaction:
                     for invocation in self._delegated_invocations
                 )
         except Exception:
-            self.closed = True
             self.session._finish(self, False)
             raise
-        self.closed = True
         return self.session._finish(self, True)
 
     def abort(self) -> CallbackResult:
@@ -585,7 +586,6 @@ class RuntimeSession:
         else:
             target = RuntimeState.HISTORICAL_CALLBACK
         self.machine.transition(target)
-        self.sequence = frame.sequence
         for storage in self.series.values():
             storage.begin()
         self.slots.begin(preserve_varip=frame.realtime)
@@ -626,6 +626,7 @@ class RuntimeSession:
             else:
                 self.requests.finish(persist=False)
             self.machine.transition(RuntimeState.COMMITTED)
+            self.sequence = frame.sequence
         else:
             for name in transaction._new_series:
                 self.series.pop(name, None)
@@ -639,21 +640,22 @@ class RuntimeSession:
             self.machine.transition(RuntimeState.ABORTED)
         self._active = None
         state_hash = self.state_hash
-        self.transcript.append(
-            {
-                "sequence": frame.sequence,
-                "phase": frame.phase,
-                "realtime": frame.realtime,
-                "final_tick": frame.final_tick,
-                "projection_hash": frame.projection_hash,
-                "bar_index": frame.bar_index,
-                "tick_index": frame.tick_index,
-                "committed": commit,
-                "state_hash": state_hash,
-                "visual_batch_hash": visual_hash,
-                "alert_batch_hash": alert_hash,
-            }
-        )
+        if commit:
+            self.transcript.append(
+                {
+                    "sequence": frame.sequence,
+                    "phase": frame.phase,
+                    "realtime": frame.realtime,
+                    "final_tick": frame.final_tick,
+                    "projection_hash": frame.projection_hash,
+                    "bar_index": frame.bar_index,
+                    "tick_index": frame.tick_index,
+                    "committed": True,
+                    "state_hash": state_hash,
+                    "visual_batch_hash": visual_hash,
+                    "alert_batch_hash": alert_hash,
+                }
+            )
         return CallbackResult(
             commit,
             not commit,

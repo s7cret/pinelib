@@ -171,9 +171,10 @@ def test_fault_rollback_discards_ta_mutation():
     abi.sma_v1(tx, "sma", 1, 2)
     tx.commit()
     before = rollback_sensitive_state(runtime)
+    before_transcript = runtime.transcript.to_dict()
     tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 1))
     abi.sma_v1(tx, "sma", 100, 2)
     tx.abort()
     assert rollback_sensitive_state(runtime) == before
-    assert runtime.sequence == 1
-    assert runtime.transcript.entries[-1]["committed"] is False
+    assert runtime.sequence == 0
+    assert runtime.transcript.to_dict() == before_transcript

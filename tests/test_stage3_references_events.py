@@ -72,13 +72,14 @@ def test_reference_heap_rolls_back_created_and_mutated_objects():
     handle = ref.array_new_v1(tx, "array:1", "array<int>", 1, 1)
     tx.commit()
     before = rollback_sensitive_state(runtime)
+    before_transcript = runtime.transcript.to_dict()
     tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 1))
     ref.array_set_v1(tx, handle, 0, 9)
     ref.array_new_v1(tx, "array:transient", "array<int>", 1, 2)
     tx.abort()
     assert rollback_sensitive_state(runtime) == before
-    assert runtime.sequence == 1
-    assert runtime.transcript.entries[-1]["committed"] is False
+    assert runtime.sequence == 0
+    assert runtime.transcript.to_dict() == before_transcript
     tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 2))
     assert ref.array_get_v1(tx, handle, 0) == 1
     with pytest.raises(PineRuntimeError):
@@ -107,13 +108,14 @@ def test_visual_and_alert_tapes_commit_abort_and_do_not_render_or_notify():
     assert plot.delivery_id != notice.delivery_id
 
     before = rollback_sensitive_state(runtime)
+    before_transcript = runtime.transcript.to_dict()
     tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 1))
     visual.bgcolor_v1(tx, "bg:1", sp, "red")
     alert.alertcondition_v1(tx, "cond:1", sp, True, "x", "y")
     tx.abort()
     assert rollback_sensitive_state(runtime) == before
-    assert runtime.sequence == 1
-    assert runtime.transcript.entries[-1]["committed"] is False
+    assert runtime.sequence == 0
+    assert runtime.transcript.to_dict() == before_transcript
     assert len(runtime.visuals.committed) == 1
     assert len(runtime.alerts.committed) == 1
 
