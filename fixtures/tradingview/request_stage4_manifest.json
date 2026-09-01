@@ -1,0 +1,12 @@
+{
+  "schema_id": "pinelib.tradingview.request_oracle_manifest.v1",
+  "stage": 4,
+  "claim_boundary": "No sealed TradingView exports were supplied; local reference vectors are not relabeled as external oracle evidence.",
+  "cases": [
+    {"case_id": "request-htf-four-mode", "test_id": "tests/test_stage4_request_engine.py::test_historical_htf_gaps_and_lookahead_matrix", "oracle_status": "NOT_AVAILABLE", "source_url": "https://www.tradingview.com/pine-script-docs/concepts/other-timeframes-and-data/", "dataset_hash": null, "expected_output_hash": null},
+    {"case_id": "request-realtime-developing", "test_id": "tests/test_stage4_request_engine.py::test_realtime_uses_admitted_developing_value_without_refetch", "oracle_status": "NOT_AVAILABLE", "source_url": "https://www.tradingview.com/pine-script-docs/concepts/other-timeframes-and-data/", "dataset_hash": null, "expected_output_hash": null},
+    {"case_id": "request-lower-tf", "test_id": "tests/test_stage4_request_engine.py::test_security_lower_tf_returns_ordered_values_and_abi_array", "oracle_status": "NOT_AVAILABLE", "source_url": "https://www.tradingview.com/pine-script-docs/concepts/other-timeframes-and-data/", "dataset_hash": null, "expected_output_hash": null},
+    {"case_id": "request-dynamic-v5-v6", "test_id": "tests/test_stage4_request_engine.py::test_dynamic_request_policy_is_version_exact", "oracle_status": "NOT_AVAILABLE", "source_url": "https://www.tradingview.com/pine-script-docs/migration-guides/to-pine-version-6/", "dataset_hash": null, "expected_output_hash": null},
+    {"case_id": "request-nested", "test_id": "tests/test_stage4_request_engine.py::test_nested_request_policy_parent_identity_and_cycle_detection", "oracle_status": "NOT_AVAILABLE", "source_url": "https://www.tradingview.com/pine-script-docs/concepts/other-timeframes-and-data/", "dataset_hash": null, "expected_output_hash": null}
+  ]
+}

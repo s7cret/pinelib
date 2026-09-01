@@ -1,156 +1,38 @@
-# PineLib 5.0.0rc5
+# PineLib 5.0.0rc6 — Stage 4 local implementation candidate
 
-> Deterministic Python runtime foundation for AST2Python-generated Pine-compatible modules.
+This source tree extends the Stage 3 direct runtime ABI with a canonical Request Engine. Request execution consumes immutable `openpine.marketdata.v2`-shaped snapshots through a strict provider protocol, binds every dataset to explicit semantic identity, and participates in the runtime transaction/checkpoint model.
 
-[![Version](https://img.shields.io/badge/version-5.0.0rc5-blue)](https://github.com/s7cret/pinelib) [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://github.com/s7cret/pinelib) [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/s7cret/pinelib)
+## Implemented architecture
 
+- Strict `RequestDataProvider` protocol with an immutable capability descriptor; runtime request execution does not inspect callable signatures or provider module names.
+- Explicit `RequestQuery`, `CanonicalBar`, `DataCoverage`, and sealed `DataSnapshot` contracts. Exchange, market, provider identity, `time_close`, finality, revisions, coverage, and snapshot hashes are mandatory rather than inferred.
+- Transactional `RequestDatasetRegistry` with discovery identities, immutable lineage, merge cursors, savepoints, rollback, resource ceilings, and portable checkpoint serialization.
+- Historical discovery plus fail-closed realtime reuse: an unseen request context cannot first appear on a realtime callback.
+- Version-bound dynamic request policy: v5 requires explicit enablement; v6 defaults to enabled unless disabled by the admitted policy.
+- Isolated child expression state keyed by request/call-site context; nested requests are capability- and depth-bound.
+- Separate HTF alignment algorithms for `gaps_on/off` and `lookahead_on/off`, with historical and developing realtime values kept distinct.
+- `request.security_lower_tf` returns ordered intrabar values and the ABI facade materializes a deterministic Pine array handle.
+- Scalar, tuple, array, UDT, and map result shapes are validated and restored without coercing the dataset to a float series.
+- Only the exact invalid-symbol taxonomy may be masked by `ignore_invalid_symbol`; transport, schema, revision, coverage, and unavailable-dataset errors remain fail-closed.
 
-**GitHub description:** PineLib provides Pine-style series, bar lifecycle, inputs, request helpers, strategy intent APIs, TA helpers, visual recorders, and runtime primitives for generated OpenPine modules.
+## Local target surface
 
-**Suggested topics:** `pine-script`, `runtime`, `technical-analysis`, `tradingview`, `backtesting`, `algorithmic-trading`, `python`, `openpine`.
+The bundled local catalog contains 275 classified rows:
 
-## What PineLib is
+- 266 direct supported rows, all imported and executed by the manifest-driven behavior test;
+- 9 explicit `UNSUPPORTED_FAIL_CLOSED` rows (`math.random` and eight provider-dependent request families);
+- `UNKNOWN=0` inside this local catalog.
 
-PineLib is the runtime surface that generated Python modules target. AST2Python emits code that calls PineLib primitives for series/history behavior, bar lifecycle state, inputs, technical-analysis helpers, strategy intent recording, visual recorders, request foundations, and reference containers.
+This is not represented as the authoritative full Pine v1–v6 denominator. The exact Pine2AST RC6 version packs, contract-owned RC6 schemas, canonical provider wheel, and sealed TradingView request oracle exports were not included in the supplied packet.
 
-```text
-pine2ast -> ast2python -> generated Python -> pinelib -> backtest-engine / openpine
-```
+## Validation performed
 
-PineLib intentionally records strategy intent. The final broker, fill, trade, equity, and report authority belongs to Backtest Engine and OpenPine.
+- full Stage 2–4 pytest regression suite;
+- line and branch coverage with the configured 95% fail threshold;
+- manifest drift, import, signature, and supported-row execution checks;
+- provider contract, identity, revision, coverage, result-shape, HTF/LTF, dynamic/nested, realtime, rollback, checkpoint, and resource-limit tests;
+- deterministic property/mutation/fault cases and incremental merge benchmark evidence;
+- production architecture scan for reflection heuristics, implicit market defaults, close-time inference, generic dispatch, and broker-domain leakage;
+- wheel/sdist double build, wheel RECORD verification, clean wheel-only install, and `pip check`.
 
-## Supported runtime surface
-
-- `Series[T]` history with current/committed bar semantics.
-- `PineRuntime` bar-loop metadata, OHLCV series, `barstate`, inputs, diagnostics, and commit lifecycle.
-- `StrategyContext` intent APIs for `strategy.entry`, `strategy.order`, `strategy.exit`, `strategy.close`, cancel calls, and risk-rule recording.
-- `run_generated_strategy()` for intent-only bar-by-bar execution of generated modules.
-- `request.security` and lower-timeframe foundations with explicit data-provider protocols and diagnostics.
-- Pine reference containers: `PineArray`, `PineMap`, and `PineMatrix`.
-- Visual object lifecycle recorder and `PlotRecorder` for debug/export paths.
-- TA helpers for moving averages, momentum, volatility, trend, statistics, and volume.
-- TradingView fixture/oracle helpers for parity evidence.
-- Optional market-data contract compatibility without making `marketdata-provider` mandatory.
-
-## Boundaries
-
-PineLib does not parse Pine source, lower AST to Python, fetch exchange data, optimize parameters, or act as the final broker/fill/equity ledger. It also does not claim complete TradingView runtime parity. It provides deterministic runtime primitives for the generated-code layer.
-
-## Install
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
-```
-
-Install from GitHub tag:
-
-```bash
-python -m pip install 'git+https://github.com/s7cret/pinelib.git@v4.0.2'
-```
-
-Optional market-data integration:
-
-```bash
-python -m pip install -e '.[marketdata]'
-```
-
-## Basic generated-strategy runner
-
-```python
-from pinelib import Bar, PineRuntime, StrategyContext, SymbolInfo, TimeframeInfo, run_generated_strategy
-
-class GeneratedLikeStrategy:
-    params = {"qty": 1}
-    INPUT_METADATA = {"qty": {"title": "Quantity", "type": "float", "default": 1}}
-
-    def on_bar(self, runtime, strategy):
-        if runtime.bar_index_series.current == 0:
-            strategy.entry("L", "long", qty=self.params["qty"])
-
-bars = [
-    Bar(time=1704067200000, open=10, high=11, low=9, close=10),
-    Bar(time=1704070800000, open=12, high=13, low=11, close=12),
-]
-
-runtime = PineRuntime(SymbolInfo("TEST:AAA"), TimeframeInfo.from_string("60"))
-strategy = StrategyContext(default_qty_type="fixed", default_qty_value=1)
-
-result = run_generated_strategy(GeneratedLikeStrategy(), runtime, strategy, bars)
-print(result.report.execution_mode)
-print(result.report.broker_authority)
-```
-
-## Bar file IO
-
-```python
-from pinelib import load_bars, load_bars_csv
-
-bars = load_bars_csv("bars.csv")      # required columns: time, open, high, low, close
-bars2 = load_bars("bars.parquet")     # optional pandas/parquet engine
-```
-
-## Notes for AST2Python integrations
-
-Generated modules should target public imports exposed through `pinelib.__all__`. Plot and visual output should remain policy-controlled by the generator/runtime (`drop`, `record`, or `error`), while PineLib provides deterministic recorders for the selected policy.
-
-## Repository layout
-
-```text
-pinelib/
-  core/                   series, runtime state, bar lifecycle, primitive helpers
-  strategy/               strategy intent context and risk-rule helpers
-  ta/                     technical-analysis functions
-  request/                security/request foundations and provider protocols
-  collections/            PineArray, PineMap, PineMatrix
-  visuals/                plot and object recorders
-  backtest/               generated-strategy runner and report helpers
-  io/                     bar loading utilities
-  tests/                  runtime, fixture, contract, and golden checks
-```
-
-## Release checks
-
-```bash
-bash scripts/release_gate.sh
-```
-
-Expanded local gate:
-
-```bash
-python -m compileall -q pinelib tests scripts
-python -m ruff check .
-BLACK_NUM_WORKERS=1 python -m black --check .
-python -m mypy pinelib
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p pytest_cov tests --cov=pinelib --cov-report=term
-python -m pinelib.quality duplicates pinelib
-python -m pinelib.quality architecture pinelib --max-lines 700
-python scripts/run_tv_golden_suite.py
-python -m pinelib.distribution manifest --root .
-python -m pinelib.release --root .
-bash scripts/smoke_import_parse.sh
-bash scripts/wheel_smoke.sh
-```
-
-## Documentation
-
-- `docs/ARCHITECTURE.md` — runtime architecture and module boundary.
-- `docs/COMPATIBILITY.md` — runtime compatibility and non-goals.
-- `docs/DEVELOPMENT.md` — local setup and checks.
-- `docs/RELEASE_4_0.md` — 4.0.0 release checklist.
-- `docs/SECURITY.md` — runtime safety and integration guidance.
-
-## License
-
-MIT. See `LICENSE`.
-
-## Support
-
-OpenPine development is independent and MIT-licensed. Support is optional and does not change license terms, feature access, or project guarantees.
-
-- Telegram: https://t.me/OpenPine
-- TON: `UQAyIr2sQ4-_Q5L-4VINcU18khDas5GPbAlYEkQN6S_qzui2`
-- SOL: `EbxMUK2W4RGeQZCTRFrdgpEJvnqtyczPZvBrQa1cYJnQ`
+The delivery's `IMPLEMENTATION_REPORT.md`, `TASK_STATUS.json`, and `FINAL_GATE.json` define the exact evidence and acceptance boundary. Merge, tag, release, and deployment are not authorized by this packet.

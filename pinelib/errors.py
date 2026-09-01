@@ -1,102 +1,72 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Final
-
-PL_UNSUPPORTED_NESTED_SECURITY: Final[str] = "PL_UNSUPPORTED_NESTED_SECURITY"
-PL_WARNING_EXIT_QTY_REDUCED: Final[str] = "PL_WARNING_EXIT_QTY_REDUCED"
-PL_DATA_FORMAT_ERROR: Final[str] = "PL_DATA_FORMAT_ERROR"
-PL_UNSUPPORTED_STRATEGY_SETTING: Final[str] = "PL_UNSUPPORTED_STRATEGY_SETTING"
-PL_MISSING_INTRABAR_DATA: Final[str] = "PL_MISSING_INTRABAR_DATA"
-PL_WARNING_BAR_MAGNIFIER_FALLBACK: Final[str] = "PL_WARNING_BAR_MAGNIFIER_FALLBACK"
-PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK: Final[str] = "PL_WARNING_CALC_ON_EVERY_TICK_FALLBACK"
-PL_INPUT_VALIDATION_ERROR: Final[str] = "PL_INPUT_VALIDATION_ERROR"
-PL_SESSION_PARSE_ERROR: Final[str] = "PL_SESSION_PARSE_ERROR"
-PL_REFERENCE_HISTORY_UNSUPPORTED: Final[str] = "PL_REFERENCE_HISTORY_UNSUPPORTED"
-PL_MARGIN_FIELDS_DIAGNOSTIC: Final[str] = "PL_MARGIN_FIELDS_DIAGNOSTIC"
-PL_UNSUPPORTED_LOWER_TF_SECURITY: Final[str] = "PL_UNSUPPORTED_LOWER_TF_SECURITY"
-PL_MARGIN_LIQUIDATION_DIAGNOSTIC: Final[str] = "PL_MARGIN_LIQUIDATION_DIAGNOSTIC"
-PL_UNSUPPORTED_REALTIME_TICK: Final[str] = "PL_UNSUPPORTED_REALTIME_TICK"
-PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC: Final[str] = "PL_UNSUPPORTED_TIMEFRAME_TIMEFUNC"
-PL_HISTORY_NOT_ALLOWED: Final[str] = "PL_HISTORY_NOT_ALLOWED"
-PL_UNKNOWN_SEMANTIC_PROFILE: Final[str] = "PL_UNKNOWN_SEMANTIC_PROFILE"
-PL_SEMANTIC_PROFILE_REQUIRED: Final[str] = "PL_SEMANTIC_PROFILE_REQUIRED"
+from collections.abc import Mapping
+from types import MappingProxyType
 
 
-@dataclass(frozen=True, slots=True)
-class ErrorContext:
-    function_name: str | None = None
-    bar_index: int | None = None
-    source_map: str | None = None
-    remedy: str | None = None
+class PineRuntimeError(RuntimeError):
+    """Stable-code runtime diagnostic.
 
+    ``details`` is deliberately detached and read-only so callers cannot mutate
+    evidence after the error has been raised.
+    """
 
-class PineRuntimeError(Exception):
     def __init__(
         self,
         message: str,
         *,
-        code: str | None = None,
-        context: ErrorContext | None = None,
+        code: str = "PL1000",
+        details: Mapping[str, object] | None = None,
     ) -> None:
         super().__init__(message)
-        self.message = message
         self.code = code
-        self.context = context
-
-    def __str__(self) -> str:
-        details: list[str] = [self.message]
-        if self.code:
-            details.append(f"code={self.code}")
-        if self.context:
-            if self.context.function_name:
-                details.append(f"function={self.context.function_name}")
-            if self.context.bar_index is not None:
-                details.append(f"bar_index={self.context.bar_index}")
-            if self.context.source_map:
-                details.append(f"source_map={self.context.source_map}")
-            if self.context.remedy:
-                details.append(f"remedy={self.context.remedy}")
-        return "; ".join(details)
+        self.details = MappingProxyType(dict(details or {}))
 
 
-class PineTypeError(PineRuntimeError):
-    pass
-
-
-class PineNAError(PineRuntimeError):
-    pass
-
-
-class PineHistoryError(PineRuntimeError):
-    pass
-
-
-class PineRequestError(PineRuntimeError):
-    pass
-
-
-class PineStrategyError(PineRuntimeError):
-    pass
-
-
-class StrategyLedgerUnavailableError(PineRuntimeError):
-    pass
-
-
-class PineUnsupportedFeatureError(PineRuntimeError):
-    pass
-
-
-class PineGoldenMismatchError(PineRuntimeError):
-    pass
-
-
-class PineDataFormatError(PineRuntimeError):
-    def __init__(self, message: str, *, context: ErrorContext | None = None) -> None:
-        super().__init__(message, code=PL_DATA_FORMAT_ERROR, context=context)
-
-
-class PineSessionError(PineRuntimeError):
-    def __init__(self, message: str, *, context: ErrorContext | None = None) -> None:
-        super().__init__(message, code=PL_SESSION_PARSE_ERROR, context=context)
+PL_RUNTIME_STATE_TRANSITION = "PL1100"
+PL_RUNTIME_CONTEXT_REQUIRED = "PL1001"
+PL_RUNTIME_VERSION_UNSUPPORTED = "PL1002"
+PL_RUNTIME_TRANSACTION_CLOSED = "PL1101"
+PL_RUNTIME_TRANSACTION_ACTIVE = "PL1102"
+PL_RUNTIME_SEQUENCE = "PL1103"
+PL_SERIES_HISTORY = "PL1200"
+PL_STATE_SLOT = "PL1201"
+PL_VALUE_BOOL = "PL1300"
+PL_VALUE_DIVISION = "PL1301"
+PL_VALUE_TYPE = "PL1302"
+PL_VALUE_DOMAIN = "PL1303"
+PL_STRING_FORMAT = "PL1304"
+PL_TA_KERNEL = "PL1400"
+PL_TA_STATE = "PL1401"
+PL_REQUEST_PROVIDER = "PL1500"
+PL_REQUEST_DATA = "PL1501"
+PL_REQUEST_IDENTITY = "PL1502"
+PL_REQUEST_DISCOVERY = "PL1503"
+PL_REQUEST_POLICY = "PL1504"
+PL_REQUEST_ALIGNMENT = "PL1505"
+PL_REQUEST_RESULT_SHAPE = "PL1506"
+PL_REQUEST_INVALID_SYMBOL = "PL1507"
+PL_REQUEST_UNAVAILABLE = "PL1508"
+PL_REQUEST_COVERAGE = "PL1509"
+PL_REQUEST_TRANSPORT = "PL1510"
+PL_REQUEST_REVISION = "PL1511"
+PL_REQUEST_NESTED = "PL1512"
+PL_REQUEST_CACHE = "PL1513"
+PL_INPUT_INVALID = "PL1600"
+PL_TIMEZONE_INVALID = "PL1601"
+PL_SESSION_INVALID = "PL1602"
+PL_METADATA_INVALID = "PL1603"
+PL_REFERENCE_INVALID = "PL1610"
+PL_REFERENCE_BOUNDS = "PL1611"
+PL_REFERENCE_TYPE = "PL1612"
+PL_VISUAL_LIMIT = "PL1620"
+PL_ALERT_LIMIT = "PL1621"
+PL_DELEGATED_HANDLER_UNAVAILABLE = "PL1700"
+PL_DELEGATED_TARGET = "PL1701"
+PL_DELEGATED_INVOCATION = "PL1702"
+PL_DELEGATED_HANDLER_FAILURE = "PL1703"
+PL_CHECKPOINT_INVALID = "PL1800"
+PL_CHECKPOINT_IDENTITY = "PL1801"
+PL_RESOURCE_LIMIT = "PL1900"
+PL_ABI_MANIFEST = "PL2000"
+PL_ABI_TARGET = "PL2001"

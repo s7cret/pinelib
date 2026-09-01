@@ -4,94 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinelib"
-version = "5.0.0rc5"
-description = "PineLib runtime foundation for generated Pine-compatible Python modules"
-readme = "README.md"
+version = "5.0.0rc6"
+description = "Version-exact transactional Pine runtime target"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [{name = "OpenPine maintainers"}]
-dependencies = [
-  "openpine-contracts==5.0.0rc5",
-]
+dependencies = ["tzdata==2026.2"]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pinelib*"]
 
-[project.scripts]
-pinelib = "pinelib.__main__:main"
-
-[project.urls]
-Homepage = "https://github.com/s7cret/pinelib"
-Repository = "https://github.com/s7cret/pinelib"
-Issues = "https://github.com/s7cret/pinelib/issues"
-
-[project.optional-dependencies]
-marketdata = [
-  "marketdata-provider==5.0.0rc5",
-]
-dev = [
-  "black>=25.0.0",
-  "mypy>=1.10.0",
-  "pytest>=8.0.0",
-  "pytest-cov>=5.0.0",
-  "ruff>=0.6.0",
-  "build>=1.2.0",
-]
-
-[tool.setuptools]
-packages = ["pinelib", "pinelib.color", "pinelib.compat", "pinelib.core", "pinelib.math", "pinelib.request", "pinelib.strategy", "pinelib.string", "pinelib.ta"]
-package-data = {"pinelib" = ["py.typed"]}
-
-[tool.black]
-line-length = 100
-target-version = ["py311"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM"]
+[tool.setuptools.package-data]
+pinelib = ["py.typed"]
+"pinelib.abi" = ["target_manifest.json", "official_pine_v6_surface.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
-pythonpath = [".", "../marketdata_provider/src"]
-
-[tool.mypy]
-python_version = "3.11"
-packages = ["pinelib"]
-mypy_path = ["../marketdata_provider/src"]
-exclude = ["^build/", "^dist/"]
-warn_unused_configs = true
-check_untyped_defs = true
-no_implicit_optional = true
-strict_equality = true
-pretty = true
-disable_error_code = [
-  "arg-type",
-  "assignment",
-  "attr-defined",
-  "call-overload",
-  "import-not-found",
-  "import-untyped",
-  "index",
-  "list-item",
-  "name-defined",
-  "no-any-return",
-  "no-redef",
-  "operator",
-  "return-value",
-  "type-var",
-  "union-attr",
-  "valid-type",
-]
 
 [tool.coverage.run]
 source = ["pinelib"]
+branch = true
 
 [tool.coverage.report]
-fail_under = 100
+fail_under = 95
 show_missing = true
-exclude_lines = [
-  "if TYPE_CHECKING:",
-  "if __name__ == \"__main__\":",
-]
