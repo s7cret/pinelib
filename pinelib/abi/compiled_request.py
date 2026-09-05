@@ -2,10 +2,12 @@
 
 The compiler supplies generated methods, not source strings. RequestEngine owns
 alignment, limits, caching and transactional/checkpoint state. This ABI does not
-claim support for live revisions, nested request closures or currency conversion.
+claim support for live revisions or currency conversion.
 """
 
 from __future__ import annotations
+
+from contextvars import ContextVar
 
 from pinelib.core.values import is_na, na
 from pinelib.errors import PL_REQUEST_DATA, PL_REQUEST_PROVIDER, PineRuntimeError
@@ -20,6 +22,13 @@ from pinelib.request.snapshots import SnapshotRequestProvider
 from pinelib.runtime.metadata import BarValues, TimeframeContext
 from pinelib.runtime.session import CallbackFrame, RuntimeSession, RuntimeTransaction
 from pinelib.state.checkpoint import sha
+
+# Bind the ephemeral evaluation context to exactly its child transaction.
+# ContextVar prevents concurrent/nested evaluations leaking into other sessions.
+# Persistent state remains solely in RequestEngine and portable checkpoints.
+_ACTIVE_CHILD: ContextVar[tuple | None] = ContextVar(
+    "pinelib_compiled_request_child", default=None
+)
 
 
 class CompiledRequestExpression:
@@ -56,6 +65,7 @@ class CompiledRequestExpression:
                 inputs=self.parent.session.inputs,
                 instrument=self.source.instrument,
                 timeframe=TimeframeContext.parse(self.source.timeframe),
+                request_provider=self.parent.session.requests.provider,
             )
             self._runtime.commit_full_identity = False
             saved = context.state("compiled-runtime", None)
@@ -84,6 +94,7 @@ class CompiledRequestExpression:
             values=values,
         )
         self._script.runtime = tx
+        token = _ACTIVE_CHILD.set((tx, context))
         try:
             value = getattr(self._script, self.method)()
             tx.commit()
@@ -91,6 +102,8 @@ class CompiledRequestExpression:
             if not tx.closed:
                 tx.abort()
             raise
+        finally:
+            _ACTIVE_CHILD.reset(token)
         if context.is_last_bar:
             # Once per source snapshot, not once per bar (avoids quadratic copies).
             context.set_state("compiled-runtime", runtime.checkpoint().to_dict())
@@ -195,6 +208,22 @@ def _run(
         pine_version=version,
         dynamic=expression.dynamic,
     )
+    active = _ACTIVE_CHILD.get()
+    if active is not None and active[0] is transaction:
+        # Use the outer transaction's engine: it owns nested parent identities,
+        # shared budgets, cycle checks and atomic publication/rollback of caches.
+        child_context = active[1]
+        nested = (
+            child_context.nested_lower_timeframe
+            if lower
+            else child_context.nested_security
+        )
+        return nested(
+            query,
+            expression,
+            expression.shape,
+            ignore_invalid_symbol=ignore_invalid_symbol,
+        )
     method = (
         transaction.requests.security_lower_tf
         if lower

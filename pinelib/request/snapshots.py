@@ -158,19 +158,30 @@ class SnapshotRequestProvider:
                 raise PineRuntimeError(
                     "request source exceeds the bar limit", code=PL_REQUEST_DATA
                 )
-            key = (source.instrument.tickerid, source.timeframe)
-            if key in by_key:
-                raise PineRuntimeError(
-                    "duplicate request source identity", code=PL_REQUEST_DATA
-                )
-            by_key[key] = source
+            # Both names are explicit source metadata, not inferred ticker aliases.
+            # A canonical ID exposed as syminfo.tickerid by a host must resolve
+            # the same data as the declared venue ticker ID. Cross-source alias
+            # collisions fail rather than depending on source insertion order.
+            for name in {source.instrument_id, source.instrument.tickerid}:
+                key = (name, source.timeframe)
+                if key in by_key:
+                    raise PineRuntimeError(
+                        "duplicate or ambiguous request source identity",
+                        code=PL_REQUEST_DATA,
+                    )
+                by_key[key] = source
             by_hash[source.content_hash] = source
         self._sources = MappingProxyType(by_key)
         self._by_hash = MappingProxyType(by_hash)
         self._descriptor = ProviderDescriptor(
             "snapshots:" + sha(sorted(by_hash)),
             "openpine.marketdata.v2",
-            ("request.security", "request.security_lower_tf", "request.dynamic"),
+            (
+                "request.security",
+                "request.security_lower_tf",
+                "request.dynamic",
+                "request.nested",
+            ),
             max_bars,
         )
 
