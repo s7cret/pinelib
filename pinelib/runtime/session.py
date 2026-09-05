@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 
 from pinelib.core.values import na, pine_binary, pine_unary
 from pinelib.errors import (
@@ -59,6 +60,7 @@ class CallbackFrame:
     is_last_bar: bool = False
     is_last_confirmed_history: bool = False
     last_bar_index: int | None = None
+    defer_bar_commit: bool = False
 
     def __post_init__(self) -> None:
         if (
@@ -72,6 +74,7 @@ class CallbackFrame:
             or self.bar_index < 0
             or type(self.tick_index) is not int
             or self.tick_index < 0
+            or type(self.defer_bar_commit) is not bool
             or type(self.is_last_bar) is not bool
             or type(self.is_last_confirmed_history) is not bool
             or (
@@ -353,6 +356,32 @@ class RuntimeTransaction:
     def value_barstate_islastconfirmedhistory(self) -> bool:
         return self.session.barstate(self.frame).islastconfirmedhistory
 
+    def declare_scalar_v1(
+        self, series_id: str, mode: str, initializer: Callable[[], object], dtype: str,
+    ) -> object:
+        """Initialize a scalar lazily and bind its final callback value to history."""
+        self._check()
+        if mode not in {"default", "var", "varip"} or dtype not in {"bool", "color", "float", "int", "string"}:
+            raise PineRuntimeError("unsupported scalar declaration")
+        if mode == "default":
+            value = initializer()
+        else:
+            state_id = "scalar:" + series_id
+            if not self.session.slots.contains(state_id):
+                self.set_slot(state_id, initializer(), owner="ast2python.scalar.v1", varip=mode == "varip")
+            value = self.state(state_id, owner="ast2python.scalar.v1", schema_version="1", initial=None, varip=mode == "varip")
+        self.set_series(series_id, value, dtype)
+        return value
+
+    def write_scalar_v1(self, series_id: str, mode: str, value: object, dtype: str) -> None:
+        """A reassignment updates the declared series, not just a Python local."""
+        self._check()
+        if mode not in {"default", "var", "varip"} or dtype not in {"bool", "color", "float", "int", "string"}:
+            raise PineRuntimeError("unsupported scalar reassignment")
+        if mode != "default":
+            self.set_slot("scalar:" + series_id, value, owner="ast2python.scalar.v1", varip=mode == "varip")
+        self.set_series(series_id, value, dtype)
+
     def set_slot(
         self,
         state_id: str,
@@ -568,6 +597,9 @@ class RuntimeSession:
         self.commit_full_identity = True
         self._identity_mode: bool | None = None
         self._active: RuntimeTransaction | None = None
+        self._pending_bar_frame: CallbackFrame | None = None
+        self._last_published_bar: int | None = None
+        self._deferred_mode: bool | None = None
         self.machine.transition(RuntimeState.ADMITTED)
         self.machine.transition(RuntimeState.INITIALIZED)
         self.requests.bind_parent_identity(self.identity_hash)
@@ -611,6 +643,19 @@ class RuntimeSession:
             raise PineRuntimeError(
                 "callback sequence must be monotonic", code=PL_RUNTIME_SEQUENCE
             )
+        if self._deferred_mode is not None and self._deferred_mode != frame.defer_bar_commit:
+            raise PineRuntimeError("bar commit mode cannot change during a run", code=PL_RUNTIME_SEQUENCE)
+        if frame.defer_bar_commit:
+            if self._last_published_bar is not None and frame.bar_index <= self._last_published_bar:
+                raise PineRuntimeError("cannot execute an already published bar", code=PL_RUNTIME_SEQUENCE)
+            if self._pending_bar_frame is not None:
+                if frame.bar_index != self._pending_bar_frame.bar_index:
+                    raise PineRuntimeError("previous bar has not been published", code=PL_RUNTIME_SEQUENCE)
+                # Roll back the provisional child request transaction just like
+                # normal variables; no past chart-bar history was committed.
+                self.requests.finish(persist=False)
+                self._pending_bar_frame = None
+        self._deferred_mode = frame.defer_bar_commit
         if frame.phase == "ORDER_FILL_RECALC":
             target = RuntimeState.FILL_RECALC
         elif frame.realtime:
@@ -620,7 +665,7 @@ class RuntimeSession:
         self.machine.transition(target)
         for storage in self.series.values():
             storage.begin()
-        self.slots.begin(preserve_varip=frame.realtime)
+        self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
         self.references.begin()
         self.visuals.begin()
         self.alerts.begin()
@@ -647,7 +692,11 @@ class RuntimeSession:
         alert_hash = self.alerts.working_hash
         if commit:
             self.machine.transition(RuntimeState.COMMITTING)
-            if not frame.realtime or frame.final_tick:
+            if frame.defer_bar_commit:
+                # Leave working values available for BAR_COMMIT. The next
+                # callback rolls them back, except the intrabar-persistent slots.
+                self._pending_bar_frame = frame
+            elif not frame.realtime or frame.final_tick:
                 for storage in self.series.values():
                     storage.commit()
                 self.slots.commit()
@@ -664,7 +713,7 @@ class RuntimeSession:
                 self.series.pop(name, None)
             for storage in self.series.values():
                 storage.rollback()
-            self.slots.rollback(preserve_varip=frame.realtime)
+            self.slots.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
             self.references.rollback()
             self.visuals.rollback()
             self.alerts.rollback()
@@ -712,6 +761,31 @@ class RuntimeSession:
             revision_fingerprint,
         )
 
+    def finalize_bar(self, bar_index: int) -> CallbackResult:
+        """Publish the last successful callback once at the host's bar boundary.
+
+        A callback commit releases intents, but history/var/requests/visuals
+        become the prior-bar baseline only here. Checkpoints between these two
+        boundaries are intentionally rejected.
+        """
+        if self._active is not None:
+            raise PineRuntimeError("cannot publish an active transaction", code=PL_RUNTIME_TRANSACTION_ACTIVE)
+        pending = self._pending_bar_frame
+        if (type(bar_index) is not int or pending is None or pending.bar_index != bar_index):
+            raise PineRuntimeError("no matching provisional bar to publish", code=PL_RUNTIME_SEQUENCE)
+        if pending.realtime and not pending.final_tick:
+            raise PineRuntimeError("cannot publish an unconfirmed realtime bar", code=PL_RUNTIME_SEQUENCE)
+        frame = replace(pending, phase="BAR_COMMIT", sequence=self.sequence + 1, defer_bar_commit=False)
+        transaction = RuntimeTransaction(self, frame)
+        transaction.closed = True
+        self._active = transaction
+        # Enter the normal transaction state before promoting the working data.
+        self.machine.transition(RuntimeState.REALTIME_CALLBACK if frame.realtime else RuntimeState.HISTORICAL_CALLBACK)
+        result = self._finish(transaction, True)
+        self._pending_bar_frame = None
+        self._last_published_bar = bar_index
+        return result
+
     def barstate(self, frame: CallbackFrame) -> BarStateView:
         return BarStateView(
             isfirst=frame.bar_index == 0,
@@ -754,8 +828,8 @@ class RuntimeSession:
         }
 
     def checkpoint(self) -> RuntimeCheckpoint:
-        if self._active is not None:
-            raise PineRuntimeError("cannot checkpoint an active transaction")
+        if self._active is not None or self._pending_bar_frame is not None:
+            raise PineRuntimeError("cannot checkpoint an active or provisional bar")
         checkpoint_state = {
             **self._state_json(),
             "transcript": self.transcript.to_dict(),
@@ -769,8 +843,8 @@ class RuntimeSession:
         return checkpoint
 
     def restore(self, data: dict[str, object]) -> None:
-        if self._active is not None:
-            raise PineRuntimeError("cannot restore an active transaction")
+        if self._active is not None or self._pending_bar_frame is not None:
+            raise PineRuntimeError("cannot restore an active or provisional bar")
         checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
         state = from_portable(checkpoint.state)
         if not isinstance(state, dict):
@@ -904,6 +978,10 @@ class RuntimeSession:
         self.requests = new_requests
         self.transcript = new_transcript
         self.sequence = new_sequence
+        last = new_transcript.entries[-1] if new_transcript.entries else None
+        self._pending_bar_frame = None
+        self._deferred_mode = None if last is None else last["phase"] == "BAR_COMMIT"
+        self._last_published_bar = last["bar_index"] if last is not None and last["phase"] == "BAR_COMMIT" else None
         self.commit_full_identity = not isinstance(
             new_transcript, CompactRuntimeTranscript
         )

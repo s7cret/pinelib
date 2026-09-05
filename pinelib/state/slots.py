@@ -27,6 +27,9 @@ class StateSlotRegistry:
         self._slots: dict[str, StateSlot] = {}
         self.limit = limit
 
+    def contains(self, state_id: str) -> bool:
+        return state_id in self._slots
+
     def register(
         self,
         state_id: str,
