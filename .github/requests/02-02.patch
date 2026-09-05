@@ -1,0 +1,195 @@
+diff --git a/pinelib/abi/manifest_v2_builder.py b/pinelib/abi/manifest_v2_builder.py
+index c6e6b31554b22ae821265c3056041413a92e414d..380f7c740ac99d4f3d4aedfde63511cf2e7bbf51 100644
+--- a/pinelib/abi/manifest_v2_builder.py
++++ b/pinelib/abi/manifest_v2_builder.py
+@@ -203,6 +203,8 @@ def _source_aliases(
+     official: Mapping[str, Any], target: CatalogRow | None
+ ) -> list[str]:
+     aliases = [str(official["symbol_id"])]
++    if official["name"] == "request.security":
++        aliases.append("pine:function:security")
+     if target is not None:
+         aliases.append(target.symbol_id)
+         aliases.append(str(official["symbol_id"]) + "#canonical")
+@@ -220,6 +222,14 @@ def _parameter_bindings(
+     rows: list[dict[str, object]] = []
+     for parameter in abi_parameters:
+         abi_name = str(parameter["name"])
++        if abi_name == "timeframe" and official["name"] == "request.security":
++            rows.append({"abi_parameter": abi_name, "binding": "INJECTED",
++                         "source": "REQUEST_TIMEFRAME_ARGUMENT"})
++            continue
++        if abi_name == "expression" and official["name"] in {"request.security", "request.security_lower_tf"}:
++            rows.append({"abi_parameter": abi_name, "binding": "INJECTED",
++                         "source": "COMPILED_REQUEST_EXPRESSION"})
++            continue
+         if abi_name in _INTERNAL_ABI_BINDINGS:
+             rows.append(
+                 {
+@@ -334,6 +344,17 @@ def build_manifest_v2(
+                 "official surface row is invalid", code=PL_ABI_MANIFEST
+             )
+         name = str(official_row["name"])
++        # Verified reference contract absent in the frozen snapshot; do not infer
++        # arbitrary source signatures from coincidental Python ABI names.
++        if name == "array.get" and not official_row.get("parameters"):
++            signature = [
++                {"name": "id", "type": "array", "qualifier_max": "series", "required": True},
++                {"name": "index", "type": "int", "qualifier_max": "series", "required": True},
++            ]
++            official_row = {**official_row, "parameters": signature[1:] if official_row["category"] == "methods" else signature}
++        if name == "na" and official_row["category"] == "functions" and not official_row.get("parameters"):
++            official_row = {**official_row, "parameters": [
++                {"name": "x", "type": "any", "required": True, "qualifier_max": "series"}]}
+         parameters = [
+             dict(item)
+             for item in official_row.get("parameters", [])
+@@ -400,7 +421,7 @@ def build_manifest_v2(
+                         else "namespace_function"
+                     )
+                 ),
+-                "version_availability": list(official_row["supported_versions"]),
++                "version_availability": (sorted(set(official_row["supported_versions"]) | {version for legacy in frozen_index.get("pine:function:security", ()) for version in legacy.pine_versions}) if name == "request.security" else list(official_row["supported_versions"])),
+                 "parameters": parameters,
+                 "abi_callable": abi_callable,
+                 "abi_parameters": abi_parameters,
+diff --git a/pinelib/abi/primitives.py b/pinelib/abi/primitives.py
+index 09e7e411289b795765bd8d1f9d7b159212a530dd..062b31b745f5f4241504b44ab037ed6b39e80945 100644
+--- a/pinelib/abi/primitives.py
++++ b/pinelib/abi/primitives.py
+@@ -15,3 +15,13 @@ def operator_unary_v1(tx: RuntimeTransaction, operator: str, operand: object) ->
+ 
+ def series_history_v1(tx: RuntimeTransaction, base: object, offset: object) -> object:
+     return tx.op_series_history(base, offset)
++
++
++def na_v1(tx: RuntimeTransaction, x: object) -> bool:
++    """Version-aware missing-value predicate, including flat broker values."""
++    from pinelib.core.values import is_na
++    from pinelib.errors import PL_VALUE_TYPE, PineRuntimeError
++    tx._check()
++    if tx.session.language.pine_version >= 6 and type(x) is bool:
++        raise PineRuntimeError("na does not accept bool in Pine v6", code=PL_VALUE_TYPE)
++    return is_na(x)
+diff --git a/pinelib/request/alignment.py b/pinelib/request/alignment.py
+index 3ede0519f210299bf1af84118d0818b4021024e2..292c43b68069eccd298bbfa68286d50a4795f6cf 100644
+--- a/pinelib/request/alignment.py
++++ b/pinelib/request/alignment.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ from bisect import bisect_left, bisect_right
++from operator import attrgetter
+ 
+ from pinelib.core.values import na
+ from pinelib.errors import PL_REQUEST_ALIGNMENT, PL_RESOURCE_LIMIT, PineRuntimeError
+@@ -13,6 +14,10 @@ from pinelib.request.models import (
+     RequestKind,
+ )
+ from pinelib.request.registry import MergeCursor
++from pinelib.runtime.metadata import TimeframeContext
++
++_OPEN = attrgetter("open_time_ms")
++_CLOSE = attrgetter("close_time_ms")
+ 
+ 
+ def _validate_chart(open_time_ms: int, close_time_ms: int) -> None:
+@@ -28,7 +33,7 @@ def _validate_chart(open_time_ms: int, close_time_ms: int) -> None:
+ 
+ def _last_final_by_close(dataset: RequestDataset, chart_close_ms: int) -> int:
+     rows = dataset.evaluated_bars
+-    index = bisect_right([row.close_time_ms for row in rows], chart_close_ms) - 1
++    index = bisect_right(rows, chart_close_ms, key=_CLOSE) - 1
+     while index >= 0 and rows[index].finality != DataFinality.FINAL:
+         index -= 1
+     return index
+@@ -36,7 +41,7 @@ def _last_final_by_close(dataset: RequestDataset, chart_close_ms: int) -> int:
+ 
+ def _last_final_before_open(dataset: RequestDataset, exclusive_open_ms: int) -> int:
+     rows = dataset.evaluated_bars
+-    index = bisect_left([row.open_time_ms for row in rows], exclusive_open_ms) - 1
++    index = bisect_left(rows, exclusive_open_ms, key=_OPEN) - 1
+     while index >= 0 and rows[index].finality != DataFinality.FINAL:
+         index -= 1
+     return index
+@@ -65,8 +70,7 @@ def align_security(
+     selected = -1
+     updated = False
+     if realtime:
+-        opens = [row.open_time_ms for row in rows]
+-        candidate = bisect_left(opens, chart_close_ms) - 1
++        candidate = bisect_left(rows, chart_close_ms, key=_OPEN) - 1
+         if candidate >= 0:
+             row = rows[candidate]
+             overlaps = (
+@@ -89,10 +93,21 @@ def align_security(
+     else:
+         # Pine lookahead observes a higher-timeframe value as soon as that HTF
+         # bar opens, including when the opening lies strictly inside a chart bar.
+-        selected = _last_final_before_open(dataset, chart_close_ms)
+-        if selected >= 0:
+-            row = rows[selected]
+-            updated = chart_open_ms <= row.open_time_ms < chart_close_ms
++        seconds = TimeframeContext.parse(query.timeframe).seconds
++        if seconds is not None and seconds * 1000 < chart_close_ms - chart_open_ms:
++            # Historical lower-TF lookahead_on selects the first intrabar.
++            start = bisect_left(rows, chart_open_ms, key=_OPEN)
++            stop = bisect_right(rows, chart_close_ms, lo=start, key=_CLOSE)
++            selected = next((i for i in range(start, stop)
++                             if rows[i].finality == DataFinality.FINAL), -1)
++            updated = selected >= 0
++            if selected < 0:
++                selected = _last_final_by_close(dataset, chart_open_ms)
++        else:
++            selected = _last_final_before_open(dataset, chart_close_ms)
++            if selected >= 0:
++                row = rows[selected]
++                updated = chart_open_ms <= row.open_time_ms < chart_close_ms
+ 
+     cursor = MergeCursor(
+         "security",
+@@ -140,10 +155,8 @@ def align_lower_timeframe(
+         )
+ 
+     rows = dataset.evaluated_bars
+-    opens = [row.open_time_ms for row in rows]
+-    closes = [row.close_time_ms for row in rows]
+-    start = bisect_left(opens, chart_open_ms)
+-    stop = bisect_right(closes, chart_close_ms, lo=start)
++    start = bisect_left(rows, chart_open_ms, key=_OPEN)
++    stop = bisect_right(rows, chart_close_ms, lo=start, key=_CLOSE)
+     indexes = [
+         index
+         for index in range(start, stop)
+diff --git a/pinelib/request/engine.py b/pinelib/request/engine.py
+index ebb0ab57d75a7b9bc7098f4430e1e0b86974c439..4208bf1d20a62b87c366373d886cb856a5ede20a 100644
+--- a/pinelib/request/engine.py
++++ b/pinelib/request/engine.py
+@@ -295,6 +295,8 @@ class RequestExpressionContext:
+         "_stack",
+         "_state",
+         "child",
++        "is_last_bar",
++        "last_bar_index",
+     )
+ 
+     def __init__(
+@@ -317,6 +319,8 @@ class RequestExpressionContext:
+         self._bar: CanonicalBar | None = None
+         self._depth = depth
+         self._stack = stack
++        self.last_bar_index = 0
++        self.is_last_bar = False
+ 
+     @property
+     def bar(self) -> CanonicalBar:
+@@ -1022,7 +1026,9 @@ class RequestEngine:
+                 )
+             state = restored_state
+         context = RequestExpressionContext(self, child, state, depth=depth, stack=stack)
++        context.last_bar_index = len(evaluated) + len(snapshot.bars) - 1
+         for bar in snapshot.bars:
++            context.is_last_bar = len(evaluated) == context.last_bar_index
+             self._evaluations += 1
+             if (
+                 self._evaluations

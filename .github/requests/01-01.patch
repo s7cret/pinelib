@@ -1,0 +1,71 @@
+diff --git a/pinelib/runtime/session.py b/pinelib/runtime/session.py
+index 57433ecefe9935c4a9696a9748d7f96b44879214..1890f06e825e9633c311ee0266d49084f1705c03 100644
+--- a/pinelib/runtime/session.py
++++ b/pinelib/runtime/session.py
+@@ -39,7 +39,6 @@ from pinelib.runtime.transcript import RuntimeTranscript
+ from pinelib.state.checkpoint import (
+     RuntimeCheckpoint,
+     canonical_json,
+-    from_portable,
+     is_canonical_sha256,
+     sha,
+     to_portable,
+@@ -846,7 +845,8 @@ class RuntimeSession:
+         if self._active is not None or self._pending_bar_frame is not None:
+             raise PineRuntimeError("cannot restore an active or provisional bar")
+         checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
+-        state = from_portable(checkpoint.state)
++        # Segment parsers own NA/reference decoding and portable round-trip checks.
++        state = checkpoint.state
+         if not isinstance(state, dict):
+             raise PineRuntimeError("checkpoint state must decode to an object")
+         required_state = {
+diff --git a/tests/test_checkpoint_na_roundtrip.py b/tests/test_checkpoint_na_roundtrip.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e389d113d1611947a1d6d46591e0af25d3c985c
+--- /dev/null
++++ b/tests/test_checkpoint_na_roundtrip.py
+@@ -0,0 +1,43 @@
++"""Segments, not their container, own portable NA decoding during restore."""
++
++import json
++
++import pytest
++
++from pinelib import CallbackFrame, RuntimeLanguageContext, RuntimeSession, is_na, na
++
++
++def runtime(compact):
++    obj = RuntimeSession(
++        RuntimeLanguageContext(
++            6, "test", "pine-v6", "sha256:" + "a" * 64, "compiler_annotation"
++        )
++    )
++    obj.commit_full_identity = not compact
++    return obj
++
++
++@pytest.mark.parametrize("compact", [True, False])
++def test_na_series_is_decoded_once_and_roundtrips(compact):
++    obj = runtime(compact)
++    for i, value in enumerate((na, na, 3.0)):
++        tx = obj.begin(CallbackFrame("HISTORICAL_EVAL", i, bar_index=i))
++        tx.set_series("na-series", value, "float")
++        tx.commit()
++    state = json.loads(json.dumps(obj.checkpoint().to_dict()))
++    restored = runtime(compact)
++    restored.restore(state)
++    assert restored.checkpoint().to_dict() == state
++    assert is_na(restored.series["na-series"].committed[0])
++    assert obj.state_hash == restored.state_hash
++
++
++@pytest.mark.parametrize("compact", [True, False])
++def test_equal_callback_counts_with_different_values_do_not_collide(compact):
++    left, right = runtime(compact), runtime(compact)
++    for obj, value in ((left, 3.0), (right, 7.0)):
++        tx = obj.begin(CallbackFrame("HISTORICAL_EVAL", 0, bar_index=0))
++        tx.set_series("same-name", value, "float")
++        tx.commit()
++    assert left.state_hash != right.state_hash
++    assert left.semantic_state_hash != right.semantic_state_hash
