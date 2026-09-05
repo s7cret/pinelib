@@ -1068,6 +1068,18 @@ class RequestEngine:
                 ProviderErrorKind.INVALID_SYMBOL, "invalid symbol"
             )
 
+    @property
+    def semantic_hash(self) -> str:
+        return sha(
+            {
+                "algorithm": "pinelib.request-engine.v1",
+                "provider_identity": self.identity.to_dict(),
+                "registry": self.registry.semantic_hash,
+                "evaluators": self._committed_evaluators,
+                "static_contexts": self._committed_static_contexts,
+            }
+        )
+
     def to_json(self) -> dict[str, object]:
         return {
             "provider_identity": self.identity.to_dict(),

@@ -204,4 +204,5 @@ def test_commit_identity_can_skip_full_state_json() -> None:
         transaction.set_series("close", float(index))
         transaction.commit()
     assert calls["n"] == 0
-    assert len(session.transcript.entries) == 0
+    assert len(session.transcript.entries) == 8
+    assert session.transcript.to_dict()["schema_id"] == "openpine.runtime_transcript.v2"

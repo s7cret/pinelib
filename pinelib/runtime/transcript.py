@@ -46,6 +46,13 @@ class RuntimeTranscript:
 
     @classmethod
     def from_dict(cls, data: object) -> RuntimeTranscript:
+        if (
+            isinstance(data, dict)
+            and data.get("schema_id") == "openpine.runtime_transcript.v2"
+        ):
+            from pinelib.runtime.compact_transcript import CompactRuntimeTranscript
+
+            return CompactRuntimeTranscript.from_dict(data)
         required = {"schema_id", "schema_version", "entries", "content_hash"}
         if not isinstance(data, dict) or set(data) != required:
             raise PineRuntimeError(

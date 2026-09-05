@@ -6,6 +6,7 @@ from typing import cast
 from pinelib.errors import PL_VISUAL_LIMIT, PineRuntimeError
 from pinelib.events.common import SourceSpan, delivery_id, event_id
 from pinelib.state.checkpoint import clone_runtime_value, sha, to_portable
+from pinelib.state.digest import AppendOnlyHistory
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +38,11 @@ class VisualEvent:
 class VisualTape:
     def __init__(self, limit: int = 100_000) -> None:
         self.limit = limit
-        self.committed: list[VisualEvent] = []
+        self.committed: AppendOnlyHistory[VisualEvent] = AppendOnlyHistory(
+            "visual-tape-v1",
+            encoder=lambda event: event.to_dict(),
+            cloner=lambda event: _parse_event(event.to_dict()),
+        )
         self.working: list[VisualEvent] = []
 
     def begin(self) -> None:
@@ -85,6 +90,16 @@ class VisualTape:
     def working_hash(self) -> str:
         return sha({"events": [event.to_dict() for event in self.working]})
 
+    @property
+    def semantic_hash(self) -> str:
+        return sha(
+            {
+                "algorithm": "pinelib.event-tape.v1",
+                "history": self.committed.identity(),
+                "working": [event.to_dict() for event in self.working],
+            }
+        )
+
     def to_json(self) -> dict[str, object]:
         return {
             "committed": [event.to_dict() for event in self.committed],
@@ -94,7 +109,12 @@ class VisualTape:
     @classmethod
     def from_json(cls, data: dict[str, object], limit: int) -> VisualTape:
         tape = cls(limit)
-        tape.committed = [_parse_event(row) for row in _rows(data, "committed")]
+        tape.committed = AppendOnlyHistory(
+            "visual-tape-v1",
+            (_parse_event(row) for row in _rows(data, "committed")),
+            encoder=lambda event: event.to_dict(),
+            cloner=lambda event: _parse_event(event.to_dict()),
+        )
         tape.working = [_parse_event(row) for row in _rows(data, "working")]
         return tape
 

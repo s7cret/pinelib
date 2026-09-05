@@ -4,7 +4,13 @@ from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
 from pinelib.errors import PL_CHECKPOINT_INVALID, PL_SERIES_HISTORY, PineRuntimeError
-from pinelib.state.checkpoint import clone_runtime_value, from_portable, to_portable
+from pinelib.state.checkpoint import (
+    clone_runtime_value,
+    from_portable,
+    sha,
+    to_portable,
+)
+from pinelib.state.digest import AppendOnlyHistory
 
 T = TypeVar("T")
 
@@ -13,7 +19,9 @@ T = TypeVar("T")
 class SeriesStorage(Generic[T]):
     name: str
     dtype: str
-    committed: list[T] = field(default_factory=list)
+    committed: AppendOnlyHistory[T] = field(
+        default_factory=lambda: AppendOnlyHistory("series-history-v1")
+    )
     working: T | None = None
     initialized: bool = False
     revision: int = 0
@@ -44,11 +52,25 @@ class SeriesStorage(Generic[T]):
         baseline = self.committed[-1] if self.committed else None
         self.working = clone_runtime_value(baseline)  # type: ignore[assignment]
 
+    @property
+    def semantic_hash(self) -> str:
+        return sha(
+            {
+                "algorithm": "pinelib.series-state.v1",
+                "name": self.name,
+                "dtype": self.dtype,
+                "history": self.committed.identity(),
+                "working": self.working,
+                "initialized": self.initialized,
+                "revision": self.revision,
+            }
+        )
+
     def to_json(self) -> dict[str, object]:
         return {
             "name": self.name,
             "dtype": self.dtype,
-            "committed": to_portable(self.committed),
+            "committed": to_portable(list(self.committed)),
             "working": to_portable(self.working),
             "initialized": self.initialized,
             "revision": self.revision,
@@ -92,7 +114,7 @@ class SeriesStorage(Generic[T]):
                 code=PL_CHECKPOINT_INVALID,
             )
         storage = SeriesStorage[object](data["name"], data["dtype"])
-        storage.committed = committed
+        storage.committed = AppendOnlyHistory("series-history-v1", committed)
         storage.working = from_portable(data["working"])
         storage.initialized = data["initialized"]
         storage.revision = data["revision"]

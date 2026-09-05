@@ -18,6 +18,7 @@ from pinelib.events import AlertEvent, AlertTape, SourceSpan, VisualEvent, Visua
 from pinelib.input import InputRegistry
 from pinelib.reference import RuntimeReferenceHeap
 from pinelib.request import RequestDataProvider, RequestEngine
+from pinelib.runtime.compact_transcript import CompactRuntimeTranscript
 from pinelib.runtime.context import RuntimeLanguageContext
 from pinelib.runtime.delegated import (
     DelegatedCapabilityDispatcher,
@@ -31,6 +32,7 @@ from pinelib.runtime.metadata import (
     TimeframeContext,
 )
 from pinelib.runtime.policies import RuntimePolicies
+from pinelib.runtime.semantic import ALGORITHM, semantic_state_digest
 from pinelib.runtime.state_machine import RuntimeState, RuntimeStateMachine
 from pinelib.runtime.transcript import RuntimeTranscript
 from pinelib.state.checkpoint import (
@@ -93,6 +95,8 @@ class CallbackResult:
     visual_batch_hash: str
     alert_batch_hash: str
     delegated_outputs: tuple[DelegatedOutput, ...] = ()
+    state_hash_algorithm: str = "pinelib.snapshot-json.v1"
+    revision_fingerprint: str | None = None
 
 
 class RuntimeTransaction:
@@ -562,6 +566,7 @@ class RuntimeSession:
         self.transcript = RuntimeTranscript()
         self.sequence = -1
         self.commit_full_identity = True
+        self._identity_mode: bool | None = None
         self._active: RuntimeTransaction | None = None
         self.machine.transition(RuntimeState.ADMITTED)
         self.machine.transition(RuntimeState.INITIALIZED)
@@ -587,6 +592,16 @@ class RuntimeSession:
     def begin(
         self, frame: CallbackFrame, *, values: BarValues | None = None
     ) -> RuntimeTransaction:
+        if type(self.commit_full_identity) is not bool:
+            raise PineRuntimeError("commit_full_identity must be boolean")
+        if self._identity_mode is None:
+            self._identity_mode = self.commit_full_identity
+            if not self.commit_full_identity:
+                self.transcript = CompactRuntimeTranscript()
+        elif self._identity_mode != self.commit_full_identity:
+            raise PineRuntimeError(
+                "identity mode is immutable during a run; use state_hash for checkpoint snapshots"
+            )
         if self._active is not None:
             raise PineRuntimeError(
                 "another callback transaction is active",
@@ -656,20 +671,19 @@ class RuntimeSession:
             self.requests.finish(persist=False)
             self.machine.transition(RuntimeState.ABORTED)
         self._active = None
-        if self.commit_full_identity:
-            state_hash = self.state_hash
-        else:
-            state_hash = sha(
-                {
-                    "sequence": frame.sequence,
-                    "bar_index": frame.bar_index,
-                    "revisions": {
-                        key: storage.revision
-                        for key, storage in sorted(self.series.items())
-                    },
-                }
-            )
-        if commit and self.commit_full_identity:
+        state_hash = (
+            self.state_hash if self.commit_full_identity else self.semantic_state_hash
+        )
+        revision_fingerprint = sha(
+            {
+                "algorithm": "pinelib.revision-fingerprint.v1",
+                "sequence": self.sequence,
+                "revisions": {
+                    key: value.revision for key, value in sorted(self.series.items())
+                },
+            }
+        )
+        if commit:
             self.transcript.append(
                 {
                     "sequence": frame.sequence,
@@ -685,12 +699,7 @@ class RuntimeSession:
                     "alert_batch_hash": alert_hash,
                 }
             )
-        if self.commit_full_identity:
-            transcript_hash = self.transcript.content_hash
-        else:
-            transcript_hash = sha(
-                {"sequence": frame.sequence, "count": len(self.transcript.entries)}
-            )
+        transcript_hash = self.transcript.content_hash
         return CallbackResult(
             commit,
             not commit,
@@ -699,6 +708,8 @@ class RuntimeSession:
             visual_hash,
             alert_hash,
             delegated_outputs,
+            "pinelib.snapshot-json.v1" if self.commit_full_identity else ALGORITHM,
+            revision_fingerprint,
         )
 
     def barstate(self, frame: CallbackFrame) -> BarStateView:
@@ -710,6 +721,19 @@ class RuntimeSession:
             isnew=not frame.realtime or frame.tick_index == 0,
             isconfirmed=not frame.realtime or frame.final_tick,
             islastconfirmedhistory=frame.is_last_confirmed_history,
+        )
+
+    @property
+    def semantic_state_hash(self) -> str:
+        return semantic_state_digest(
+            self.identity_hash,
+            self.sequence,
+            self.series,
+            self.slots,
+            self.references,
+            self.visuals,
+            self.alerts,
+            self.requests,
         )
 
     @property
@@ -845,8 +869,23 @@ class RuntimeSession:
         normalized_runtime_state = {
             key: value for key, value in normalized_state.items() if key != "transcript"
         }
-        if new_transcript.entries and new_transcript.entries[-1]["state_hash"] != sha(
-            normalized_runtime_state
+        expected_state_hash = (
+            semantic_state_digest(
+                self.identity_hash,
+                new_sequence,
+                new_series,
+                new_slots,
+                new_references,
+                new_visuals,
+                new_alerts,
+                new_requests,
+            )
+            if isinstance(new_transcript, CompactRuntimeTranscript)
+            else sha(normalized_runtime_state)
+        )
+        if (
+            new_transcript.entries
+            and new_transcript.entries[-1]["state_hash"] != expected_state_hash
         ):
             raise PineRuntimeError(
                 "runtime transcript state hash does not match checkpoint state",
@@ -865,6 +904,10 @@ class RuntimeSession:
         self.requests = new_requests
         self.transcript = new_transcript
         self.sequence = new_sequence
+        self.commit_full_identity = not isinstance(
+            new_transcript, CompactRuntimeTranscript
+        )
+        self._identity_mode = self.commit_full_identity
 
     def finalize(self) -> None:
         if self._active is not None:

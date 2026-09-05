@@ -515,6 +515,29 @@ class RequestDatasetRegistry:
             ],
         }
 
+    @property
+    def semantic_hash(self) -> str:
+        # Datasets are admitted content-addressed immutable values. Cursors and
+        # discovery are live state, not revision-count stand-ins.
+        return sha(
+            {
+                "algorithm": "pinelib.request-registry.v1",
+                "datasets": [
+                    {
+                        "key": key,
+                        "content_hash": value.content_hash,
+                        "child_state": value.child_state,
+                    }
+                    for key, value in sorted(self._committed_datasets.items())
+                ],
+                "discovery": dict(sorted(self._committed_discovery.items())),
+                "cursors": {
+                    key: value.to_dict()
+                    for key, value in sorted(self._committed_cursors.items())
+                },
+            }
+        )
+
     def to_json(self) -> dict[str, object]:
         return {
             "datasets": [
