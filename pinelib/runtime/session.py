@@ -39,7 +39,6 @@ from pinelib.runtime.transcript import RuntimeTranscript
 from pinelib.state.checkpoint import (
     RuntimeCheckpoint,
     canonical_json,
-    from_portable,
     is_canonical_sha256,
     sha,
     to_portable,
@@ -846,7 +845,8 @@ class RuntimeSession:
         if self._active is not None or self._pending_bar_frame is not None:
             raise PineRuntimeError("cannot restore an active or provisional bar")
         checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
-        state = from_portable(checkpoint.state)
+        # Segment parsers own NA/reference decoding and portable round-trip checks.
+        state = checkpoint.state
         if not isinstance(state, dict):
             raise PineRuntimeError("checkpoint state must decode to an object")
         required_state = {
