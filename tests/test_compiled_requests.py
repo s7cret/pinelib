@@ -19,7 +19,7 @@ from pinelib.request.snapshots import RequestSource, SnapshotRequestProvider
 from pinelib.runtime.metadata import BarValues, InstrumentContext, TimeframeContext
 from pinelib.runtime.policies import ResourcePolicy, RuntimePolicies
 
-I = InstrumentContext("S", "EX:S", "EX", "USD", "S", "UTC", "stock", 0.01)
+INSTRUMENT = InstrumentContext("S", "EX:S", "EX", "USD", "S", "UTC", "stock", 0.01)
 
 
 class Provider(SnapshotRequestProvider):
@@ -43,7 +43,7 @@ class Provider(SnapshotRequestProvider):
             for i, v in enumerate(values)
         )
         super().__init__(
-            (RequestSource("stock:S", I, "stock", period, bars, "sha256:" + "d" * 64),)
+            (RequestSource("stock:S", INSTRUMENT, "stock", period, bars, "sha256:" + "d" * 64),)
         )
 
     def fetch(self, q):
@@ -81,7 +81,7 @@ def runtime(provider, version=6, period="1", policies=None):
             "compiler_annotation",
         ),
         policies,
-        instrument=I,
+        instrument=INSTRUMENT,
         timeframe=TimeframeContext.parse(period),
         request_provider=provider,
     )
@@ -201,7 +201,7 @@ def test_bool_gap_obeys_version_rules(version):
 def test_snapshot_identity_includes_values_and_metadata():
     p = Provider()
     source = p.source("EX:S", "5")
-    other = replace(source, instrument=replace(I, pointvalue=10))
+    other = replace(source, instrument=replace(INSTRUMENT, pointvalue=10))
     assert source.content_hash != other.content_hash
     assert (
         p.descriptor.provider_id
@@ -291,5 +291,3 @@ def test_missing_intrabars_are_empty_array():
     handle = security_lower_tf_v1(tx, "EX:S", "1", expression(tx, "close"), "empty")
     tx.commit()
     assert not is_na(handle) and array_values(r.references, handle) == ()
-
-
