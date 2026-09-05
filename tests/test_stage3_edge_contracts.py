@@ -219,6 +219,9 @@ def test_manifest_builder_cli_and_mutation_fail_closed(monkeypatch, tmp_path):
 
 
 def test_manifest_loader_rejects_shape_hash_and_unknown(monkeypatch):
+    cache_clear = getattr(manifest.load_target_manifest, "cache_clear", None)
+    if callable(cache_clear):
+        cache_clear()
     monkeypatch.setattr(manifest, "files", lambda _package: FakeResource("[]"))
     expect_error(manifest.load_target_manifest)
 
@@ -234,6 +237,25 @@ def test_manifest_loader_rejects_shape_hash_and_unknown(monkeypatch):
         manifest, "files", lambda _package: FakeResource(json.dumps(unknown))
     )
     expect_error(manifest.load_target_manifest)
+
+
+def test_load_target_manifest_rebuilds_canonical_builder_once(monkeypatch) -> None:
+    calls = {"n": 0}
+    real = builder.build_manifest
+
+    def counted() -> object:
+        calls["n"] += 1
+        return real()
+
+    monkeypatch.setattr(builder, "build_manifest", counted)
+    cache_clear = getattr(manifest.load_target_manifest, "cache_clear", None)
+    if callable(cache_clear):
+        cache_clear()
+    first = manifest.load_target_manifest()
+    second = manifest.load_target_manifest()
+    assert first == second
+    assert first["classification"]["unknown"] == 0
+    assert calls["n"] == 1
 
 
 def test_inputs_metadata_time_and_session_negative_corpus():

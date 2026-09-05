@@ -186,3 +186,22 @@ def test_transaction_closed_and_resource_checkpoint_limit():
         t.commit()
     with pytest.raises(PineRuntimeError):
         s.checkpoint()
+
+
+def test_commit_identity_can_skip_full_state_json() -> None:
+    session = RuntimeSession(ctx())
+    session.commit_full_identity = False
+    calls = {"n": 0}
+    original = session._state_json
+
+    def counted() -> dict[str, object]:
+        calls["n"] += 1
+        return original()
+
+    session._state_json = counted  # type: ignore[method-assign]
+    for index in range(8):
+        transaction = session.begin(CallbackFrame("HISTORICAL_EVAL", index))
+        transaction.set_series("close", float(index))
+        transaction.commit()
+    assert calls["n"] == 0
+    assert len(session.transcript.entries) == 0

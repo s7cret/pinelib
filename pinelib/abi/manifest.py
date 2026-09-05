@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from importlib.resources import files
 
 from pinelib.errors import PL_ABI_MANIFEST, PineRuntimeError
 from pinelib.state.checkpoint import sha
 
 
+@lru_cache(maxsize=1)
 def load_target_manifest() -> dict[str, object]:
     resource = files("pinelib.abi").joinpath("target_manifest.json")
     data = json.loads(resource.read_text(encoding="utf-8"))

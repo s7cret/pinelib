@@ -545,6 +545,7 @@ class RuntimeSession:
         self.delegated_dispatcher = delegated_dispatcher
         self.transcript = RuntimeTranscript()
         self.sequence = -1
+        self.commit_full_identity = True
         self._active: RuntimeTransaction | None = None
         self.machine.transition(RuntimeState.ADMITTED)
         self.machine.transition(RuntimeState.INITIALIZED)
@@ -639,8 +640,20 @@ class RuntimeSession:
             self.requests.finish(persist=False)
             self.machine.transition(RuntimeState.ABORTED)
         self._active = None
-        state_hash = self.state_hash
-        if commit:
+        if self.commit_full_identity:
+            state_hash = self.state_hash
+        else:
+            state_hash = sha(
+                {
+                    "sequence": frame.sequence,
+                    "bar_index": frame.bar_index,
+                    "revisions": {
+                        key: storage.revision
+                        for key, storage in sorted(self.series.items())
+                    },
+                }
+            )
+        if commit and self.commit_full_identity:
             self.transcript.append(
                 {
                     "sequence": frame.sequence,
@@ -656,11 +669,17 @@ class RuntimeSession:
                     "alert_batch_hash": alert_hash,
                 }
             )
+        if self.commit_full_identity:
+            transcript_hash = self.transcript.content_hash
+        else:
+            transcript_hash = sha(
+                {"sequence": frame.sequence, "count": len(self.transcript.entries)}
+            )
         return CallbackResult(
             commit,
             not commit,
             state_hash,
-            self.transcript.content_hash,
+            transcript_hash,
             visual_hash,
             alert_hash,
             delegated_outputs,
