@@ -154,6 +154,17 @@ for old_name in ("tostring", "tonumber"):
     )
 
 # Immutable inputs.
+ROWS.append(
+    _row(
+        "input",
+        "pinelib.abi.input.generic_v1",
+        versions=ALL_VERSIONS,
+        status=TargetStatus.SUPPORTED_CONTEXT,
+        return_type="any",
+        state_model="ADMITTED_INPUT",
+        capabilities=("input.registry",),
+    )
+)
 for name, return_type in {
     "bool": "bool",
     "int": "int",
@@ -170,7 +181,11 @@ for name, return_type in {
     ROWS.append(
         _row(
             f"input.{name}",
-            f"pinelib.abi.input.{name}_v1",
+            (
+                "pinelib.abi.input.source_value_v1"
+                if name == "source"
+                else f"pinelib.abi.input.{name}_v1"
+            ),
             versions=NAMESPACE,
             status=TargetStatus.SUPPORTED_CONTEXT,
             return_type=return_type,

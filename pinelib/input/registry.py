@@ -4,7 +4,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, cast
+from typing import Literal, cast, get_args
 
 from pinelib.errors import PL_INPUT_INVALID, PineRuntimeError
 from pinelib.state.checkpoint import sha, to_portable
@@ -40,7 +40,9 @@ class InputSpec:
     confirm: bool = False
 
     def __post_init__(self) -> None:
-        if not self.input_id:
+        if self.kind not in get_args(InputKind):
+            raise PineRuntimeError("unknown input kind", code=PL_INPUT_INVALID)
+        if not isinstance(self.input_id, str) or not self.input_id:
             raise PineRuntimeError("input_id is required", code=PL_INPUT_INVALID)
         self._validate_type(self.default, "default")
         self._validate_type(self.value, "value")
@@ -52,6 +54,17 @@ class InputSpec:
             raise PineRuntimeError(
                 "input minimum exceeds maximum", code=PL_INPUT_INVALID
             )
+        for name, bound in (
+            ("minimum", self.minimum),
+            ("maximum", self.maximum),
+            ("step", self.step),
+        ):
+            if bound is not None and (
+                type(bound) not in (int, float) or not math.isfinite(bound)
+            ):
+                raise PineRuntimeError(
+                    f"input {name} must be a finite number", code=PL_INPUT_INVALID
+                )
         if self.step is not None and self.step <= 0:
             raise PineRuntimeError("input step must be positive", code=PL_INPUT_INVALID)
         if self.kind not in {"int", "float", "price", "time"} and any(
@@ -61,12 +74,27 @@ class InputSpec:
                 "numeric constraints are not valid for this input type",
                 code=PL_INPUT_INVALID,
             )
-        if self.options and self.value not in self.options:
+        for option in self.options:
+            self._validate_type(option, "option")
+        if self.options and any(
+            item is not None for item in (self.minimum, self.maximum, self.step)
+        ):
+            raise PineRuntimeError(
+                "options cannot be combined with numeric constraints",
+                code=PL_INPUT_INVALID,
+            )
+        if self.options and (
+            self.default not in self.options or self.value not in self.options
+        ):
             raise PineRuntimeError(
                 "input value is not one of the declared options",
                 code=PL_INPUT_INVALID,
             )
         if self.kind in {"int", "float", "price", "time"}:
+            if not math.isfinite(cast(int | float, self.default)):
+                raise PineRuntimeError(
+                    "input default must be finite", code=PL_INPUT_INVALID
+                )
             number = float(cast(int | float, self.value))
             if not math.isfinite(number):
                 raise PineRuntimeError(
@@ -80,12 +108,6 @@ class InputSpec:
                 raise PineRuntimeError(
                     "input value is above maximum", code=PL_INPUT_INVALID
                 )
-            if self.step is not None and self.minimum is not None:
-                quotient = (number - float(self.minimum)) / float(self.step)
-                if abs(quotient - round(quotient)) > 1e-9:
-                    raise PineRuntimeError(
-                        "input value does not align to step", code=PL_INPUT_INVALID
-                    )
 
     def _validate_type(self, value: object, field: str) -> None:
         valid = False
@@ -135,6 +157,16 @@ class InputRegistry:
         self._identity_hash = sha({"inputs": [spec.identity() for spec in ordered]})
         self._sealed = True
 
+    @classmethod
+    def from_descriptors(
+        cls,
+        descriptors: Mapping[str, object],
+        overrides: Mapping[str, object] | None = None,
+    ) -> InputRegistry:
+        from pinelib.input.admission import admit_input_descriptors
+
+        return cls(admit_input_descriptors(descriptors, overrides))
+
     @property
     def specs(self) -> tuple[InputSpec, ...]:
         return self._specs
@@ -143,13 +175,17 @@ class InputRegistry:
     def identity_hash(self) -> str:
         return self._identity_hash
 
-    def get(self, input_id: str, kind: InputKind | None = None) -> object:
+    def spec(self, input_id: str) -> InputSpec:
         try:
             spec = self._by_id[input_id]
         except KeyError as error:
             raise PineRuntimeError(
                 f"unknown input_id: {input_id}", code=PL_INPUT_INVALID
             ) from error
+        return spec
+
+    def get(self, input_id: str, kind: InputKind | None = None) -> object:
+        spec = self.spec(input_id)
         if kind is not None and spec.kind != kind:
             raise PineRuntimeError(
                 f"input {input_id} has kind {spec.kind}, expected {kind}",

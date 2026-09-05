@@ -266,11 +266,12 @@ def test_inputs_metadata_time_and_session_negative_corpus():
         ("x", "string", "a", "b", {"options": ("a",)}),
         ("x", "float", 1.0, float("inf"), {}),
         ("x", "int", 1, 0, {"minimum": 1}),
-        ("x", "int", 1, 4, {"minimum": 0, "step": 3}),
         ("x", "bool", True, 1, {}),
     ]
     for input_id, kind, default, value, kwargs in invalid_specs:
         expect_error(InputSpec, input_id, kind, default, value, **kwargs)
+    # TradingView step is the widget arrow increment, not a value lattice.
+    assert InputSpec("step", "int", 1, 4, minimum=0, step=3).value == 4
     registry = InputRegistry([InputSpec("x", "int", 1, 1)])
     expect_error(registry.get, "missing")
     expect_error(registry.get, "x", "float")

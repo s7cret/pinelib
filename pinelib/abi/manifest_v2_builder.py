@@ -62,6 +62,8 @@ _COMPILER_OPERATIONS = (
     ),
 )
 _INTERNAL_ABI_BINDINGS = {
+    "registry": "RUNTIME_INPUT_REGISTRY",
+    "input_id": "ADMITTED_INPUT_SPEC_ID",
     "tx": "RUNTIME_TRANSACTION",
     "transaction": "RUNTIME_TRANSACTION",
     "state_id": "SOURCE_LOCATION_STATE_ID",
