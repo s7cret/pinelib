@@ -40,12 +40,20 @@ class InputSpec:
     confirm: bool = False
 
     def __post_init__(self) -> None:
+        if not isinstance(self.options, (tuple, list)):
+            raise PineRuntimeError(
+                "input options must be ordered", code=PL_INPUT_INVALID
+            )
+        object.__setattr__(self, "options", tuple(self.options))
         if self.kind not in get_args(InputKind):
             raise PineRuntimeError("unknown input kind", code=PL_INPUT_INVALID)
         if not isinstance(self.input_id, str) or not self.input_id:
             raise PineRuntimeError("input_id is required", code=PL_INPUT_INVALID)
         self._validate_type(self.default, "default")
         self._validate_type(self.value, "value")
+        if self.kind in {"float", "price"}:
+            object.__setattr__(self, "default", float(cast(int | float, self.default)))
+            object.__setattr__(self, "value", float(cast(int | float, self.value)))
         if (
             self.minimum is not None
             and self.maximum is not None
@@ -94,6 +102,13 @@ class InputSpec:
             if not math.isfinite(cast(int | float, self.default)):
                 raise PineRuntimeError(
                     "input default must be finite", code=PL_INPUT_INVALID
+                )
+            default_number = float(cast(int | float, self.default))
+            if (self.minimum is not None and default_number < self.minimum) or (
+                self.maximum is not None and default_number > self.maximum
+            ):
+                raise PineRuntimeError(
+                    "input default violates bounds", code=PL_INPUT_INVALID
                 )
             number = float(cast(int | float, self.value))
             if not math.isfinite(number):
@@ -145,6 +160,11 @@ class InputSpec:
 class InputRegistry:
     __slots__ = ("_by_id", "_identity_hash", "_sealed", "_specs")
 
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_sealed", False):
+            raise AttributeError("input registry is immutable; construct a new run")
+        object.__setattr__(self, name, value)
+
     def __init__(self, specs: tuple[InputSpec, ...] | list[InputSpec] = ()) -> None:
         ordered = tuple(specs)
         by_id: dict[str, InputSpec] = {}
@@ -166,6 +186,19 @@ class InputRegistry:
         from pinelib.input.admission import admit_input_descriptors
 
         return cls(admit_input_descriptors(descriptors, overrides))
+
+    @property
+    def values(self) -> Mapping[str, object]:
+        return MappingProxyType({spec.input_id: spec.value for spec in self._specs})
+
+    @property
+    def values_hash(self) -> str:
+        return sha(
+            {
+                "schema_id": "pinelib.input-values.v1",
+                "values": to_portable(dict(self.values)),
+            }
+        )
 
     @property
     def specs(self) -> tuple[InputSpec, ...]:
