@@ -107,6 +107,7 @@ class RuntimeTransaction:
         self.frame = frame
         self.closed = False
         self._new_series: set[str] = set()
+        self._request_allocations = 0
         self._delegated_invocations: list[DelegatedInvocation] = []
         self._delegated_outputs: list[DelegatedOutput] = []
 

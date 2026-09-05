@@ -203,6 +203,8 @@ def _source_aliases(
     official: Mapping[str, Any], target: CatalogRow | None
 ) -> list[str]:
     aliases = [str(official["symbol_id"])]
+    if official["name"] == "request.security":
+        aliases.append("pine:function:security")
     if target is not None:
         aliases.append(target.symbol_id)
         aliases.append(str(official["symbol_id"]) + "#canonical")
@@ -220,6 +222,14 @@ def _parameter_bindings(
     rows: list[dict[str, object]] = []
     for parameter in abi_parameters:
         abi_name = str(parameter["name"])
+        if abi_name == "timeframe" and official["name"] == "request.security":
+            rows.append({"abi_parameter": abi_name, "binding": "INJECTED",
+                         "source": "REQUEST_TIMEFRAME_ARGUMENT"})
+            continue
+        if abi_name == "expression" and official["name"] in {"request.security", "request.security_lower_tf"}:
+            rows.append({"abi_parameter": abi_name, "binding": "INJECTED",
+                         "source": "COMPILED_REQUEST_EXPRESSION"})
+            continue
         if abi_name in _INTERNAL_ABI_BINDINGS:
             rows.append(
                 {
@@ -334,6 +344,17 @@ def build_manifest_v2(
                 "official surface row is invalid", code=PL_ABI_MANIFEST
             )
         name = str(official_row["name"])
+        # Verified reference contract absent in the frozen snapshot; do not infer
+        # arbitrary source signatures from coincidental Python ABI names.
+        if name == "array.get" and not official_row.get("parameters"):
+            signature = [
+                {"name": "id", "type": "array", "qualifier_max": "series", "required": True},
+                {"name": "index", "type": "int", "qualifier_max": "series", "required": True},
+            ]
+            official_row = {**official_row, "parameters": signature[1:] if official_row["category"] == "methods" else signature}
+        if name == "na" and official_row["category"] == "functions" and not official_row.get("parameters"):
+            official_row = {**official_row, "parameters": [
+                {"name": "x", "type": "any", "required": True, "qualifier_max": "series"}]}
         parameters = [
             dict(item)
             for item in official_row.get("parameters", [])
@@ -400,7 +421,7 @@ def build_manifest_v2(
                         else "namespace_function"
                     )
                 ),
-                "version_availability": list(official_row["supported_versions"]),
+                "version_availability": (sorted(set(official_row["supported_versions"]) | {version for legacy in frozen_index.get("pine:function:security", ()) for version in legacy.pine_versions}) if name == "request.security" else list(official_row["supported_versions"])),
                 "parameters": parameters,
                 "abi_callable": abi_callable,
                 "abi_parameters": abi_parameters,

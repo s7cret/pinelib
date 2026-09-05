@@ -20,8 +20,9 @@ def _row(
     diagnostic: str | None = None,
     tuple_arity: int = 0,
     overload: str = "v1",
+    evaluation_mode: str = "EAGER_ARGUMENTS",
 ) -> CatalogRow:
-    prefix = "pine:variable:" if call_form == "context_field" else "pine:function:"
+    prefix = "pine:constant:" if call_form == "constant" else "pine:variable:" if call_form == "context_field" else "pine:function:"
     symbol_id = prefix + symbol
     return CatalogRow(
         symbol_id,
@@ -31,7 +32,7 @@ def _row(
         status,
         callable_path,
         return_type,
-        "EAGER_ARGUMENTS",
+        evaluation_mode,
         state_model,
         capabilities,
         diagnostic,
@@ -199,34 +200,37 @@ for name, return_type in {
 ROWS.append(
     _row(
         "security",
-        "pinelib.abi.request.security_v1",
+        "pinelib.abi.compiled_request.security_v1",
         versions=PRE_NAMESPACE,
         status=TargetStatus.SUPPORTED_STATEFUL,
         return_type="typed_request_result",
         call_form="global_function",
-        state_model="REQUEST_DATASET_REGISTRY",
+        state_model="COMPILED_REQUEST_EXPRESSION",
+        evaluation_mode="CHILD_CONTEXT_EXPRESSION",
         capabilities=("request.security", "marketdata.v2"),
     )
 )
 ROWS.append(
     _row(
         "request.security",
-        "pinelib.abi.request.security_v1",
+        "pinelib.abi.compiled_request.security_v1",
         versions=NAMESPACE,
         status=TargetStatus.SUPPORTED_STATEFUL,
         return_type="typed_request_result",
-        state_model="REQUEST_DATASET_REGISTRY",
+        state_model="COMPILED_REQUEST_EXPRESSION",
+        evaluation_mode="CHILD_CONTEXT_EXPRESSION",
         capabilities=("request.security", "marketdata.v2"),
     )
 )
 ROWS.append(
     _row(
         "request.security_lower_tf",
-        "pinelib.abi.request.security_lower_tf_v1",
+        "pinelib.abi.compiled_request.security_lower_tf_v1",
         versions=NAMESPACE,
         status=TargetStatus.SUPPORTED_STATEFUL,
         return_type="array<typed_request_result>",
-        state_model="REQUEST_DATASET_REGISTRY",
+        state_model="COMPILED_REQUEST_EXPRESSION",
+        evaluation_mode="CHILD_CONTEXT_EXPRESSION",
         capabilities=("request.security_lower_tf", "marketdata.v2", "reference.array"),
     )
 )
@@ -582,5 +586,14 @@ for name in ("alert", "alertcondition"):
             capabilities=("alert.events",),
         )
     )
+
+for name in ("gaps_off", "gaps_on", "lookahead_off", "lookahead_on"):
+    ROWS.append(_row(f"barmerge.{name}", f"pinelib.abi.compiled_request.{name}_v1",
+                     versions=(3, 4, 5, 6), status=TargetStatus.SUPPORTED_PURE,
+                     call_form="constant", return_type="string"))
+
+ROWS.append(_row("na", "pinelib.abi.primitives.na_v1", versions=ALL_VERSIONS,
+                 status=TargetStatus.SUPPORTED_CONTEXT, call_form="global_function",
+                 return_type="bool", capabilities=("value.na",)))
 
 CATALOG: tuple[CatalogRow, ...] = tuple(ROWS)

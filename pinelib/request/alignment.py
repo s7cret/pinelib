@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
+from operator import attrgetter
 
 from pinelib.core.values import na
 from pinelib.errors import PL_REQUEST_ALIGNMENT, PL_RESOURCE_LIMIT, PineRuntimeError
@@ -13,6 +14,10 @@ from pinelib.request.models import (
     RequestKind,
 )
 from pinelib.request.registry import MergeCursor
+from pinelib.runtime.metadata import TimeframeContext
+
+_OPEN = attrgetter("open_time_ms")
+_CLOSE = attrgetter("close_time_ms")
 
 
 def _validate_chart(open_time_ms: int, close_time_ms: int) -> None:
@@ -28,7 +33,7 @@ def _validate_chart(open_time_ms: int, close_time_ms: int) -> None:
 
 def _last_final_by_close(dataset: RequestDataset, chart_close_ms: int) -> int:
     rows = dataset.evaluated_bars
-    index = bisect_right([row.close_time_ms for row in rows], chart_close_ms) - 1
+    index = bisect_right(rows, chart_close_ms, key=_CLOSE) - 1
     while index >= 0 and rows[index].finality != DataFinality.FINAL:
         index -= 1
     return index
@@ -36,7 +41,7 @@ def _last_final_by_close(dataset: RequestDataset, chart_close_ms: int) -> int:
 
 def _last_final_before_open(dataset: RequestDataset, exclusive_open_ms: int) -> int:
     rows = dataset.evaluated_bars
-    index = bisect_left([row.open_time_ms for row in rows], exclusive_open_ms) - 1
+    index = bisect_left(rows, exclusive_open_ms, key=_OPEN) - 1
     while index >= 0 and rows[index].finality != DataFinality.FINAL:
         index -= 1
     return index
@@ -65,8 +70,7 @@ def align_security(
     selected = -1
     updated = False
     if realtime:
-        opens = [row.open_time_ms for row in rows]
-        candidate = bisect_left(opens, chart_close_ms) - 1
+        candidate = bisect_left(rows, chart_close_ms, key=_OPEN) - 1
         if candidate >= 0:
             row = rows[candidate]
             overlaps = (
@@ -89,10 +93,21 @@ def align_security(
     else:
         # Pine lookahead observes a higher-timeframe value as soon as that HTF
         # bar opens, including when the opening lies strictly inside a chart bar.
-        selected = _last_final_before_open(dataset, chart_close_ms)
-        if selected >= 0:
-            row = rows[selected]
-            updated = chart_open_ms <= row.open_time_ms < chart_close_ms
+        seconds = TimeframeContext.parse(query.timeframe).seconds
+        if seconds is not None and seconds * 1000 < chart_close_ms - chart_open_ms:
+            # Historical lower-TF lookahead_on selects the first intrabar.
+            start = bisect_left(rows, chart_open_ms, key=_OPEN)
+            stop = bisect_right(rows, chart_close_ms, lo=start, key=_CLOSE)
+            selected = next((i for i in range(start, stop)
+                             if rows[i].finality == DataFinality.FINAL), -1)
+            updated = selected >= 0
+            if selected < 0:
+                selected = _last_final_by_close(dataset, chart_open_ms)
+        else:
+            selected = _last_final_before_open(dataset, chart_close_ms)
+            if selected >= 0:
+                row = rows[selected]
+                updated = chart_open_ms <= row.open_time_ms < chart_close_ms
 
     cursor = MergeCursor(
         "security",
@@ -140,10 +155,8 @@ def align_lower_timeframe(
         )
 
     rows = dataset.evaluated_bars
-    opens = [row.open_time_ms for row in rows]
-    closes = [row.close_time_ms for row in rows]
-    start = bisect_left(opens, chart_open_ms)
-    stop = bisect_right(closes, chart_close_ms, lo=start)
+    start = bisect_left(rows, chart_open_ms, key=_OPEN)
+    stop = bisect_right(rows, chart_close_ms, lo=start, key=_CLOSE)
     indexes = [
         index
         for index in range(start, stop)

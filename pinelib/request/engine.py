@@ -295,6 +295,8 @@ class RequestExpressionContext:
         "_stack",
         "_state",
         "child",
+        "is_last_bar",
+        "last_bar_index",
     )
 
     def __init__(
@@ -317,6 +319,8 @@ class RequestExpressionContext:
         self._bar: CanonicalBar | None = None
         self._depth = depth
         self._stack = stack
+        self.last_bar_index = 0
+        self.is_last_bar = False
 
     @property
     def bar(self) -> CanonicalBar:
@@ -1022,7 +1026,9 @@ class RequestEngine:
                 )
             state = restored_state
         context = RequestExpressionContext(self, child, state, depth=depth, stack=stack)
+        context.last_bar_index = len(evaluated) + len(snapshot.bars) - 1
         for bar in snapshot.bars:
+            context.is_last_bar = len(evaluated) == context.last_bar_index
             self._evaluations += 1
             if (
                 self._evaluations
