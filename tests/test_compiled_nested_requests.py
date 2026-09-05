@@ -4,6 +4,8 @@ import json
 from dataclasses import replace
 
 import pytest
+
+from pinelib import is_na
 from pinelib.abi.compiled_request import (
     _ACTIVE_CHILD,
     CompiledRequestExpression,
@@ -13,8 +15,6 @@ from pinelib.abi.ta import sma_v1
 from pinelib.errors import PineRuntimeError
 from pinelib.request import ResultShape
 from pinelib.runtime.policies import RuntimePolicies
-
-from pinelib import is_na
 from tests.test_compiled_requests import Provider, begin, runtime
 
 
