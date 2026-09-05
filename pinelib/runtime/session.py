@@ -132,7 +132,7 @@ class RuntimeTransaction:
     def read_series(self, name: str, offset: int = 0) -> object:
         self._check()
         try:
-            return self.session.series[name].read(offset)
+            return self._read_typed_series(self.session.series[name], offset)
         except KeyError as error:
             raise PineRuntimeError(f"unknown series: {name}") from error
 
@@ -157,15 +157,31 @@ class RuntimeTransaction:
                 "history offset must be an int", code=PL_SERIES_HISTORY
             )
         if isinstance(base, SeriesStorage):
-            value = base.read(offset)
+            storage = base
         elif isinstance(base, str) and base in self.session.series:
-            value = self.session.series[base].read(offset)
+            storage = self.session.series[base]
         else:
             raise PineRuntimeError(
                 "history base must be declared series storage",
                 code=PL_SERIES_HISTORY,
             )
+        value = self._read_typed_series(storage, offset)
         return na if value is None else value
+
+    def _read_typed_series(self, storage: SeriesStorage, offset: int) -> object:
+        if type(offset) is not int:
+            raise PineRuntimeError(
+                "history offset must be an int", code=PL_SERIES_HISTORY
+            )
+        value = storage.read(offset)
+        if (
+            offset > 0
+            and value is None
+            and storage.dtype == "bool"
+            and self.session.language.pine_version >= 6
+        ):
+            return False
+        return value
 
     def _required_series_value(self, name: str) -> object:
         try:
