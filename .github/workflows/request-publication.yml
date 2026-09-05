@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install setuptools==84.0.0 wheel==0.48.0 hatchling==1.32.0 build==1.6.0 tzdata==2026.2
+      - run: python -m pip install setuptools==84.0.0 wheel==0.48.0 hatchling==1.32.0 build==1.6.0 tzdata==2026.2 pytest==9.1.1 ruff==0.12.10
       - name: Regenerate manifest and restore exact reviewed commits
         run: |
           python "$RUNNER_TEMP/restore.py" restore .github/requests/plan.json "$RUNNER_TEMP/evidence"
@@ -41,7 +41,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/build-source"
           git archive HEAD | tar -x -C "$RUNNER_TEMP/build-source"
-          python -m pip install "$RUNNER_TEMP/build-source[dev]"
+          python -m pip install "$RUNNER_TEMP/build-source"
       - name: Complete runtime functional suite
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
