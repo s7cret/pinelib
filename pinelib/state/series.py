@@ -25,11 +25,27 @@ class SeriesStorage(Generic[T]):
     working: T | None = None
     initialized: bool = False
     revision: int = 0
+    history_policy: str = "each_bar"
+    evaluated: bool = False
+
+    def __post_init__(self):
+        if self.history_policy not in {"each_bar", "on_evaluation"}:
+            raise PineRuntimeError(
+                "unknown series history policy", code=PL_SERIES_HISTORY
+            )
+
+    def _history_identity(self) -> dict:
+        return (
+            {"history_policy": self.history_policy, "evaluated": self.evaluated}
+            if self.history_policy != "each_bar"
+            else {}
+        )
 
     def begin(self, value: T | None = None) -> None:
         baseline = self.committed[-1] if value is None and self.committed else value
         self.working = clone_runtime_value(baseline)  # type: ignore[assignment]
         self.initialized = True
+        self.evaluated = False
 
     def set(self, value: T) -> None:
         if not self.initialized:
@@ -45,6 +61,8 @@ class SeriesStorage(Generic[T]):
         return self.committed[index] if index >= 0 else None
 
     def commit(self) -> None:
+        if self.history_policy == "on_evaluation" and not self.evaluated:
+            return
         self.committed.append(clone_runtime_value(self.working))  # type: ignore[arg-type]
         self.revision += 1
 
@@ -63,6 +81,7 @@ class SeriesStorage(Generic[T]):
                 "working": self.working,
                 "initialized": self.initialized,
                 "revision": self.revision,
+                **self._history_identity(),
             }
         )
 
@@ -74,6 +93,7 @@ class SeriesStorage(Generic[T]):
             "working": to_portable(self.working),
             "initialized": self.initialized,
             "revision": self.revision,
+            **self._history_identity(),
         }
 
     @classmethod
@@ -86,7 +106,10 @@ class SeriesStorage(Generic[T]):
             "initialized",
             "revision",
         }
-        if not isinstance(data, dict) or set(data) != required:
+        if not isinstance(data, dict) or set(data) not in (
+            required,
+            required | {"history_policy", "evaluated"},
+        ):
             raise PineRuntimeError(
                 "series checkpoint schema mismatch", code=PL_CHECKPOINT_INVALID
             )
@@ -103,6 +126,13 @@ class SeriesStorage(Generic[T]):
             raise PineRuntimeError(
                 "series checkpoint types are invalid", code=PL_CHECKPOINT_INVALID
             )
+        if "history_policy" in data and (
+            data["history_policy"] != "on_evaluation"
+            or type(data["evaluated"]) is not bool
+        ):
+            raise PineRuntimeError(
+                "invalid local history policy", code=PL_CHECKPOINT_INVALID
+            )
         committed = from_portable(data["committed"])
         if not isinstance(committed, list):
             raise PineRuntimeError(
@@ -113,7 +143,12 @@ class SeriesStorage(Generic[T]):
                 "series checkpoint revision is inconsistent",
                 code=PL_CHECKPOINT_INVALID,
             )
-        storage = SeriesStorage[object](data["name"], data["dtype"])
+        storage = SeriesStorage[object](
+            data["name"],
+            data["dtype"],
+            history_policy=data.get("history_policy", "each_bar"),
+        )
+        storage.evaluated = data.get("evaluated", False)
         storage.committed = AppendOnlyHistory("series-history-v1", committed)
         storage.working = from_portable(data["working"])
         storage.initialized = data["initialized"]

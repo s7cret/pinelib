@@ -78,6 +78,7 @@ class NumericPolicy:
 
 @dataclass(frozen=True, slots=True)
 class ResourcePolicy:
+    max_loop_iterations: int = 100_000
     max_series: int = 10_000
     max_state_slots: int = 10_000
     max_checkpoint_bytes: int = 16 * 1024 * 1024

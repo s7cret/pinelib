@@ -26,6 +26,7 @@ from pinelib.runtime.delegated import (
     DelegatedInvocation,
     DelegatedOutput,
 )
+from pinelib.runtime.language import LanguageExecutionMixin
 from pinelib.runtime.metadata import (
     BarStateView,
     BarValues,
@@ -101,12 +102,13 @@ class CallbackResult:
     revision_fingerprint: str | None = None
 
 
-class RuntimeTransaction:
+class RuntimeTransaction(LanguageExecutionMixin):
     def __init__(self, session: RuntimeSession, frame: CallbackFrame) -> None:
         self.session = session
         self.frame = frame
         self.closed = False
         self._new_series: set[str] = set()
+        self._function_path: tuple[str, ...] = ()
         self._request_allocations = 0
         self._delegated_invocations: list[DelegatedInvocation] = []
         self._delegated_outputs: list[DelegatedOutput] = []
@@ -121,20 +123,30 @@ class RuntimeTransaction:
                 "transaction is not active", code=PL_RUNTIME_TRANSACTION_CLOSED
             )
 
-    def set_series(self, name: str, value: object, dtype: str = "float") -> None:
+    def set_series(
+        self,
+        name: str,
+        value: object,
+        dtype: str = "float",
+        *,
+        history_policy: str = "each_bar",
+    ) -> None:
         self._check()
         if name not in self.session.series:
             if len(self.session.series) >= self.session.policies.resource.max_series:
                 raise PineRuntimeError("series limit exceeded", code=PL_RESOURCE_LIMIT)
-            self.session.series[name] = SeriesStorage(name, dtype)
+            self.session.series[name] = SeriesStorage(
+                name, dtype, history_policy=history_policy
+            )
             self._new_series.add(name)
         storage = self.session.series[name]
-        if storage.dtype != dtype:
+        if storage.dtype != dtype or storage.history_policy != history_policy:
             raise PineRuntimeError("series type descriptor changed for the same name")
         if not storage.initialized:
             storage.begin(value)
         else:
             storage.set(value)
+        storage.evaluated = True
 
     def read_series(self, name: str, offset: int = 0) -> object:
         self._check()
@@ -357,30 +369,72 @@ class RuntimeTransaction:
         return self.session.barstate(self.frame).islastconfirmedhistory
 
     def declare_scalar_v1(
-        self, series_id: str, mode: str, initializer: Callable[[], object], dtype: str,
+        self,
+        series_id: str,
+        mode: str,
+        initializer: Callable[[], object],
+        dtype: str,
+        *,
+        history_policy: str = "each_bar",
     ) -> object:
         """Initialize a scalar lazily and bind its final callback value to history."""
         self._check()
-        if mode not in {"default", "var", "varip"} or dtype not in {"bool", "color", "float", "int", "string"}:
+        if mode not in {"default", "var", "varip"} or dtype not in {
+            "bool",
+            "color",
+            "float",
+            "int",
+            "string",
+        }:
             raise PineRuntimeError("unsupported scalar declaration")
         if mode == "default":
             value = initializer()
         else:
             state_id = "scalar:" + series_id
             if not self.session.slots.contains(state_id):
-                self.set_slot(state_id, initializer(), owner="ast2python.scalar.v1", varip=mode == "varip")
-            value = self.state(state_id, owner="ast2python.scalar.v1", schema_version="1", initial=None, varip=mode == "varip")
-        self.set_series(series_id, value, dtype)
+                self.set_slot(
+                    state_id,
+                    initializer(),
+                    owner="ast2python.scalar.v1",
+                    varip=mode == "varip",
+                )
+            value = self.state(
+                state_id,
+                owner="ast2python.scalar.v1",
+                schema_version="1",
+                initial=None,
+                varip=mode == "varip",
+            )
+        self.set_series(series_id, value, dtype, history_policy=history_policy)
         return value
 
-    def write_scalar_v1(self, series_id: str, mode: str, value: object, dtype: str) -> None:
+    def write_scalar_v1(
+        self,
+        series_id: str,
+        mode: str,
+        value: object,
+        dtype: str,
+        *,
+        history_policy: str = "each_bar",
+    ) -> None:
         """A reassignment updates the declared series, not just a Python local."""
         self._check()
-        if mode not in {"default", "var", "varip"} or dtype not in {"bool", "color", "float", "int", "string"}:
+        if mode not in {"default", "var", "varip"} or dtype not in {
+            "bool",
+            "color",
+            "float",
+            "int",
+            "string",
+        }:
             raise PineRuntimeError("unsupported scalar reassignment")
         if mode != "default":
-            self.set_slot("scalar:" + series_id, value, owner="ast2python.scalar.v1", varip=mode == "varip")
-        self.set_series(series_id, value, dtype)
+            self.set_slot(
+                "scalar:" + series_id,
+                value,
+                owner="ast2python.scalar.v1",
+                varip=mode == "varip",
+            )
+        self.set_series(series_id, value, dtype, history_policy=history_policy)
 
     def set_slot(
         self,
@@ -643,14 +697,26 @@ class RuntimeSession:
             raise PineRuntimeError(
                 "callback sequence must be monotonic", code=PL_RUNTIME_SEQUENCE
             )
-        if self._deferred_mode is not None and self._deferred_mode != frame.defer_bar_commit:
-            raise PineRuntimeError("bar commit mode cannot change during a run", code=PL_RUNTIME_SEQUENCE)
+        if (
+            self._deferred_mode is not None
+            and self._deferred_mode != frame.defer_bar_commit
+        ):
+            raise PineRuntimeError(
+                "bar commit mode cannot change during a run", code=PL_RUNTIME_SEQUENCE
+            )
         if frame.defer_bar_commit:
-            if self._last_published_bar is not None and frame.bar_index <= self._last_published_bar:
-                raise PineRuntimeError("cannot execute an already published bar", code=PL_RUNTIME_SEQUENCE)
+            if (
+                self._last_published_bar is not None
+                and frame.bar_index <= self._last_published_bar
+            ):
+                raise PineRuntimeError(
+                    "cannot execute an already published bar", code=PL_RUNTIME_SEQUENCE
+                )
             if self._pending_bar_frame is not None:
                 if frame.bar_index != self._pending_bar_frame.bar_index:
-                    raise PineRuntimeError("previous bar has not been published", code=PL_RUNTIME_SEQUENCE)
+                    raise PineRuntimeError(
+                        "previous bar has not been published", code=PL_RUNTIME_SEQUENCE
+                    )
                 # Roll back the provisional child request transaction just like
                 # normal variables; no past chart-bar history was committed.
                 self.requests.finish(persist=False)
@@ -769,18 +835,38 @@ class RuntimeSession:
         boundaries are intentionally rejected.
         """
         if self._active is not None:
-            raise PineRuntimeError("cannot publish an active transaction", code=PL_RUNTIME_TRANSACTION_ACTIVE)
+            raise PineRuntimeError(
+                "cannot publish an active transaction",
+                code=PL_RUNTIME_TRANSACTION_ACTIVE,
+            )
         pending = self._pending_bar_frame
-        if (type(bar_index) is not int or pending is None or pending.bar_index != bar_index):
-            raise PineRuntimeError("no matching provisional bar to publish", code=PL_RUNTIME_SEQUENCE)
+        if (
+            type(bar_index) is not int
+            or pending is None
+            or pending.bar_index != bar_index
+        ):
+            raise PineRuntimeError(
+                "no matching provisional bar to publish", code=PL_RUNTIME_SEQUENCE
+            )
         if pending.realtime and not pending.final_tick:
-            raise PineRuntimeError("cannot publish an unconfirmed realtime bar", code=PL_RUNTIME_SEQUENCE)
-        frame = replace(pending, phase="BAR_COMMIT", sequence=self.sequence + 1, defer_bar_commit=False)
+            raise PineRuntimeError(
+                "cannot publish an unconfirmed realtime bar", code=PL_RUNTIME_SEQUENCE
+            )
+        frame = replace(
+            pending,
+            phase="BAR_COMMIT",
+            sequence=self.sequence + 1,
+            defer_bar_commit=False,
+        )
         transaction = RuntimeTransaction(self, frame)
         transaction.closed = True
         self._active = transaction
         # Enter the normal transaction state before promoting the working data.
-        self.machine.transition(RuntimeState.REALTIME_CALLBACK if frame.realtime else RuntimeState.HISTORICAL_CALLBACK)
+        self.machine.transition(
+            RuntimeState.REALTIME_CALLBACK
+            if frame.realtime
+            else RuntimeState.HISTORICAL_CALLBACK
+        )
         result = self._finish(transaction, True)
         self._pending_bar_frame = None
         self._last_published_bar = bar_index
@@ -982,7 +1068,11 @@ class RuntimeSession:
         last = new_transcript.entries[-1] if new_transcript.entries else None
         self._pending_bar_frame = None
         self._deferred_mode = None if last is None else last["phase"] == "BAR_COMMIT"
-        self._last_published_bar = last["bar_index"] if last is not None and last["phase"] == "BAR_COMMIT" else None
+        self._last_published_bar = (
+            last["bar_index"]
+            if last is not None and last["phase"] == "BAR_COMMIT"
+            else None
+        )
         self.commit_full_identity = not isinstance(
             new_transcript, CompactRuntimeTranscript
         )
