@@ -44,10 +44,14 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import os, shutil
+          output = Path(os.environ['RUNNER_TEMP'])/'submission'
+          output.mkdir()
+          shutil.copyfile('.github/merge/plan.json',output/'plan.json')
           for path in Path('.github/merge').glob('*.patch'):
-              path.write_bytes(path.read_bytes().replace(b'\n diff --git ', b'\ndiff --git '))
+              (output/path.name).write_bytes(path.read_bytes().replace(b'\n diff --git ', b'\ndiff --git '))
           PY
-          python "$RUNNER_TEMP/restore.py" restore .github/merge/plan.json "$RUNNER_TEMP/evidence"
+          python "$RUNNER_TEMP/restore.py" restore "$RUNNER_TEMP/submission/plan.json" "$RUNNER_TEMP/evidence"
           cp "$RUNNER_TEMP/restore.py" "$RUNNER_TEMP/evidence/restore.py"
       - name: Install clean source and verification dependencies
         run: |
