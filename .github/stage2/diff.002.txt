@@ -1,0 +1,149 @@
+                 "abi_callable": abi_callable,
+                 "abi_parameters": abi_parameters,
+diff --git a/pinelib/abi/primitives.py b/pinelib/abi/primitives.py
+index 062b31b745f5f4241504b44ab037ed6b39e80945..08bf6a16af9b2d5f69a82c9a4468d8bd386d3fb9 100644
+--- a/pinelib/abi/primitives.py
++++ b/pinelib/abi/primitives.py
+@@ -19,9 +19,45 @@ def series_history_v1(tx: RuntimeTransaction, base: object, offset: object) -> o
+ 
+ def na_v1(tx: RuntimeTransaction, x: object) -> bool:
+     """Version-aware missing-value predicate, including flat broker values."""
+-    from pinelib.core.values import is_na
++    from pinelib.core.values import is_na, normalize_na
+     from pinelib.errors import PL_VALUE_TYPE, PineRuntimeError
++
+     tx._check()
+     if tx.session.language.pine_version >= 6 and type(x) is bool:
+         raise PineRuntimeError("na does not accept bool in Pine v6", code=PL_VALUE_TYPE)
+-    return is_na(x)
++    return is_na(normalize_na(x))
++
++
++def once_v1(tx: RuntimeTransaction, state_id: str, condition):
++    return tx.once_v1(state_id, condition)
++
++
++def range_v1(tx: RuntimeTransaction, start, end, step):
++    return tx.range_v1(start, end, step)
++
++
++def invoke_function_v1(tx: RuntimeTransaction, callsite: str, function, arguments):
++    return tx.invoke_function_v1(callsite, function, arguments)
++
++
++def logical_eager_v1(tx: RuntimeTransaction, operator: str, left, right):
++    # Inputs have both been evaluated before this call, including legacy na.
++    a, b = tx.condition_v1(left), tx.condition_v1(right)
++    if operator == "and":
++        return a and b
++    if operator == "or":
++        return a or b
++    from pinelib.errors import PineRuntimeError
++
++    raise PineRuntimeError("invalid logical operator")
++
++
++def logical_lazy_v1(tx: RuntimeTransaction, operator: str, left, right):
++    a = tx.condition_v1(left)
++    if operator == "and":
++        return a and tx.condition_v1(right())
++    if operator == "or":
++        return a or tx.condition_v1(right())
++    from pinelib.errors import PineRuntimeError
++
++    raise PineRuntimeError("invalid logical operator")
+diff --git a/pinelib/runtime/language.py b/pinelib/runtime/language.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..17bdfda775782c6c3584b1ffa2d07845f1d7a9ca
+--- /dev/null
++++ b/pinelib/runtime/language.py
+@@ -0,0 +1,117 @@
++"""Versioned compiler services over the existing transaction/slot/series model.
++
++Written function calls own scopes; loop iterations do not create new callsites.
++No separate interpreter, global mutable cache, or parallel checkpoint format.
++"""
++
++from __future__ import annotations
++
++from pinelib.core.values import is_na, na, pine_bool
++from pinelib.errors import PL_RESOURCE_LIMIT, PL_VALUE_TYPE, PineRuntimeError
++from pinelib.state.checkpoint import sha
++
++
++class LanguageExecutionMixin:
++    def scoped_id_v1(self, source_id: str, *, local: bool = False) -> str:
++        self._check()
++        if type(source_id) is not str or not source_id:
++            raise PineRuntimeError(
++                "source state identity must be nonempty text", code=PL_VALUE_TYPE
++            )
++        path = self._function_path
++        if not path and not local:
++            return source_id
++        return "lexical:" + sha({"path": list(path), "source": source_id})
++
++    def invoke_function_v1(self, callsite: str, function, arguments: dict):
++        self._check()
++        if not callable(function) or not isinstance(arguments, dict):
++            raise PineRuntimeError(
++                "invalid compiled function invocation", code=PL_VALUE_TYPE
++            )
++        if type(callsite) is not str or not callsite:
++            raise PineRuntimeError("function callsite is missing", code=PL_VALUE_TYPE)
++        # Recursive Pine calls are rejected by the frontend; bound native misuse
++        # as well, without relying on the Python recursion limit.
++        if len(self._function_path) >= 64:
++            raise PineRuntimeError(
++                "compiled function call depth exceeded", code=PL_RESOURCE_LIMIT
++            )
++        prior = self._function_path
++        self._function_path = (*prior, callsite)
++        try:
++            return function(**arguments)
++        finally:
++            self._function_path = prior
++
++    def condition_v1(self, value: object) -> bool:
++        self._check()
++        if value is None or is_na(value):
++            if self.session.language.pine_version >= 6:
++                raise PineRuntimeError(
++                    "bool cannot be na in Pine v6", code=PL_VALUE_TYPE
++                )
++            return False
++        if type(value) not in (bool, int, float):
++            raise PineRuntimeError(
++                "condition requires bool or legacy numeric value", code=PL_VALUE_TYPE
++            )
++        result = pine_bool(value, self.session.language)
++        return False if result is na else result
++
++    def once_v1(self, state_id: str, condition) -> bool:
++        self._check()
++        if self.session.language.pine_version != 6:
++            raise PineRuntimeError("once requires Pine v6", code=PL_VALUE_TYPE)
++        key = self.scoped_id_v1("once:" + state_id, local=True)
++        done = self.state(
++            key, owner="ast2python.once.v1", schema_version="1", initial=False
++        )
++        if done:
++            return False
++        # Do not even evaluate the predicate after committed completion.
++        if not self.condition_v1(condition()):
++            return False
++        self.set_slot(key, True, owner="ast2python.once.v1")
++        return True
++
++    def range_v1(self, start: int, end, step: int = 1):
++        self._check()
++        stop = end()
++        if is_na(start) or is_na(stop) or is_na(step):
++            return
++        if (
++            type(start) is not int
++            or type(stop) is not int
++            or type(step) is not int
++            or step <= 0
++        ):
++            raise PineRuntimeError(

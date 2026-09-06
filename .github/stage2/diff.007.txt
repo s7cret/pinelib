@@ -1,0 +1,2 @@
++        assert t.condition_v1(value) is (value == 1)
++    t.abort()

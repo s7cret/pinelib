@@ -1,0 +1,152 @@
+diff --git a/pinelib/abi/manifest_v2_builder.py b/pinelib/abi/manifest_v2_builder.py
+index 380f7c740ac99d4f3d4aedfde63511cf2e7bbf51..b0267d064f1c31a868ac44354dc39e44b4d823f8 100644
+--- a/pinelib/abi/manifest_v2_builder.py
++++ b/pinelib/abi/manifest_v2_builder.py
+@@ -42,6 +42,50 @@ _VISUAL_GLOBALS = {
+ }
+ _VISUAL_NAMESPACES = {"box", "label", "line", "linefill", "polyline", "table"}
+ _COMPILER_OPERATIONS = (
++    (
++        "operator.div.legacy",
++        "eager",
++        "pure",
++        "pinelib.abi.primitives.operator_binary_v1",
++    ),
++    (
++        "operator.div.fractional",
++        "eager",
++        "pure",
++        "pinelib.abi.primitives.operator_binary_v1",
++    ),
++    ("control.once", "lazy", "control", "pinelib.abi.primitives.once_v1"),
++    (
++        "control.for_range.dynamic_end",
++        "lazy",
++        "control",
++        "pinelib.abi.primitives.range_v1",
++    ),
++    (
++        "control.for_range.fixed_end",
++        "lazy",
++        "control",
++        "pinelib.abi.primitives.range_v1",
++    ),
++    (
++        "function.invoke.pure",
++        "eager",
++        "pure",
++        "pinelib.abi.primitives.invoke_function_v1",
++    ),
++    (
++        "function.invoke.stateful",
++        "eager",
++        "state",
++        "pinelib.abi.primitives.invoke_function_v1",
++    ),
++    (
++        "operator.logical.eager",
++        "eager",
++        "pure",
++        "pinelib.abi.primitives.logical_eager_v1",
++    ),
++    ("operator.logical.lazy", "lazy", "pure", "pinelib.abi.primitives.logical_lazy_v1"),
+     (
+         "operator.binary",
+         "eager",
+@@ -223,12 +267,25 @@ def _parameter_bindings(
+     for parameter in abi_parameters:
+         abi_name = str(parameter["name"])
+         if abi_name == "timeframe" and official["name"] == "request.security":
+-            rows.append({"abi_parameter": abi_name, "binding": "INJECTED",
+-                         "source": "REQUEST_TIMEFRAME_ARGUMENT"})
++            rows.append(
++                {
++                    "abi_parameter": abi_name,
++                    "binding": "INJECTED",
++                    "source": "REQUEST_TIMEFRAME_ARGUMENT",
++                }
++            )
+             continue
+-        if abi_name == "expression" and official["name"] in {"request.security", "request.security_lower_tf"}:
+-            rows.append({"abi_parameter": abi_name, "binding": "INJECTED",
+-                         "source": "COMPILED_REQUEST_EXPRESSION"})
++        if abi_name == "expression" and official["name"] in {
++            "request.security",
++            "request.security_lower_tf",
++        }:
++            rows.append(
++                {
++                    "abi_parameter": abi_name,
++                    "binding": "INJECTED",
++                    "source": "COMPILED_REQUEST_EXPRESSION",
++                }
++            )
+             continue
+         if abi_name in _INTERNAL_ABI_BINDINGS:
+             rows.append(
+@@ -348,13 +405,41 @@ def build_manifest_v2(
+         # arbitrary source signatures from coincidental Python ABI names.
+         if name == "array.get" and not official_row.get("parameters"):
+             signature = [
+-                {"name": "id", "type": "array", "qualifier_max": "series", "required": True},
+-                {"name": "index", "type": "int", "qualifier_max": "series", "required": True},
++                {
++                    "name": "id",
++                    "type": "array",
++                    "qualifier_max": "series",
++                    "required": True,
++                },
++                {
++                    "name": "index",
++                    "type": "int",
++                    "qualifier_max": "series",
++                    "required": True,
++                },
+             ]
+-            official_row = {**official_row, "parameters": signature[1:] if official_row["category"] == "methods" else signature}
+-        if name == "na" and official_row["category"] == "functions" and not official_row.get("parameters"):
+-            official_row = {**official_row, "parameters": [
+-                {"name": "x", "type": "any", "required": True, "qualifier_max": "series"}]}
++            official_row = {
++                **official_row,
++                "parameters": signature[1:]
++                if official_row["category"] == "methods"
++                else signature,
++            }
++        if (
++            name == "na"
++            and official_row["category"] == "functions"
++            and not official_row.get("parameters")
++        ):
++            official_row = {
++                **official_row,
++                "parameters": [
++                    {
++                        "name": "x",
++                        "type": "any",
++                        "required": True,
++                        "qualifier_max": "series",
++                    }
++                ],
++            }
+         parameters = [
+             dict(item)
+             for item in official_row.get("parameters", [])
+@@ -421,7 +506,18 @@ def build_manifest_v2(
+                         else "namespace_function"
+                     )
+                 ),
+-                "version_availability": (sorted(set(official_row["supported_versions"]) | {version for legacy in frozen_index.get("pine:function:security", ()) for version in legacy.pine_versions}) if name == "request.security" else list(official_row["supported_versions"])),
++                "version_availability": (
++                    sorted(
++                        set(official_row["supported_versions"])
++                        | {
++                            version
++                            for legacy in frozen_index.get("pine:function:security", ())
++                            for version in legacy.pine_versions
++                        }
++                    )
++                    if name == "request.security"
++                    else list(official_row["supported_versions"])
++                ),
+                 "parameters": parameters,

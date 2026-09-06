@@ -1,0 +1,143 @@
++                "Pine range requires int boundaries and positive step",
++                code=PL_VALUE_TYPE,
++            )
++        direction = 1 if start <= stop else -1
++        current = start
++        iterations = 0
++        while current <= stop if direction == 1 else current >= stop:
++            self._check()
++            iterations += 1
++            if iterations > self.session.policies.resource.max_loop_iterations:
++                raise PineRuntimeError(
++                    "loop iteration budget exceeded", code=PL_RESOURCE_LIMIT
++                )
++            yield current
++            current += direction * step
++            if self.session.language.pine_version >= 6:
++                stop = end()
++                if is_na(stop):
++                    return
++                if type(stop) is not int:
++                    raise PineRuntimeError(
++                        "dynamic range boundary must remain int", code=PL_VALUE_TYPE
++                    )
++
++    def history_value_v1(self, source_id: str, value: object, offset: int, dtype: str):
++        key = self.scoped_id_v1("expression-history:" + source_id, local=True)
++        self.set_series(key, value, dtype, history_policy="on_evaluation")
++        return self.op_series_history(key, offset)
+diff --git a/pinelib/runtime/policies.py b/pinelib/runtime/policies.py
+index 1187a331dbbbe7d4838146b290a81f8e1af7a35c..93e13b47055c9c8f8f0af4e95d333cffd3dd4bea 100644
+--- a/pinelib/runtime/policies.py
++++ b/pinelib/runtime/policies.py
+@@ -78,6 +78,7 @@ class NumericPolicy:
+ 
+ @dataclass(frozen=True, slots=True)
+ class ResourcePolicy:
++    max_loop_iterations: int = 100_000
+     max_series: int = 10_000
+     max_state_slots: int = 10_000
+     max_checkpoint_bytes: int = 16 * 1024 * 1024
+diff --git a/pinelib/runtime/session.py b/pinelib/runtime/session.py
+index 32cea44ff4d2aeed8b1aefc76e523be3badc394b..e84a602bb0341fb6e0aff0eff0eef484150186d2 100644
+--- a/pinelib/runtime/session.py
++++ b/pinelib/runtime/session.py
+@@ -101,12 +101,16 @@ class CallbackResult:
+     revision_fingerprint: str | None = None
+ 
+ 
+-class RuntimeTransaction:
++from pinelib.runtime.language import LanguageExecutionMixin
++
++
++class RuntimeTransaction(LanguageExecutionMixin):
+     def __init__(self, session: RuntimeSession, frame: CallbackFrame) -> None:
+         self.session = session
+         self.frame = frame
+         self.closed = False
+         self._new_series: set[str] = set()
++        self._function_path: tuple[str, ...] = ()
+         self._request_allocations = 0
+         self._delegated_invocations: list[DelegatedInvocation] = []
+         self._delegated_outputs: list[DelegatedOutput] = []
+@@ -121,20 +125,30 @@ class RuntimeTransaction:
+                 "transaction is not active", code=PL_RUNTIME_TRANSACTION_CLOSED
+             )
+ 
+-    def set_series(self, name: str, value: object, dtype: str = "float") -> None:
++    def set_series(
++        self,
++        name: str,
++        value: object,
++        dtype: str = "float",
++        *,
++        history_policy: str = "each_bar",
++    ) -> None:
+         self._check()
+         if name not in self.session.series:
+             if len(self.session.series) >= self.session.policies.resource.max_series:
+                 raise PineRuntimeError("series limit exceeded", code=PL_RESOURCE_LIMIT)
+-            self.session.series[name] = SeriesStorage(name, dtype)
++            self.session.series[name] = SeriesStorage(
++                name, dtype, history_policy=history_policy
++            )
+             self._new_series.add(name)
+         storage = self.session.series[name]
+-        if storage.dtype != dtype:
++        if storage.dtype != dtype or storage.history_policy != history_policy:
+             raise PineRuntimeError("series type descriptor changed for the same name")
+         if not storage.initialized:
+             storage.begin(value)
+         else:
+             storage.set(value)
++        storage.evaluated = True
+ 
+     def read_series(self, name: str, offset: int = 0) -> object:
+         self._check()
+@@ -357,30 +371,72 @@ class RuntimeTransaction:
+         return self.session.barstate(self.frame).islastconfirmedhistory
+ 
+     def declare_scalar_v1(
+-        self, series_id: str, mode: str, initializer: Callable[[], object], dtype: str,
++        self,
++        series_id: str,
++        mode: str,
++        initializer: Callable[[], object],
++        dtype: str,
++        *,
++        history_policy: str = "each_bar",
+     ) -> object:
+         """Initialize a scalar lazily and bind its final callback value to history."""
+         self._check()
+-        if mode not in {"default", "var", "varip"} or dtype not in {"bool", "color", "float", "int", "string"}:
++        if mode not in {"default", "var", "varip"} or dtype not in {
++            "bool",
++            "color",
++            "float",
++            "int",
++            "string",
++        }:
+             raise PineRuntimeError("unsupported scalar declaration")
+         if mode == "default":
+             value = initializer()
+         else:
+             state_id = "scalar:" + series_id
+             if not self.session.slots.contains(state_id):
+-                self.set_slot(state_id, initializer(), owner="ast2python.scalar.v1", varip=mode == "varip")
+-            value = self.state(state_id, owner="ast2python.scalar.v1", schema_version="1", initial=None, varip=mode == "varip")
+-        self.set_series(series_id, value, dtype)
++                self.set_slot(
++                    state_id,
++                    initializer(),
++                    owner="ast2python.scalar.v1",
++                    varip=mode == "varip",
++                )
++            value = self.state(
++                state_id,
++                owner="ast2python.scalar.v1",
++                schema_version="1",
++                initial=None,
++                varip=mode == "varip",
++            )
++        self.set_series(series_id, value, dtype, history_policy=history_policy)
+         return value
