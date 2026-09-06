@@ -1,0 +1,38 @@
+diff --git a/tests/test_compiled_nested_requests.py b/tests/test_compiled_nested_requests.py
+index bff6fef028e2af2b738112ff41e098374e7a8f77..10b6d547b7d9b3b92ac12e107ef08fb7febca79a 100644
+--- a/tests/test_compiled_nested_requests.py
++++ b/tests/test_compiled_nested_requests.py
+@@ -4,6 +4,8 @@ import json
+ from dataclasses import replace
+ 
+ import pytest
++
++from pinelib import is_na
+ from pinelib.abi.compiled_request import (
+     _ACTIVE_CHILD,
+     CompiledRequestExpression,
+@@ -13,8 +15,6 @@ from pinelib.abi.ta import sma_v1
+ from pinelib.errors import PineRuntimeError
+ from pinelib.request import ResultShape
+ from pinelib.runtime.policies import RuntimePolicies
+-
+-from pinelib import is_na
+ from tests.test_compiled_requests import Provider, begin, runtime
+ 
+ 
+ diff --git a/tests/test_snapshot_aliases.py b/tests/test_snapshot_aliases.py
+index d12000daea09499327d8d2d6a292ec3396c15ed8..851cbce955816988e4114533f26e37250b96fe29 100644
+--- a/tests/test_snapshot_aliases.py
++++ b/tests/test_snapshot_aliases.py
+@@ -3,10 +3,10 @@
+ from dataclasses import replace
+ 
+ import pytest
++
+ from pinelib.errors import PineRuntimeError
+ from pinelib.request.provider import RequestProviderError
+ from pinelib.request.snapshots import SnapshotRequestProvider
+-
+ from tests.test_compiled_requests import Provider
+ 
+ 

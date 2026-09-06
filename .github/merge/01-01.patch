@@ -1,0 +1,279 @@
+diff --git a/pinelib/abi/compiled_request.py b/pinelib/abi/compiled_request.py
+index 8e8f5681809a53772fa6ddcfe97839b360582145..4847c65168495599d9228608f08d3265b79f4393 100644
+--- a/pinelib/abi/compiled_request.py
++++ b/pinelib/abi/compiled_request.py
+@@ -2,11 +2,13 @@
+ 
+ The compiler supplies generated methods, not source strings. RequestEngine owns
+ alignment, limits, caching and transactional/checkpoint state. This ABI does not
+-claim support for live revisions, nested request closures or currency conversion.
++claim support for live revisions or currency conversion.
+ """
+ 
+ from __future__ import annotations
+ 
++from contextvars import ContextVar
++
+ from pinelib.core.values import is_na, na
+ from pinelib.errors import PL_REQUEST_DATA, PL_REQUEST_PROVIDER, PineRuntimeError
+ from pinelib.request import (
+@@ -21,6 +23,13 @@ from pinelib.runtime.metadata import BarValues, TimeframeContext
+ from pinelib.runtime.session import CallbackFrame, RuntimeSession, RuntimeTransaction
+ from pinelib.state.checkpoint import sha
+ 
++# Bind the ephemeral evaluation context to exactly its child transaction.
++# ContextVar prevents concurrent/nested evaluations leaking into other sessions.
++# Persistent state remains solely in RequestEngine and portable checkpoints.
++_ACTIVE_CHILD: ContextVar[tuple | None] = ContextVar(
++    "pinelib_compiled_request_child", default=None
++)
++
+ 
+ class CompiledRequestExpression:
+     def __init__(
+@@ -56,6 +65,7 @@ class CompiledRequestExpression:
+                 inputs=self.parent.session.inputs,
+                 instrument=self.source.instrument,
+                 timeframe=TimeframeContext.parse(self.source.timeframe),
++                request_provider=self.parent.session.requests.provider,
+             )
+             self._runtime.commit_full_identity = False
+             saved = context.state("compiled-runtime", None)
+@@ -84,6 +94,7 @@ class CompiledRequestExpression:
+             values=values,
+         )
+         self._script.runtime = tx
++        token = _ACTIVE_CHILD.set((tx, context))
+         try:
+             value = getattr(self._script, self.method)()
+             tx.commit()
+@@ -91,6 +102,8 @@ class CompiledRequestExpression:
+             if not tx.closed:
+                 tx.abort()
+             raise
++        finally:
++            _ACTIVE_CHILD.reset(token)
+         if context.is_last_bar:
+             # Once per source snapshot, not once per bar (avoids quadratic copies).
+             context.set_state("compiled-runtime", runtime.checkpoint().to_dict())
+@@ -195,6 +208,22 @@ def _run(
+         pine_version=version,
+         dynamic=expression.dynamic,
+     )
++    active = _ACTIVE_CHILD.get()
++    if active is not None and active[0] is transaction:
++        # Use the outer transaction's engine: it owns nested parent identities,
++        # shared budgets, cycle checks and atomic publication/rollback of caches.
++        child_context = active[1]
++        nested = (
++            child_context.nested_lower_timeframe
++            if lower
++            else child_context.nested_security
++        )
++        return nested(
++            query,
++            expression,
++            expression.shape,
++            ignore_invalid_symbol=ignore_invalid_symbol,
++        )
+     method = (
+         transaction.requests.security_lower_tf
+         if lower
+ diff --git a/pinelib/request/snapshots.py b/pinelib/request/snapshots.py
+index e8c3548f4db70c1a011da6038f3c34cca0b05768..b552a4077c332728811f3022bee3ebadb7ec687f 100644
+--- a/pinelib/request/snapshots.py
++++ b/pinelib/request/snapshots.py
+@@ -158,19 +158,30 @@ class SnapshotRequestProvider:
+                 raise PineRuntimeError(
+                     "request source exceeds the bar limit", code=PL_REQUEST_DATA
+                 )
+-            key = (source.instrument.tickerid, source.timeframe)
+-            if key in by_key:
+-                raise PineRuntimeError(
+-                    "duplicate request source identity", code=PL_REQUEST_DATA
+-                )
+-            by_key[key] = source
++            # Both names are explicit source metadata, not inferred ticker aliases.
++            # A canonical ID exposed as syminfo.tickerid by a host must resolve
++            # the same data as the declared venue ticker ID. Cross-source alias
++            # collisions fail rather than depending on source insertion order.
++            for name in {source.instrument_id, source.instrument.tickerid}:
++                key = (name, source.timeframe)
++                if key in by_key:
++                    raise PineRuntimeError(
++                        "duplicate or ambiguous request source identity",
++                        code=PL_REQUEST_DATA,
++                    )
++                by_key[key] = source
+             by_hash[source.content_hash] = source
+         self._sources = MappingProxyType(by_key)
+         self._by_hash = MappingProxyType(by_hash)
+         self._descriptor = ProviderDescriptor(
+             "snapshots:" + sha(sorted(by_hash)),
+             "openpine.marketdata.v2",
+-            ("request.security", "request.security_lower_tf", "request.dynamic"),
++            (
++                "request.security",
++                "request.security_lower_tf",
++                "request.dynamic",
++                "request.nested",
++            ),
+             max_bars,
+         )
+ 
+ diff --git a/tests/test_compiled_nested_requests.py b/tests/test_compiled_nested_requests.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bff6fef028e2af2b738112ff41e098374e7a8f77
+--- /dev/null
++++ b/tests/test_compiled_nested_requests.py
+@@ -0,0 +1,95 @@
++"""Nested compiled evaluators share the outer engine's atomic cache and budgets."""
++
++import json
++from dataclasses import replace
++
++import pytest
++from pinelib.abi.compiled_request import (
++    _ACTIVE_CHILD,
++    CompiledRequestExpression,
++    security_v1,
++)
++from pinelib.abi.ta import sma_v1
++from pinelib.errors import PineRuntimeError
++from pinelib.request import ResultShape
++from pinelib.runtime.policies import RuntimePolicies
++
++from pinelib import is_na
++from tests.test_compiled_requests import Provider, begin, runtime
++
++
++class Script:
++    def __init__(self, runtime):
++        self.runtime = runtime
++
++    def outer(self):
++        expression = CompiledRequestExpression(
++            self.runtime,
++            Script,
++            "inner",
++            "sha256:" + "2" * 64,
++            ResultShape.scalar("float"),
++        )
++        # These inherit EX:S/5 from the outer request, not the parent chart EX:S/1.
++        return security_v1(self.runtime, "", "", expression, "inner")
++
++    def inner(self):
++        return sma_v1(self.runtime, "sma", self.runtime.value_close, 2)
++
++
++def policies(enabled=True):
++    base = RuntimePolicies()
++    return replace(
++        base,
++        request=replace(
++            base.request, nested_requests="enabled" if enabled else "disabled"
++        ),
++    )
++
++
++def evaluate(session, index):
++    tx = begin(session, index)
++    try:
++        expr = CompiledRequestExpression(
++            tx, Script, "outer", "sha256:" + "1" * 64, ResultShape.scalar("float")
++        )
++        value = security_v1(tx, "EX:S", "5", expr, "outer")
++        tx.commit()
++        return value
++    except Exception:
++        if not tx.closed:
++            tx.abort()
++        raise
++
++
++def test_nested_cache_is_shared_checkpointable_and_not_recomputed_each_chart_bar():
++    provider = Provider()
++    whole = runtime(provider, policies=policies())
++    output = [evaluate(whole, index) for index in range(15)]
++    assert is_na(output[8]) and output[9] == 15 and output[14] == 25
++    assert provider.calls == 2  # one fetch per child dataset, not per chart bar
++    assert whole.requests.registry.dataset_count == 2
++    partial = runtime(Provider(), policies=policies())
++    for index in range(7):
++        evaluate(partial, index)
++    checkpoint = json.loads(json.dumps(partial.checkpoint().to_dict()))
++    restored_provider = Provider()
++    restored = runtime(restored_provider, policies=policies())
++    restored.restore(checkpoint)
++    assert [evaluate(restored, index) for index in range(7, 15)] == output[7:]
++    assert restored_provider.calls == 0
++    assert restored.semantic_state_hash == whole.semantic_state_hash
++    assert restored.state_hash == whole.state_hash
++    assert _ACTIVE_CHILD.get() is None
++
++
++def test_disabled_nested_policy_rolls_back_every_staged_dataset_and_context():
++    session = runtime(Provider(), policies=policies(False))
++    with pytest.raises(PineRuntimeError, match="nested requests are disabled"):
++        evaluate(session, 0)
++    assert session.requests.registry.dataset_count == 0
++    assert _ACTIVE_CHILD.get() is None
++    # A later independent session must not inherit the failed evaluation's context.
++    clean = runtime(Provider(), policies=policies())
++    assert is_na(evaluate(clean, 0))
++    assert clean.requests.registry.dataset_count == 2
+ diff --git a/tests/test_snapshot_aliases.py b/tests/test_snapshot_aliases.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..d12000daea09499327d8d2d6a292ec3396c15ed8
+--- /dev/null
++++ b/tests/test_snapshot_aliases.py
+@@ -0,0 +1,49 @@
++"""Only explicit canonical/venue names are aliases; ambiguity is an error."""
++
++from dataclasses import replace
++
++import pytest
++from pinelib.errors import PineRuntimeError
++from pinelib.request.provider import RequestProviderError
++from pinelib.request.snapshots import SnapshotRequestProvider
++
++from tests.test_compiled_requests import Provider
++
++
++def test_both_explicit_names_return_the_identical_source():
++    p = Provider()
++    source = p.source("EX:S", "5")
++    assert p.source("stock:S", "5") is source
++    assert p.source("EX:S", "5") is source
++    # No bare-ticker guessing or unannounced case folding.
++    for name in ("S", "ex:s", "EX:T"):
++        with pytest.raises(RequestProviderError):
++            p.source(name, "5")
++
++
++@pytest.mark.parametrize("reverse", [False, True])
++@pytest.mark.parametrize("overlap", ["canonical", "venue"])
++def test_alias_collision_rejected_in_either_insertion_order(reverse, overlap):
++    first = Provider().source("EX:S", "5")
++    # First's canonical ID used as another venue alias, or first's venue alias
++    # reused for another instrument; neither is an admissible second source.
++    other = replace(
++        first,
++        instrument=replace(
++            first.instrument,
++            tickerid=first.instrument_id
++            if overlap == "canonical"
++            else first.instrument.tickerid,
++        ),
++    )
++    sources = (first, other) if not reverse else (other, first)
++    with pytest.raises(PineRuntimeError, match="ambiguous"):
++        SnapshotRequestProvider(sources)
++
++
++def test_equal_canonical_and_venue_id_is_a_single_unambiguous_alias():
++    source = Provider().source("EX:S", "5")
++    source = replace(
++        source, instrument=replace(source.instrument, tickerid=source.instrument_id)
++    )
++    assert SnapshotRequestProvider((source,)).source("stock:S", "5") is source
