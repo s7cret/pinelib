@@ -158,7 +158,11 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
     """
     name = official["name"]
     if name == "float" and official["category"] == "functions":
-        return {**official, "parameters": [
+        # The v4 type-system manual dates explicit casts to v4. Scope this
+        # correction to the callable row: a type/input constant or a numeric
+        # kernel's existence does not authorize the source-level cast in v1-v3.
+        # https://www.tradingview.com/pine-script-docs/v4/language/type-system/#type-casting
+        return {**official, "supported_versions": [4, 5, 6], "parameters": [
             {"name": "x", "type": "float", "qualifier_max": "series", "required": True}
         ]}
     if name not in _AUDITED_BUILTINS:
