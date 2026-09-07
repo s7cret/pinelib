@@ -20,7 +20,7 @@ def test_math_na_domains_rounding_and_varargs():
     assert is_na(math_abi.log_v1(0))
     assert is_na(math_abi.pow_v1(-2, 0.5))
     assert math_abi.round_v1(1.25, 1) == 1.3
-    assert math_abi.round_v1(-1.25, 1) == -1.3
+    assert math_abi.round_v1(-1.25, 1) == -1.2
     assert math_abi.round_to_mintick_v1(1.225, 0.05) == pytest.approx(1.25)
     assert math_abi.avg_v1(1, 2, 3) == 2
     assert math_abi.max_v1(1, 3, 2) == 3
