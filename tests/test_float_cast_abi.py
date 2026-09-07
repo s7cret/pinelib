@@ -13,7 +13,10 @@ from pinelib.errors import PL_VALUE_DOMAIN, PL_VALUE_TYPE, PineRuntimeError
 def float_target(version):
     row = next(row for row in build_manifest()["rows"] if row["symbol_id"] == "pine:function:float")
     assert row["disposition"] == "TARGET_DIRECT"
-    assert version in row["version_availability"]
+    # Official v4 type-system manual dates explicit casts to v4. Preserve these
+    # nodeids and all kernel value/type assertions, while checking that earlier
+    # versions do not receive source-call admission from a versionless kernel.
+    assert (version in row["version_availability"]) is (version >= 4)
     assert row["abi_callable"] == "pinelib.abi.primitives.float_v1"
     return primitives.float_v1
 
@@ -60,7 +63,7 @@ def test_float_cast_rejects_python_coercions_and_nonfinite_values(version):
 
 def test_float_target_has_exact_source_identity_and_complete_binding():
     row = next(row for row in build_manifest()["rows"] if row["symbol_id"] == "pine:function:float")
-    assert row["version_availability"] == [1, 2, 3, 4, 5, 6]
+    assert row["version_availability"] == [4, 5, 6]
     assert row["call_form"] == "global_function"
     assert row["producer_call_forms"] == ["FUNCTION"]
     assert row["producer_overload_ids"] == ["pine:function:float#canonical"]
