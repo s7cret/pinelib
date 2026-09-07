@@ -99,7 +99,11 @@ class StateSlotRegistry:
         self.begin(preserve_varip=preserve_varip)
 
     def varip_values(self, owner: str) -> tuple[object, ...]:
-        return tuple(slot.working for slot in self._slots.values() if slot.varip and slot.owner == owner)
+        return tuple(
+            slot.working
+            for slot in self._slots.values()
+            if slot.varip and slot.owner == owner
+        )
 
     def commit(self) -> None:
         for slot in self._slots.values():

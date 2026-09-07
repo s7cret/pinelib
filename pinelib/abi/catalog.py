@@ -22,7 +22,13 @@ def _row(
     overload: str = "v1",
     evaluation_mode: str = "EAGER_ARGUMENTS",
 ) -> CatalogRow:
-    prefix = "pine:constant:" if call_form == "constant" else "pine:variable:" if call_form == "context_field" else "pine:function:"
+    prefix = (
+        "pine:constant:"
+        if call_form == "constant"
+        else "pine:variable:"
+        if call_form == "context_field"
+        else "pine:function:"
+    )
     symbol_id = prefix + symbol
     return CatalogRow(
         symbol_id,
@@ -588,12 +594,27 @@ for name in ("alert", "alertcondition"):
     )
 
 for name in ("gaps_off", "gaps_on", "lookahead_off", "lookahead_on"):
-    ROWS.append(_row(f"barmerge.{name}", f"pinelib.abi.compiled_request.{name}_v1",
-                     versions=(3, 4, 5, 6), status=TargetStatus.SUPPORTED_PURE,
-                     call_form="constant", return_type="string"))
+    ROWS.append(
+        _row(
+            f"barmerge.{name}",
+            f"pinelib.abi.compiled_request.{name}_v1",
+            versions=(3, 4, 5, 6),
+            status=TargetStatus.SUPPORTED_PURE,
+            call_form="constant",
+            return_type="string",
+        )
+    )
 
-ROWS.append(_row("na", "pinelib.abi.primitives.na_v1", versions=ALL_VERSIONS,
-                 status=TargetStatus.SUPPORTED_CONTEXT, call_form="global_function",
-                 return_type="bool", capabilities=("value.na",)))
+ROWS.append(
+    _row(
+        "na",
+        "pinelib.abi.primitives.na_v1",
+        versions=ALL_VERSIONS,
+        status=TargetStatus.SUPPORTED_CONTEXT,
+        call_form="global_function",
+        return_type="bool",
+        capabilities=("value.na",),
+    )
+)
 
 CATALOG: tuple[CatalogRow, ...] = tuple(ROWS)

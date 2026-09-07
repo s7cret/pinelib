@@ -201,7 +201,9 @@ class RuntimeTransaction(LanguageExecutionMixin, ReferenceValuesMixin):
             )
         value = storage.read(offset)
         if storage.dtype.startswith(("array<", "matrix<", "map<")):
-            return validate_reference(self.references, stored_reference(value), storage.dtype)
+            return validate_reference(
+                self.references, stored_reference(value), storage.dtype
+            )
         if (
             offset > 0
             and value is None
@@ -741,7 +743,11 @@ class RuntimeSession:
         for storage in self.series.values():
             storage.begin()
         self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.references.begin(preserve=self._varip_references() if frame.realtime or frame.defer_bar_commit else ())
+        self.references.begin(
+            preserve=self._varip_references()
+            if frame.realtime or frame.defer_bar_commit
+            else ()
+        )
         self.visuals.begin()
         self.alerts.begin()
         self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
@@ -756,7 +762,10 @@ class RuntimeSession:
 
     def _varip_references(self) -> tuple[ReferenceHandle, ...]:
         # A varip slot must retain its working collection, not a dangling ID.
-        values = (stored_reference(value) for value in self.slots.varip_values(REFERENCE_OWNER))
+        values = (
+            stored_reference(value)
+            for value in self.slots.varip_values(REFERENCE_OWNER)
+        )
         return tuple(value for value in values if isinstance(value, ReferenceHandle))
 
     def _finish(self, transaction: RuntimeTransaction, commit: bool) -> CallbackResult:
@@ -794,7 +803,11 @@ class RuntimeSession:
             for storage in self.series.values():
                 storage.rollback()
             self.slots.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
-            self.references.begin(preserve=self._varip_references() if frame.realtime or frame.defer_bar_commit else ())
+            self.references.begin(
+                preserve=self._varip_references()
+                if frame.realtime or frame.defer_bar_commit
+                else ()
+            )
             self.visuals.rollback()
             self.alerts.rollback()
             self.requests.finish(persist=False)
@@ -1012,14 +1025,21 @@ class RuntimeSession:
         from itertools import chain
 
         from pinelib.state.checkpoint import from_portable
+
         for storage in new_series.values():
             if storage.dtype.startswith(("array<", "matrix<", "map<")):
                 for value in chain(storage.committed, (storage.working,)):
-                    validate_reference(new_references, stored_reference(value), storage.dtype)
+                    validate_reference(
+                        new_references, stored_reference(value), storage.dtype
+                    )
         for slot in new_slots.to_json():
             if slot["owner"] == REFERENCE_OWNER:
                 for part in ("committed", "working"):
-                    validate_reference(new_references, stored_reference(from_portable(slot[part])), slot["schema_version"])
+                    validate_reference(
+                        new_references,
+                        stored_reference(from_portable(slot[part])),
+                        slot["schema_version"],
+                    )
         new_visuals = VisualTape.from_json(
             visuals_data, self.policies.resource.max_visual_events
         )

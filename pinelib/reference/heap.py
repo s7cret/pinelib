@@ -163,7 +163,10 @@ class RuntimeReferenceHeap:
         data, offset, length = item.working, 0, len(item.working)
         for start, end in reversed(windows):
             if end > length:
-                raise PineRuntimeError("array slice is out of bounds of its parent", code=PL_REFERENCE_BOUNDS)
+                raise PineRuntimeError(
+                    "array slice is out of bounds of its parent",
+                    code=PL_REFERENCE_BOUNDS,
+                )
             offset += start
             length = end - start
         return data, offset, length
@@ -260,7 +263,9 @@ class RuntimeReferenceHeap:
 
     def _get(self, handle: ReferenceHandle) -> _HeapObject:
         if not isinstance(handle, ReferenceHandle):
-            raise PineRuntimeError("expected an initialized reference handle", code=PL_REFERENCE_INVALID)
+            raise PineRuntimeError(
+                "expected an initialized reference handle", code=PL_REFERENCE_INVALID
+            )
         try:
             item = self._objects[handle.object_id]
         except KeyError as error:

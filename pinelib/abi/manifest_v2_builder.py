@@ -250,16 +250,24 @@ def _source_aliases(
     # Explicit supported specializations bridge the producer's escaped IDs to
     # this exact ABI row. The concrete result type still supplies the descriptor;
     # unsupported UDT/object specializations do not match by a wildcard.
-    arity = {"array.new<type>": 1, "matrix.new<type>": 1, "map.new<type,type>": 2}.get(official["name"])
+    arity = {"array.new<type>": 1, "matrix.new<type>": 1, "map.new<type,type>": 2}.get(
+        official["name"]
+    )
     if arity is not None:
         from itertools import product
+
         primitive = ("bool", "color", "float", "int", "string")
-        names = [official["name"], *(
-            str(official["name"]).split("<")[0] + "<" + ",".join(args) + ">"
-            for args in product(primitive, repeat=arity)
-        )]
+        names = [
+            official["name"],
+            *(
+                str(official["name"]).split("<")[0] + "<" + ",".join(args) + ">"
+                for args in product(primitive, repeat=arity)
+            ),
+        ]
         for name in names:
-            encoded = name.replace("<", "u003c").replace(",", "u002c").replace(">", "u003e")
+            encoded = (
+                name.replace("<", "u003c").replace(",", "u002c").replace(">", "u003e")
+            )
             aliases.append("pine:function:" + encoded)
     if official["name"] == "request.security":
         aliases.append("pine:function:security")
@@ -326,7 +334,10 @@ def _parameter_bindings(
                     "source": source_name,
                 }
             )
-        elif is_method and (abi_name == "handle" or (official["name"] == "array.concat" and abi_name == "id1")):
+        elif is_method and (
+            abi_name == "handle"
+            or (official["name"] == "array.concat" and abi_name == "id1")
+        ):
             rows.append(
                 {
                     "abi_parameter": abi_name,
@@ -433,7 +444,14 @@ def build_manifest_v2(
                 },
             ]
             if name == "array.set":
-                signature.append({"name": "value", "type": "any", "qualifier_max": "series", "required": True})
+                signature.append(
+                    {
+                        "name": "value",
+                        "type": "any",
+                        "qualifier_max": "series",
+                        "required": True,
+                    }
+                )
             official_row = {
                 **official_row,
                 "parameters": signature[1:]

@@ -72,7 +72,9 @@ def test_reference_identity_aliases_and_history(version, mode):
     for i in range(3):
         tx = begin(r, i)
         a = declare(tx, mode, i)
-        b = tx.declare_reference_v1("alias", "default", lambda value=a: value, "array<float>")
+        b = tx.declare_reference_v1(
+            "alias", "default", lambda value=a: value, "array<float>"
+        )
         assert a == b
         array_set(tx.references, b, 0, 10 + i)
         assert array_get(tx.references, a, 0) == 10 + i
