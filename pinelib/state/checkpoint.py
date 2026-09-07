@@ -111,7 +111,13 @@ class RuntimeCheckpoint:
         }
 
     @classmethod
-    def seal(cls, identity_hash: str, state: dict[str, object]) -> RuntimeCheckpoint:
+    def seal(cls, identity_hash: str, state: dict[str, object], *, schema_version: str | None = None) -> RuntimeCheckpoint:
+        if schema_version is None:
+            transcript = state.get("transcript") if isinstance(state, dict) else None
+            modern = isinstance(transcript, dict) and transcript.get("schema_version") in ("1.1.0", "2.1.0")
+            schema_version = "1.1.0" if modern or "pending_abort" in state else "1.0.0"
+        if schema_version not in ("1.0.0", "1.1.0"):
+            raise PineRuntimeError("checkpoint schema version mismatch", code=PL_CHECKPOINT_INVALID)
         if not is_canonical_sha256(identity_hash):
             raise PineRuntimeError(
                 "checkpoint identity must be a canonical sha256",
@@ -125,7 +131,7 @@ class RuntimeCheckpoint:
             )
         body = {
             "schema_id": "openpine.runtime_checkpoint.v1",
-            "schema_version": "1.0.0",
+            "schema_version": schema_version,
             "identity_hash": identity_hash,
             "state": portable_state,
         }
@@ -156,7 +162,7 @@ class RuntimeCheckpoint:
             raise PineRuntimeError(
                 "checkpoint schema id mismatch", code=PL_CHECKPOINT_INVALID
             )
-        if data["schema_version"] != "1.0.0":
+        if data["schema_version"] not in ("1.0.0", "1.1.0"):
             raise PineRuntimeError(
                 "checkpoint schema version mismatch", code=PL_CHECKPOINT_INVALID
             )

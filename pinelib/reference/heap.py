@@ -90,6 +90,7 @@ class RuntimeReferenceHeap:
             raise PineRuntimeError("nominal registry differs from heap language", code=PL_REFERENCE_TYPE)
         self._nominal_registry = nominal_registry
         self._loading_checkpoint = False
+        self._transient_slice_bounds = False
         self.language = language
         self.max_objects = max_objects
         self.max_elements = max_elements
@@ -309,7 +310,8 @@ class RuntimeReferenceHeap:
                 if self.type_descriptor(parent) != item.type_descriptor:
                     raise PineRuntimeError("nominal slice/backing type mismatch", code=PL_REFERENCE_TYPE)
                 backing = self._materialize(parent, committed=committed, active=set())
-                if not isinstance(backing, list) or end > len(backing):
+                if not isinstance(backing, list) or (end > len(backing) and not
+                        (self._transient_slice_bounds and (not committed or not item.committed_exists))):
                     raise PineRuntimeError("nominal slice is out of backing bounds", code=PL_REFERENCE_BOUNDS)
                 decoded = backing[start:end]
             if not isinstance(decoded, list):
@@ -638,6 +640,8 @@ class RuntimeReferenceHeap:
         active.add(handle.object_id)
         try:
             parent, start, end = descriptor
+            if self._transient_slice_bounds and self._get(parent).type_descriptor != item.type_descriptor:
+                raise PineRuntimeError("attempted slice/backing type mismatch", code=PL_REFERENCE_TYPE)
             parent_values = self._materialize(
                 parent, committed=committed, active=active
             )
@@ -646,7 +650,8 @@ class RuntimeReferenceHeap:
                     "array slice parent payload must be a list",
                     code=PL_REFERENCE_TYPE,
                 )
-            if end > len(parent_values):
+            if end > len(parent_values) and not (
+                    self._transient_slice_bounds and (not committed or not item.committed_exists)):
                 raise PineRuntimeError(
                     "array slice is out of bounds of its parent",
                     code=PL_REFERENCE_BOUNDS,
@@ -731,8 +736,27 @@ class RuntimeReferenceHeap:
         max_elements: int,
         nominal_registry=None,
     ) -> RuntimeReferenceHeap:
+        return cls._decode_json(data, language, max_objects=max_objects, max_elements=max_elements,
+                                nominal_registry=nominal_registry, transient_slice_bounds=False)
+
+    @classmethod
+    def _from_abort_witness_json(cls, data, language, *, max_objects, max_elements, nominal_registry=None):
+        """Internal proof decoder; only temporary slice upper bounds are deferred.
+
+        Shrinking a backing can invalidate a view until the actual abort restores
+        it. A newly allocated view can also exceed the parent's committed length.
+        Marker shape, owner/type edges, cycles and all nominal values stay strict.
+        The returned heap has ordinary strict reads; enclosing replay must admit
+        the final state through the public strict decoder before publishing it.
+        """
+        return cls._decode_json(data, language, max_objects=max_objects, max_elements=max_elements,
+                                nominal_registry=nominal_registry, transient_slice_bounds=True)
+
+    @classmethod
+    def _decode_json(cls, data, language, *, max_objects, max_elements, nominal_registry, transient_slice_bounds):
         heap = cls(language, max_objects=max_objects, max_elements=max_elements, nominal_registry=nominal_registry)
         heap._loading_checkpoint = True
+        heap._transient_slice_bounds = transient_slice_bounds
         rows = data.get("objects")
         if not isinstance(rows, list):
             raise PineRuntimeError("reference heap objects must be a list")
@@ -807,4 +831,5 @@ class RuntimeReferenceHeap:
                     )
                     committed = heap._materialize(ReferenceHandle(item.object_id, item.kind), committed=True, active=set())
                     validate_collection_payload(item.kind, item.type_descriptor, committed, language.pine_version)
+        heap._transient_slice_bounds = False
         return heap
