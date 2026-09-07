@@ -3,6 +3,12 @@ from __future__ import annotations
 from pinelib.runtime.session import RuntimeTransaction
 
 
+def float_v1(x: object) -> object:
+    from pinelib.core.values import pine_float
+
+    return pine_float(x)
+
+
 def operator_binary_v1(
     tx: RuntimeTransaction, operator: str, left: object, right: object
 ) -> object:

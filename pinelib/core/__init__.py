@@ -8,6 +8,7 @@ from .values import (
     pine_bool,
     pine_div,
     pine_div_const_int,
+    pine_float,
     pine_unary,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "pine_bool",
     "pine_div",
     "pine_div_const_int",
+    "pine_float",
     "pine_unary",
 ]

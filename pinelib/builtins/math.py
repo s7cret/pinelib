@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
 from pinelib.core.values import is_na, na, require_number
 from pinelib.errors import PL_VALUE_DOMAIN, PineRuntimeError
@@ -144,15 +144,35 @@ def power(base: object, exponent: object) -> object:
     return result if math.isfinite(result) else na
 
 
-def round_value(value: object, precision: int = 0) -> object:
-    if is_na(value):
+def _round_ratio_up(numerator: int, denominator: int) -> int:
+    """Round an exact ratio to the nearest integer; a tie chooses +infinity."""
+    integral, remainder = divmod(numerator, denominator)
+    return integral + (2 * remainder >= denominator)
+
+
+def round_value(value: object, precision: object = None) -> object:
+    # None is the ABI's omitted argument marker, distinct from Pine's `na`.
+    if is_na(value) or is_na(precision):
         return na
-    if type(precision) is not int:
+    if precision is not None and type(precision) is not int:
         raise PineRuntimeError("round precision must be int", code=PL_VALUE_DOMAIN)
     number = Decimal(str(require_number(value)))
-    quantum = Decimal(1).scaleb(-precision)
-    rounded = number.quantize(quantum, rounding=ROUND_HALF_UP)
-    return int(rounded) if precision <= 0 else float(rounded)
+    digits = 0 if precision is None else precision
+    exponent = number.as_tuple().exponent
+    assert isinstance(exponent, int)  # require_number has rejected infinities/NaN.
+    if not number or digits >= -exponent:
+        return int(number) if precision is None else float(number)
+    # Avoid enormous powers for precision values that cannot affect the result.
+    if digits < -number.adjusted() - 1:
+        return 0 if precision is None else 0.0
+    numerator, denominator = number.as_integer_ratio()
+    scale = 10 ** abs(digits)
+    if digits >= 0:
+        integral = _round_ratio_up(numerator * scale, denominator)
+        rounded = integral / scale if precision is not None else integral
+    else:
+        rounded = _round_ratio_up(numerator, denominator * scale) * scale
+    return int(rounded) if precision is None else float(rounded)
 
 
 def round_to_mintick(value: object, mintick: float) -> object:
@@ -161,9 +181,10 @@ def round_to_mintick(value: object, mintick: float) -> object:
     tick = float(require_number(mintick, name="mintick"))
     if tick <= 0:
         raise PineRuntimeError("mintick must be positive", code=PL_VALUE_DOMAIN)
-    units = Decimal(str(require_number(value))) / Decimal(str(tick))
-    rounded_units = units.quantize(Decimal(1), rounding=ROUND_HALF_UP)
-    return float(rounded_units * Decimal(str(tick)))
+    numerator, denominator = Decimal(str(require_number(value))).as_integer_ratio()
+    tick_numerator, tick_denominator = Decimal(str(tick)).as_integer_ratio()
+    units = _round_ratio_up(numerator * tick_denominator, denominator * tick_numerator)
+    return units * tick_numerator / tick_denominator
 
 
 def sum_pair(left: object, right: object) -> object:
