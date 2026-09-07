@@ -1,0 +1,43 @@
+name: Materialize exact reference-value candidate for joint verification
+'on':
+  push:
+    branches: ['ops/stage2-reference-values-20260907']
+permissions:
+  contents: write
+concurrency:
+  group: stage2-reference-materialize
+  cancel-in-progress: false
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: s7cret/pine2ast
+          ref: f9dfa085fe26a8911462540d05e09909e62db5f2
+          path: publisher
+          sparse-checkout: .github/reference-values/restore.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - run: cp publisher/.github/reference-values/restore.py "$RUNNER_TEMP/restore.py"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install tzdata==2026.2
+      - name: Reconstruct source and publish only the candidate ref
+        run: |
+          mkdir "$RUNNER_TEMP/submission"
+          cp .github/reference-values/plan.json "$RUNNER_TEMP/submission/plan.json"
+          cat .github/reference-values/01.b64 .github/reference-values/02.b64 .github/reference-values/03.b64 .github/reference-values/04.b64 > "$RUNNER_TEMP/submission/source.b64"
+          python "$RUNNER_TEMP/restore.py" "$RUNNER_TEMP/submission" "$RUNNER_TEMP/candidate-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reference-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/candidate-evidence/
+          if-no-files-found: error
+          retention-days: 30
