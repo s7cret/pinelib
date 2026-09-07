@@ -110,6 +110,7 @@ class RuntimePolicies:
     def identity(self) -> dict[str, object]:
         return {
             "compiled_reference_storage": "typed-handles-occurrence-allocation-v1",
+            "compiled_nominal_types": "declared-schema-field-rollback-nominal-values-v1",
             "compiled_varip_reference_storage": "per-object-transactional-persistence-v1",
             "compiled_collection_iteration": "map-key-guard-matrix-row-arrays-v1",
             "compiled_loop_values": "last-completed-return-shared-budget-v1",

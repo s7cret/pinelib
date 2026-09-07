@@ -590,6 +590,14 @@ def build_manifest_v2(
             "binding_modes": ["default", "var"],
             "reference_history_min_version": {"array": 5},
         },
+        "compiled_nominal_types": {
+            "revision": 1,
+            "identity": "source-declaration",
+            "udt_binding_modes": ["default", "var", "varip"],
+            "udt_fields": "declared-schema-field-rollback",
+            "enum_storage": "nominal-portable-values",
+            "min_pine_version": 5,
+        },
         "compiled_varip_reference_storage": {
             "revision": 1,
             "policy": "per-object-transactional-persistence",

@@ -18,7 +18,7 @@ def udt_new(
 
 
 def _fields(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> dict[str, object]:
-    if handle.kind != "udt":
+    if not isinstance(handle, ReferenceHandle) or handle.kind != "udt":
         raise PineRuntimeError("expected UDT handle", code=PL_REFERENCE_TYPE)
     payload = heap.read_payload(handle)
     if not isinstance(payload, dict):
@@ -51,3 +51,10 @@ def udt_copy(
 
 def enum_value(enum_id: str, member: str, ordinal: int) -> PineEnumValue:
     return PineEnumValue(enum_id, member, ordinal)
+
+
+def udt_new_typed(heap, object_id, type_descriptor, fields, field_types, varip_fields=()):
+    from pinelib.reference.nominal import validate_udt_schema
+
+    schema = validate_udt_schema(heap, type_descriptor, fields, field_types, varip_fields)
+    return heap.create(object_id, "udt", type_descriptor, dict(fields), udt_schema=schema)

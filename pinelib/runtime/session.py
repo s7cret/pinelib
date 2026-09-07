@@ -204,9 +204,11 @@ class RuntimeTransaction(LanguageExecutionMixin):
             )
         value = storage.read(offset)
         if value is not None and storage.dtype.startswith(
-            ("array<", "map<", "matrix<")
+            ("array<", "map<", "matrix<", "udt:")
         ):
             return self._check_reference_binding(value, storage.dtype)
+        if value is not None and storage.dtype.startswith("enum:"):
+            return self.enum_coerce_v1(value, storage.dtype)
         if (
             offset > 0
             and value is None
@@ -1008,6 +1010,26 @@ class RuntimeSession:
             max_objects=self.policies.resource.max_reference_objects,
             max_elements=self.policies.resource.max_collection_elements,
         )
+        # Nominal identities remain typed across serialized series and slots;
+        # accepting a JSON-shaped enum or a foreign UDT here would defer a corrupt
+        # checkpoint error until the next generated callback.
+        from pinelib.reference.nominal import validate_field_value
+        for storage in new_series.values():
+            if storage.dtype.startswith(("udt:", "enum:", "array<", "map<", "matrix<")):
+                for value in [*storage.committed, storage.working]:
+                    if value is not None:
+                        validate_field_value(new_references, value, storage.dtype)
+        for row in new_slots.to_json():
+            prefix = ("enum-binding:" if row["owner"] == "ast2python.enum.v1"
+                      else "reference-binding:" if row["owner"] == "ast2python.reference.v1" else None)
+            if prefix is not None and row["state_id"].startswith(prefix):
+                storage = new_series.get(row["state_id"][len(prefix):])
+                if storage is None:
+                    raise PineRuntimeError("typed binding checkpoint lacks declared series", code=PL_CHECKPOINT_INVALID)
+                if storage.dtype.startswith(("udt:", "enum:", "array<", "map<", "matrix<")):
+                    validate_field_value(new_references, from_portable(row["working"]), storage.dtype)
+                    if row["committed_exists"]:
+                        validate_field_value(new_references, from_portable(row["committed"]), storage.dtype)
         # A rehashed checkpoint must not preserve only the binding while rolling
         # back its object. Validate both segments together before replacing either.
         for row in new_slots.to_json():
