@@ -238,14 +238,17 @@ def map_remove_v1(
     return map_remove(tx.references, handle, key)
 
 
-def map_keys_v1(tx: RuntimeTransaction, handle: ReferenceHandle) -> tuple[object, ...]:
-    return map_keys(tx.references, handle)
+def _map_array(tx: RuntimeTransaction, handle: ReferenceHandle, object_id: str, type_descriptor: str, *, keys: bool) -> ReferenceHandle:
+    values = map_keys(tx.references, handle) if keys else map_values(tx.references, handle)
+    return tx.references.create(object_id, "array", type_descriptor, list(values))
 
 
-def map_values_v1(
-    tx: RuntimeTransaction, handle: ReferenceHandle
-) -> tuple[object, ...]:
-    return map_values(tx.references, handle)
+def map_keys_v1(tx: RuntimeTransaction, handle: ReferenceHandle, object_id: str, type_descriptor: str) -> ReferenceHandle:
+    return _map_array(tx, handle, object_id, type_descriptor, keys=True)
+
+
+def map_values_v1(tx: RuntimeTransaction, handle: ReferenceHandle, object_id: str, type_descriptor: str) -> ReferenceHandle:
+    return _map_array(tx, handle, object_id, type_descriptor, keys=False)
 
 
 def map_size_v1(tx: RuntimeTransaction, handle: ReferenceHandle) -> int:
@@ -274,9 +277,9 @@ def matrix_new_v1(
     tx: RuntimeTransaction,
     object_id: str,
     type_descriptor: str,
-    rows: int,
-    columns: int,
-    initial: object,
+    rows: int = 0,
+    columns: int = 0,
+    initial: object = na,
 ) -> ReferenceHandle:
     return matrix_new(tx.references, object_id, type_descriptor, rows, columns, initial)
 

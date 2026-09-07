@@ -176,19 +176,23 @@ class LanguageExecutionMixin:
     ) -> object:
         """Store typed handles in the established slots/series and transactional heap."""
         self._check()
-        if mode not in {"default", "var"}:
-            raise PineRuntimeError(
-                "varip reference heap persistence is not admitted", code=PL_VALUE_TYPE
-            )
+        if mode not in {"default", "var", "varip"}:
+            raise PineRuntimeError("unsupported reference declaration mode", code=PL_VALUE_TYPE)
+        if mode == "varip":
+            from pinelib.reference.persistence import validate_varip_type
+            validate_varip_type(dtype.split("<", 1)[0], dtype, self.session.language.pine_version)
         if mode == "default":
             value = self._check_reference_binding(initializer(), dtype)
         else:
             key = "reference-binding:" + series_id
             if not self.session.slots.contains(key):
                 value = self._check_reference_binding(initializer(), dtype)
-                self.set_slot(key, value, owner="ast2python.reference.v1")
+                if mode == "varip" and not is_na(value):
+                    self.references.retain_intrabar(value)
+                self.set_slot(key, value, owner="ast2python.reference.v1", varip=mode == "varip")
             value = self.state(
-                key, owner="ast2python.reference.v1", schema_version="1", initial=na
+                key, owner="ast2python.reference.v1", schema_version="1", initial=na,
+                varip=mode == "varip",
             )
             value = self._check_reference_binding(value, dtype)
         self.set_series(series_id, value, dtype, history_policy=history_policy)
@@ -204,14 +208,17 @@ class LanguageExecutionMixin:
         history_policy: str = "each_bar",
     ) -> None:
         self._check()
-        if mode not in {"default", "var"}:
-            raise PineRuntimeError(
-                "varip reference heap persistence is not admitted", code=PL_VALUE_TYPE
-            )
+        if mode not in {"default", "var", "varip"}:
+            raise PineRuntimeError("unsupported reference declaration mode", code=PL_VALUE_TYPE)
+        if mode == "varip":
+            from pinelib.reference.persistence import validate_varip_type
+            validate_varip_type(dtype.split("<", 1)[0], dtype, self.session.language.pine_version)
         value = self._check_reference_binding(value, dtype)
-        if mode == "var":
+        if mode == "varip" and not is_na(value):
+            self.references.retain_intrabar(value)
+        if mode != "default":
             self.set_slot(
-                "reference-binding:" + series_id, value, owner="ast2python.reference.v1"
+                "reference-binding:" + series_id, value, owner="ast2python.reference.v1", varip=mode == "varip"
             )
         self.set_series(series_id, value, dtype, history_policy=history_policy)
 
@@ -236,4 +243,27 @@ class LanguageExecutionMixin:
         while index < array_size(self.references, handle):
             value = array_get(self.references, handle, index)
             yield (index, value) if indexed else value
+            index += 1
+
+
+    def iter_map_v1(self, handle):
+        self._check()
+        if self.session.language.pine_version < 5:
+            raise PineRuntimeError("map iteration requires Pine v5/v6", code=PL_VALUE_TYPE)
+        return self.references.map_iteration(handle)
+
+    def iter_matrix_v1(self, handle, source_id, *, indexed=False):
+        """Retrieve current rows as independent arrays; retain element references."""
+        self._check()
+        if self.session.language.pine_version < 5:
+            raise PineRuntimeError("matrix iteration requires Pine v5/v6", code=PL_VALUE_TYPE)
+        index = 0
+        dtype = self.references.type_descriptor(handle)
+        if dtype.startswith("matrix<") and dtype.endswith(">"):
+            dtype = dtype[len("matrix<"):-1]
+        while index < self.references.matrix_dimensions(handle)[0]:
+            self._check()
+            values = self.references.read_matrix_row(handle, index)
+            row = self.references.create(self.reference_id_v1(source_id), "array", dtype, values)
+            yield (index, row) if indexed else row
             index += 1

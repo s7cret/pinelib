@@ -40,6 +40,7 @@ from pinelib.runtime.transcript import RuntimeTranscript
 from pinelib.state.checkpoint import (
     RuntimeCheckpoint,
     canonical_json,
+    from_portable,
     is_canonical_sha256,
     sha,
     to_portable,
@@ -745,7 +746,7 @@ class RuntimeSession:
         for storage in self.series.values():
             storage.begin()
         self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.references.begin()
+        self.references.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
         self.visuals.begin()
         self.alerts.begin()
         self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
@@ -793,7 +794,7 @@ class RuntimeSession:
             for storage in self.series.values():
                 storage.rollback()
             self.slots.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
-            self.references.rollback()
+            self.references.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
             self.visuals.rollback()
             self.alerts.rollback()
             self.requests.finish(persist=False)
@@ -1007,6 +1008,13 @@ class RuntimeSession:
             max_objects=self.policies.resource.max_reference_objects,
             max_elements=self.policies.resource.max_collection_elements,
         )
+        # A rehashed checkpoint must not preserve only the binding while rolling
+        # back its object. Validate both segments together before replacing either.
+        for row in new_slots.to_json():
+            if row["owner"] == "ast2python.reference.v1" and row["varip"]:
+                new_references.validate_intrabar_binding(from_portable(row["working"]))
+                if row["committed_exists"]:
+                    new_references.validate_intrabar_binding(from_portable(row["committed"]), committed=True)
         new_visuals = VisualTape.from_json(
             visuals_data, self.policies.resource.max_visual_events
         )
