@@ -10,16 +10,60 @@ from copy import deepcopy
 
 import pytest
 
-from pinelib import is_na, na
+from pinelib import RuntimeSession, is_na, na
 from pinelib.errors import PineRuntimeError
 from pinelib.reference.array import array_get, array_new, array_set
 from pinelib.reference.heap import PineEnumValue, RuntimeReferenceHeap
+from pinelib.reference.registry import NominalTypeRegistry
 from pinelib.state.checkpoint import RuntimeCheckpoint
-from tests.test_language_scopes_once import begin, session
+from tests.test_language_scopes_once import begin, session as language_session
 
 
-POINT = "udt:source-a:Point:decl-1"
-SIDE = "enum:source-a:Side:decl-2"
+SOURCE_HASH = "sha256:" + "a" * 64
+POINT = f"udt:{SOURCE_HASH}:Point:decl-1"
+SIDE = f"enum:{SOURCE_HASH}:Side:decl-2"
+NESTED = f"udt:{SOURCE_HASH}:Nested:decl-3"
+ARRAY_HOLDER = f"udt:{SOURCE_HASH}:ArrayHolder:decl-4"
+WRITE_TARGET = f"udt:{SOURCE_HASH}:WriteTarget:decl-5"
+FLAG = f"udt:{SOURCE_HASH}:Flag:decl-6"
+CHECKPOINT_RECORD = f"udt:{SOURCE_HASH}:CheckpointRecord:decl-7"
+OTHER_POINT = f"udt:{SOURCE_HASH}:OtherPoint:decl-8"
+OTHER_SIDE = f"enum:{SOURCE_HASH}:OtherSide:decl-9"
+
+
+def nominal_registry(version):
+    """Declare each fixture schema before construction, including foreign types."""
+    def udt(dtype, field_types, varip_fields=()):
+        return {"id": dtype, "kind": "udt", "fields": [
+            {"name": name, "type": field_type, "varip": name in varip_fields}
+            for name, field_type in field_types.items()
+        ]}
+
+    types = [
+        udt(POINT, {"bars": "int", "ticks": "int"}, ("ticks",)),
+        udt(NESTED, {"child": POINT, "values": "array<int>", "side": SIDE}),
+        udt(ARRAY_HOLDER, {"values": "array<int>"}),
+        udt(WRITE_TARGET, {"n": "int", "child": POINT, "side": SIDE}),
+        udt(FLAG, {"flag": "bool"}),
+        udt(CHECKPOINT_RECORD, {"n": "int", "side": SIDE}, ("n",)),
+        udt(OTHER_POINT, {"bars": "int", "ticks": "int"}, ("ticks",)),
+        *({"id": dtype, "kind": "enum", "members": [
+            {"name": "long", "title": "long"},
+            {"name": "short", "title": "short"},
+        ]} for dtype in (SIDE, OTHER_SIDE)),
+    ]
+    return NominalTypeRegistry.from_json(
+        {"schema_id": "pinelib.nominal_registry.v1", "pine_version": version,
+         "source_hash": SOURCE_HASH, "types": sorted(types, key=lambda row: row["id"])},
+        pine_version=version, expected_source_hash=SOURCE_HASH,
+    )
+
+
+def session(version=6):
+    return RuntimeSession(
+        language_session(version).language,
+        nominal_registry=nominal_registry(version) if version >= 5 else None,
+    )
 
 
 def point(tx, *, dtype=POINT, fields=None, field_types=None, varip_fields=("ticks",)):
@@ -96,7 +140,7 @@ def test_nested_aliases_and_copy_keep_reference_identity_and_field_policy(versio
     child = point(tx)
     array = array_new(tx.references, "array", "int", 1, 5)
     side = tx.enum_value_v1(SIDE, "long", 0)
-    outer = point(tx, fields={"child": child, "values": array, "side": side},
+    outer = point(tx, dtype=NESTED, fields={"child": child, "values": array, "side": side},
                   field_types={"child": POINT, "values": "array<int>", "side": SIDE}, varip_fields=())
     copied = tx.copy_udt_v1(outer, tx.reference_id_v1("copy"))
     child_copy = tx.copy_udt_v1(child, tx.reference_id_v1("child-copy"))
@@ -130,12 +174,12 @@ def test_varip_new_udt_keeps_initial_nested_reference_graph_addressable():
     s = session()
     tx = begin(s, 0, bar=0, realtime=True, final=False)
     array = array_new(tx.references, "array", "int", 1, 5)
-    outer = point(tx, fields={"values": array}, field_types={"values": "array<int>"}, varip_fields=())
-    tx.declare_reference_v1("outer", "varip", lambda: outer, POINT)
+    outer = point(tx, dtype=ARRAY_HOLDER, fields={"values": array}, field_types={"values": "array<int>"}, varip_fields=())
+    tx.declare_reference_v1("outer", "varip", lambda: outer, ARRAY_HOLDER)
     array_set(tx.references, array, 0, 10)
     tx.commit()
     tx = begin(s, 1, bar=0, realtime=True)
-    assert tx.declare_reference_v1("outer", "varip", lambda: 1 / 0, POINT) == outer
+    assert tx.declare_reference_v1("outer", "varip", lambda: 1 / 0, ARRAY_HOLDER) == outer
     assert array_get(tx.references, tx.get_udt_field_v1(outer, "values"), 0) == 5
     tx.commit()
 
@@ -182,10 +226,10 @@ def test_wrong_udt_field_writes_are_atomic(fault):
     tx = begin(session(), 0)
     child = point(tx)
     side = tx.enum_value_v1(SIDE, "long", 0)
-    obj = point(tx, fields={"n": 0, "child": child, "side": side},
+    obj = point(tx, dtype=WRITE_TARGET, fields={"n": 0, "child": child, "side": side},
                 field_types={"n": "int", "child": POINT, "side": SIDE}, varip_fields=())
-    other = point(tx, dtype="udt:source-b:Point:decl-1")
-    foreign = tx.enum_value_v1("enum:source-b:Side:decl-2", "long", 0)
+    other = point(tx, dtype=OTHER_POINT)
+    foreign = tx.enum_value_v1(OTHER_SIDE, "long", 0)
     field, value = {"wrong_scalar": ("n", True), "unknown_field": ("missing", 0),
                     "foreign_udt": ("child", other), "foreign_enum": ("side", foreign), "null": ("n", None)}[fault]
     before = tx.references.to_json()
@@ -200,11 +244,11 @@ def test_bool_field_missing_default_is_version_exact(version):
     tx = begin(session(version), 0)
     if version == 6:
         with pytest.raises(PineRuntimeError, match="bool"):
-            point(tx, fields={"flag": na}, field_types={"flag": "bool"}, varip_fields=())
-        obj = point(tx, fields={"flag": False}, field_types={"flag": "bool"}, varip_fields=())
+            point(tx, dtype=FLAG, fields={"flag": na}, field_types={"flag": "bool"}, varip_fields=())
+        obj = point(tx, dtype=FLAG, fields={"flag": False}, field_types={"flag": "bool"}, varip_fields=())
         assert tx.get_udt_field_v1(obj, "flag") is False
     else:
-        obj = point(tx, fields={"flag": na}, field_types={"flag": "bool"}, varip_fields=())
+        obj = point(tx, dtype=FLAG, fields={"flag": na}, field_types={"flag": "bool"}, varip_fields=())
         assert is_na(tx.get_udt_field_v1(obj, "flag"))
     tx.abort()
 
@@ -214,7 +258,7 @@ def test_rehashed_nominal_heap_corruption_rejected_without_replacing_session(fau
     s = session()
     tx = begin(s, 0)
     side = tx.enum_value_v1(SIDE, "long", 0)
-    point(tx, fields={"n": 0, "side": side}, field_types={"n": "int", "side": SIDE}, varip_fields=("n",))
+    point(tx, dtype=CHECKPOINT_RECORD, fields={"n": 0, "side": side}, field_types={"n": "int", "side": SIDE}, varip_fields=("n",))
     tx.commit()
     saved = s.checkpoint().to_dict()
     bad = deepcopy(saved)
@@ -226,7 +270,7 @@ def test_rehashed_nominal_heap_corruption_rejected_without_replacing_session(fau
     elif fault == "wrong_field_type":
         row["working"]["n"] = False
     elif fault == "foreign_enum":
-        row["working"]["side"]["$pinelib_enum"]["enum_id"] = "enum:other:Side"
+        row["working"]["side"]["$pinelib_enum"]["enum_id"] = OTHER_SIDE
     elif fault == "enum_ordinal_bool":
         row["working"]["side"]["$pinelib_enum"]["ordinal"] = True
     if fault == "version":
@@ -252,7 +296,7 @@ def test_nominal_enum_comparisons_reject_foreign_types_and_scalar_truthiness():
     long = tx.enum_value_v1(SIDE, "long", 0)
     assert tx.op_operator_binary("==", long, tx.enum_value_v1(SIDE, "long", 0)) is True
     assert tx.op_operator_binary("!=", long, tx.enum_value_v1(SIDE, "short", 1)) is True
-    for other in (0, "long", tx.enum_value_v1("enum:other:Side", "long", 0)):
+    for other in (0, "long", tx.enum_value_v1(OTHER_SIDE, "long", 0)):
         with pytest.raises(PineRuntimeError):
             tx.op_operator_binary("==", long, other)
     with pytest.raises(PineRuntimeError):
@@ -297,7 +341,7 @@ def test_standalone_enum_checkpoint_values_are_validated_before_atomic_restore(s
     value = (bad["state"]["series"]["side"]["working"] if segment == "series"
              else bad["state"]["slots"][0]["working"])
     if fault == "foreign_type":
-        value["$pinelib_enum"]["enum_id"] = "enum:other:Side"
+        value["$pinelib_enum"]["enum_id"] = OTHER_SIDE
     elif fault == "bad_ordinal":
         value["$pinelib_enum"]["ordinal"] = True
     else:

@@ -1,7 +1,8 @@
 """Preserved candidate checks against the current single reference owner.
 
 Source: 861ced1, tests/test_reference_language_state.py and
-tests/test_reference_variable_storage.py. Only API names are adapted. No
+tests/test_reference_variable_storage.py. API names and explicit nominal
+declaration fixtures are adapted. No
 alternative reference binding mixin or old manifest is introduced.
 """
 
@@ -9,10 +10,29 @@ from copy import deepcopy
 
 import pytest
 
+from pinelib import RuntimeSession
 from pinelib.errors import PineRuntimeError
 from pinelib.reference.array import array_get, array_new, array_set
+from pinelib.reference.registry import NominalTypeRegistry
 from pinelib.state.checkpoint import RuntimeCheckpoint
-from tests.test_language_scopes_once import begin, session
+from tests.test_language_scopes_once import begin, session as language_session
+
+
+SOURCE_HASH = "sha256:" + "a" * 64
+POINT = f"udt:{SOURCE_HASH}:RetryPoint:decl-10"
+
+
+def session():
+    registry = NominalTypeRegistry.from_json(
+        {"schema_id": "pinelib.nominal_registry.v1", "pine_version": 6,
+         "source_hash": SOURCE_HASH, "types": [
+             {"id": POINT, "kind": "udt", "fields": [
+                 {"name": "n", "type": "int", "varip": True},
+             ]},
+         ]},
+        pine_version=6, expected_source_hash=SOURCE_HASH,
+    )
+    return RuntimeSession(language_session().language, nominal_registry=registry)
 
 
 def create(tx, value=0.0):
@@ -49,7 +69,7 @@ def test_ordinary_aborted_allocations_replay_deterministically():
 @pytest.mark.parametrize("kind", ["array", "udt"])
 def test_varip_retry_without_reexecuting_initializer_keeps_prior_object(kind):
     s = session()
-    dtype = "array<float>" if kind == "array" else "udt:source:Point"
+    dtype = "array<float>" if kind == "array" else POINT
     def make(tx):
         return (create(tx) if kind == "array" else tx.new_udt_v1(tx.reference_id_v1("create"), dtype,
                 {"n": 0}, field_types={"n": "int"}, varip_fields=("n",)))

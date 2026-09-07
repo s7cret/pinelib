@@ -133,6 +133,10 @@ class RuntimeTransaction(LanguageExecutionMixin):
         history_policy: str = "each_bar",
     ) -> None:
         self._check()
+        from pinelib.reference.nominal import validate_field_value
+        decoded = self.references._decode_value(value)
+        if self.references._has_nominal_value(decoded) or (type(dtype) is str and ("udt:" in dtype or "enum:" in dtype)):
+            validate_field_value(self.references, value, dtype)
         if name not in self.session.series:
             if len(self.session.series) >= self.session.policies.resource.max_series:
                 raise PineRuntimeError("series limit exceeded", code=PL_RESOURCE_LIMIT)
@@ -160,6 +164,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
         """Ast2Python ``operator.binary`` ABI."""
 
         self._check()
+        self.references._decode_value(left)
+        self.references._decode_value(right)
         return pine_binary(operator, left, right, self.session.language)
 
     def op_operator_unary(self, operator: str, operand: object) -> object:
@@ -193,6 +199,9 @@ class RuntimeTransaction(LanguageExecutionMixin):
             raise PineRuntimeError(
                 "history offset must be an int", code=PL_SERIES_HISTORY
             )
+        if "udt:" in storage.dtype or "enum:" in storage.dtype:
+            from pinelib.reference.nominal import validate_field_type
+            validate_field_type(storage.dtype, self.session.language.pine_version, self.session.nominal_registry)
         if (
             offset > 0
             and storage.dtype.startswith("array<")
@@ -462,6 +471,7 @@ class RuntimeTransaction(LanguageExecutionMixin):
         varip: bool = False,
     ) -> None:
         self._check()
+        self.references._decode_value(value)
         slot = self.session.slots.register(state_id, owner, schema_version, varip=varip)
         slot.working = value
 
@@ -475,13 +485,16 @@ class RuntimeTransaction(LanguageExecutionMixin):
         varip: bool = False,
     ) -> object:
         self._check()
-        return self.session.slots.get_working(
+        self.references._decode_value(initial)
+        value = self.session.slots.get_working(
             state_id,
             owner,
             schema_version,
             varip=varip,
             initial=initial,
         )
+        self.references._decode_value(value)
+        return value
 
     @property
     def references(self) -> RuntimeReferenceHeap:
@@ -643,7 +656,15 @@ class RuntimeSession:
         timeframe: TimeframeContext | None = None,
         request_provider: RequestDataProvider | None = None,
         delegated_dispatcher: DelegatedCapabilityDispatcher | None = None,
+        nominal_registry=None,
     ) -> None:
+        from pinelib.reference.registry import NominalTypeRegistry
+        if nominal_registry is not None and (
+            type(nominal_registry) is not NominalTypeRegistry
+            or nominal_registry.pine_version != language.pine_version
+        ):
+            raise PineRuntimeError("nominal registry differs from runtime language")
+        self._nominal_registry = nominal_registry
         self.language = language
         self.policies = policies if policies is not None else RuntimePolicies()
         policies = self.policies
@@ -657,6 +678,7 @@ class RuntimeSession:
             language,
             max_objects=policies.resource.max_reference_objects,
             max_elements=policies.resource.max_collection_elements,
+            nominal_registry=nominal_registry,
         )
         self.visuals = VisualTape(policies.resource.max_visual_events)
         self.alerts = AlertTape(policies.resource.max_alert_events)
@@ -675,6 +697,10 @@ class RuntimeSession:
         self.requests.bind_parent_identity(self.identity_hash)
 
     @property
+    def nominal_registry(self):
+        return self._nominal_registry
+
+    @property
     def identity_hash(self) -> str:
         return sha(
             {
@@ -688,6 +714,8 @@ class RuntimeSession:
                     None if self.timeframe is None else self.timeframe.identity()
                 ),
                 "request_engine": self.requests.identity.to_dict(),
+                **({"nominal_registry_hash": self.nominal_registry.content_hash}
+                   if self.nominal_registry is not None else {}),
             }
         )
 
@@ -945,6 +973,130 @@ class RuntimeSession:
         return checkpoint
 
     def restore(self, data: dict[str, object]) -> None:
+        self._preflight_checkpoint_input(data)
+        self._restore_checkpoint(data, validate_children=True)
+
+    def _preflight_checkpoint_input(self, data):
+        """Bound portable input before recursive canonical codecs inspect it."""
+        limit = self.policies.resource.max_checkpoint_bytes
+        pending = [(data, 0, False)]
+        active = []
+        nodes = chars = 0
+        while pending:
+            value, depth, leaving = pending.pop()
+            if leaving:
+                active.pop()
+                continue
+            nodes += 1
+            # A fixed transport bound also applies when request-depth budgets
+            # are configured above the safe depth of the canonical JSON codec.
+            if nodes > limit or depth > 128:
+                raise PineRuntimeError("checkpoint JSON structure exceeds limits", code=PL_RESOURCE_LIMIT)
+            if type(value) in (dict, list, tuple):
+                if any(value is ancestor for ancestor in active):
+                    raise PineRuntimeError("checkpoint JSON contains a cycle", code=PL_CHECKPOINT_INVALID)
+                if len(value) > limit - nodes:
+                    raise PineRuntimeError("checkpoint JSON container exceeds limits", code=PL_RESOURCE_LIMIT)
+                active.append(value)
+                pending.append((value, depth, True))
+                if type(value) is dict:
+                    if any(type(key) is not str for key in value):
+                        raise PineRuntimeError("checkpoint JSON keys must be strings", code=PL_CHECKPOINT_INVALID)
+                    chars += sum(len(key) for key in value)
+                    pending.extend((child, depth + 1, False) for child in value.values())
+                else:
+                    pending.extend((child, depth + 1, False) for child in value)
+            elif isinstance(value, str):
+                chars += len(value)
+            elif value is not None and value is not na and not isinstance(value, (bool, int, float)):
+                # Preserve the existing portable value owner (enum/reference
+                # protocols, mappings and sequences) rather than inventing a
+                # narrower cast table at this admission boundary.
+                try:
+                    portable = to_portable(value)
+                except (ValueError, UnicodeError, RecursionError) as error:
+                    raise PineRuntimeError("checkpoint JSON is not canonical", code=PL_CHECKPOINT_INVALID) from error
+                pending.append((portable, depth, False))
+            if chars > limit:
+                raise PineRuntimeError("checkpoint exceeds byte limit", code=PL_RESOURCE_LIMIT)
+        try:
+            encoded_size = len(canonical_json(data))
+        except (ValueError, UnicodeError, RecursionError) as error:
+            raise PineRuntimeError("checkpoint JSON is not canonical", code=PL_CHECKPOINT_INVALID) from error
+        if encoded_size > limit:
+            raise PineRuntimeError("checkpoint exceeds byte limit", code=PL_RESOURCE_LIMIT)
+
+    def _new_compiled_request_runtime(self, instrument, timeframe):
+        """One child identity owner for live evaluation and checkpoint admission."""
+        child = RuntimeSession(
+            self.language,
+            self.policies,
+            inputs=self.inputs,
+            instrument=instrument,
+            timeframe=TimeframeContext.parse(timeframe),
+            request_provider=self.requests.provider,
+            nominal_registry=self.nominal_registry,
+        )
+        child.commit_full_identity = False
+        return child
+
+    def _validate_compiled_request_checkpoints(self, requests):
+        """Validate saved children without executing generated code or fetching bars.
+
+        Scratch children use the ordinary segment decoder. An explicit work list
+        keeps one cumulative budget and avoids recursive restore calls. Only the
+        reserved compiled-runtime slot has runtime checkpoint semantics; ordinary
+        request expression state remains owned by the request engine.
+        """
+        from pinelib.request.snapshots import SnapshotRequestProvider
+
+        limits = self.policies.resource
+        pending = [(self, requests, 0)]
+        count = total_bytes = 0
+        while pending:
+            parent, engine, depth = pending.pop()
+            for dataset in engine.registry.committed_datasets:
+                if "compiled-runtime" not in dataset.child_state:
+                    continue
+                count += 1
+                saved = dataset.child_state["compiled-runtime"]
+                size = len(canonical_json(saved))
+                total_bytes += size
+                if (depth > limits.max_request_depth
+                        or count > limits.max_request_datasets
+                        or size > limits.max_request_state_bytes
+                        or total_bytes > limits.max_request_cache_bytes):
+                    raise PineRuntimeError(
+                        "compiled request checkpoint validation exceeds limits", code=PL_RESOURCE_LIMIT
+                    )
+                provider = engine.provider
+                if not isinstance(provider, SnapshotRequestProvider):
+                    raise PineRuntimeError(
+                        "compiled request checkpoint requires admitted snapshot metadata", code=PL_CHECKPOINT_INVALID
+                    )
+                query = dataset.key.query
+                source = provider.source(query.instrument_id, query.timeframe)
+                context = dataset.child_context
+                if (source.content_hash != query.snapshot_id
+                        or source.instrument_id != query.instrument_id
+                        or source.timeframe != query.timeframe
+                        or provider.descriptor.provider_id != query.provider_id
+                        or source.instrument.ticker != query.symbol
+                        or source.instrument.prefix != query.exchange
+                        or source.market != query.market
+                        or query.currency not in (None, source.instrument.currency)
+                        or query.pine_version != parent.language.pine_version
+                        or context is None
+                        or context.language_hash != sha(parent.language.identity())
+                        or context.policy_hash != sha(parent.policies.identity())):
+                    raise PineRuntimeError(
+                        "compiled request checkpoint source identity mismatch", code=PL_CHECKPOINT_INVALID
+                    )
+                child = parent._new_compiled_request_runtime(source.instrument, source.timeframe)
+                child._restore_checkpoint(saved, validate_children=False)
+                pending.append((child, child.requests, depth + 1))
+
+    def _restore_checkpoint(self, data, *, validate_children):
         if self._active is not None or self._pending_bar_frame is not None:
             raise PineRuntimeError("cannot restore an active or provisional bar")
         checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
@@ -1009,17 +1161,26 @@ class RuntimeSession:
             self.language,
             max_objects=self.policies.resource.max_reference_objects,
             max_elements=self.policies.resource.max_collection_elements,
+            nominal_registry=self.nominal_registry,
         )
         # Nominal identities remain typed across serialized series and slots;
         # accepting a JSON-shaped enum or a foreign UDT here would defer a corrupt
         # checkpoint error until the next generated callback.
-        from pinelib.reference.nominal import validate_field_value
+        from pinelib.reference.nominal import validate_field_type, validate_field_value
         for storage in new_series.values():
+            if "udt:" in storage.dtype or "enum:" in storage.dtype:
+                validate_field_type(storage.dtype, self.language.pine_version, self.nominal_registry)
+            for value in [*storage.committed, storage.working]:
+                decoded = new_references._decode_value(value)
+                if new_references._has_nominal_value(decoded):
+                    validate_field_value(new_references, value, storage.dtype)
             if storage.dtype.startswith(("udt:", "enum:", "array<", "map<", "matrix<")):
                 for value in [*storage.committed, storage.working]:
                     if value is not None:
                         validate_field_value(new_references, value, storage.dtype)
         for row in new_slots.to_json():
+            new_references._decode_value(from_portable(row["working"]))
+            new_references._decode_value(from_portable(row["committed"]))
             prefix = ("enum-binding:" if row["owner"] == "ast2python.enum.v1"
                       else "reference-binding:" if row["owner"] == "ast2python.reference.v1" else None)
             if prefix is not None and row["state_id"].startswith(prefix):
@@ -1099,6 +1260,8 @@ class RuntimeSession:
             raise PineRuntimeError(
                 "checkpoint is not round-trip stable", code=PL_CHECKPOINT_INVALID
             )
+        if validate_children:
+            self._validate_compiled_request_checkpoints(new_requests)
         # Atomic replacement only after every segment has validated.
         self.series = new_series
         self.slots = new_slots
