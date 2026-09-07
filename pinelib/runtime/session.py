@@ -133,6 +133,10 @@ class RuntimeTransaction(LanguageExecutionMixin):
         history_policy: str = "each_bar",
     ) -> None:
         self._check()
+        from pinelib.reference.nominal import validate_field_value
+        decoded = self.references._decode_value(value)
+        if self.references._has_nominal_value(decoded) or (type(dtype) is str and ("udt:" in dtype or "enum:" in dtype)):
+            validate_field_value(self.references, value, dtype)
         if name not in self.session.series:
             if len(self.session.series) >= self.session.policies.resource.max_series:
                 raise PineRuntimeError("series limit exceeded", code=PL_RESOURCE_LIMIT)
@@ -160,6 +164,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
         """Ast2Python ``operator.binary`` ABI."""
 
         self._check()
+        self.references._decode_value(left)
+        self.references._decode_value(right)
         return pine_binary(operator, left, right, self.session.language)
 
     def op_operator_unary(self, operator: str, operand: object) -> object:
@@ -193,6 +199,9 @@ class RuntimeTransaction(LanguageExecutionMixin):
             raise PineRuntimeError(
                 "history offset must be an int", code=PL_SERIES_HISTORY
             )
+        if "udt:" in storage.dtype or "enum:" in storage.dtype:
+            from pinelib.reference.nominal import validate_field_type
+            validate_field_type(storage.dtype, self.session.language.pine_version, self.session.nominal_registry)
         if (
             offset > 0
             and storage.dtype.startswith("array<")
@@ -462,6 +471,7 @@ class RuntimeTransaction(LanguageExecutionMixin):
         varip: bool = False,
     ) -> None:
         self._check()
+        self.references._decode_value(value)
         slot = self.session.slots.register(state_id, owner, schema_version, varip=varip)
         slot.working = value
 
@@ -475,13 +485,16 @@ class RuntimeTransaction(LanguageExecutionMixin):
         varip: bool = False,
     ) -> object:
         self._check()
-        return self.session.slots.get_working(
+        self.references._decode_value(initial)
+        value = self.session.slots.get_working(
             state_id,
             owner,
             schema_version,
             varip=varip,
             initial=initial,
         )
+        self.references._decode_value(value)
+        return value
 
     @property
     def references(self) -> RuntimeReferenceHeap:
@@ -643,7 +656,15 @@ class RuntimeSession:
         timeframe: TimeframeContext | None = None,
         request_provider: RequestDataProvider | None = None,
         delegated_dispatcher: DelegatedCapabilityDispatcher | None = None,
+        nominal_registry=None,
     ) -> None:
+        from pinelib.reference.registry import NominalTypeRegistry
+        if nominal_registry is not None and (
+            type(nominal_registry) is not NominalTypeRegistry
+            or nominal_registry.pine_version != language.pine_version
+        ):
+            raise PineRuntimeError("nominal registry differs from runtime language")
+        self._nominal_registry = nominal_registry
         self.language = language
         self.policies = policies if policies is not None else RuntimePolicies()
         policies = self.policies
@@ -657,6 +678,7 @@ class RuntimeSession:
             language,
             max_objects=policies.resource.max_reference_objects,
             max_elements=policies.resource.max_collection_elements,
+            nominal_registry=nominal_registry,
         )
         self.visuals = VisualTape(policies.resource.max_visual_events)
         self.alerts = AlertTape(policies.resource.max_alert_events)
@@ -675,6 +697,10 @@ class RuntimeSession:
         self.requests.bind_parent_identity(self.identity_hash)
 
     @property
+    def nominal_registry(self):
+        return self._nominal_registry
+
+    @property
     def identity_hash(self) -> str:
         return sha(
             {
@@ -688,6 +714,8 @@ class RuntimeSession:
                     None if self.timeframe is None else self.timeframe.identity()
                 ),
                 "request_engine": self.requests.identity.to_dict(),
+                **({"nominal_registry_hash": self.nominal_registry.content_hash}
+                   if self.nominal_registry is not None else {}),
             }
         )
 
@@ -1009,17 +1037,26 @@ class RuntimeSession:
             self.language,
             max_objects=self.policies.resource.max_reference_objects,
             max_elements=self.policies.resource.max_collection_elements,
+            nominal_registry=self.nominal_registry,
         )
         # Nominal identities remain typed across serialized series and slots;
         # accepting a JSON-shaped enum or a foreign UDT here would defer a corrupt
         # checkpoint error until the next generated callback.
-        from pinelib.reference.nominal import validate_field_value
+        from pinelib.reference.nominal import validate_field_type, validate_field_value
         for storage in new_series.values():
+            if "udt:" in storage.dtype or "enum:" in storage.dtype:
+                validate_field_type(storage.dtype, self.language.pine_version, self.nominal_registry)
+            for value in [*storage.committed, storage.working]:
+                decoded = new_references._decode_value(value)
+                if new_references._has_nominal_value(decoded):
+                    validate_field_value(new_references, value, storage.dtype)
             if storage.dtype.startswith(("udt:", "enum:", "array<", "map<", "matrix<")):
                 for value in [*storage.committed, storage.working]:
                     if value is not None:
                         validate_field_value(new_references, value, storage.dtype)
         for row in new_slots.to_json():
+            new_references._decode_value(from_portable(row["working"]))
+            new_references._decode_value(from_portable(row["committed"]))
             prefix = ("enum-binding:" if row["owner"] == "ast2python.enum.v1"
                       else "reference-binding:" if row["owner"] == "ast2python.reference.v1" else None)
             if prefix is not None and row["state_id"].startswith(prefix):

@@ -729,6 +729,13 @@ def build_manifest_v2(
             "enum_storage": "nominal-portable-values",
             "min_pine_version": 5,
         },
+        "compiled_nominal_registry": {
+            "revision": 1,
+            "schema_id": "pinelib.nominal_registry.v1",
+            "identity": "source-declaration",
+            "admission": "module-literal-before-execution",
+            "min_pine_version": 5,
+        },
         "compiled_varip_reference_storage": {
             "revision": 1,
             "policy": "per-object-transactional-persistence",

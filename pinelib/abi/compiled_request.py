@@ -66,6 +66,7 @@ class CompiledRequestExpression:
                 instrument=self.source.instrument,
                 timeframe=TimeframeContext.parse(self.source.timeframe),
                 request_provider=self.parent.session.requests.provider,
+                nominal_registry=self.parent.session.nominal_registry,
             )
             self._runtime.commit_full_identity = False
             saved = context.state("compiled-runtime", None)

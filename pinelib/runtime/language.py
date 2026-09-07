@@ -142,9 +142,8 @@ class LanguageExecutionMixin:
             raise PineRuntimeError(
                 "unsupported reference binding type", code=PL_REFERENCE_TYPE
             )
-        if dtype.startswith("udt:"):
-            from pinelib.reference.nominal import nominal_type
-            nominal_type(dtype, "udt", self.session.language.pine_version)
+        from pinelib.reference.nominal import validate_field_type
+        validate_field_type(dtype, self.session.language.pine_version, self.session.nominal_registry)
         if is_na(value):
             return na
         if isinstance(value, dict) and set(value) == {"$pinelib_ref"}:
@@ -187,6 +186,8 @@ class LanguageExecutionMixin:
         self._check()
         if mode not in {"default", "var", "varip"}:
             raise PineRuntimeError("unsupported reference declaration mode", code=PL_VALUE_TYPE)
+        from pinelib.reference.nominal import validate_field_type
+        validate_field_type(dtype, self.session.language.pine_version, self.session.nominal_registry)
         if mode == "varip":
             self._validate_varip_binding_type(dtype)
         if mode == "default":
@@ -260,21 +261,20 @@ class LanguageExecutionMixin:
     def enum_value_v1(self, dtype, member, ordinal):
         self._check()
         from pinelib.reference.heap import PineEnumValue
-        from pinelib.reference.nominal import nominal_type
-        nominal_type(dtype, "enum", self.session.language.pine_version)
-        return PineEnumValue(dtype, member, ordinal)
+        return self.enum_coerce_v1(PineEnumValue(dtype, member, ordinal), dtype)
 
     def enum_coerce_v1(self, value, dtype):
         self._check()
         from pinelib.reference.nominal import enum_coerce
-        return enum_coerce(value, dtype, self.session.language.pine_version)
+        return enum_coerce(value, dtype, self.session.language.pine_version, self.session.nominal_registry)
 
     def declare_enum_v1(self, series_id, mode, initializer, dtype, *, history_policy="each_bar"):
         self._check()
         if mode not in {"default", "var", "varip"}:
             raise PineRuntimeError("unsupported enum declaration mode", code=PL_VALUE_TYPE)
-        from pinelib.reference.nominal import nominal_type
+        from pinelib.reference.nominal import nominal_type, require_registry
         nominal_type(dtype, "enum", self.session.language.pine_version)
+        require_registry(self.session.nominal_registry, dtype, "enum")
         key = "enum-binding:" + series_id
         if mode == "default":
             value = self.enum_coerce_v1(initializer(), dtype)

@@ -80,12 +80,25 @@ class RuntimeReferenceHeap:
         *,
         max_objects: int = 10_000,
         max_elements: int = 100_000,
+        nominal_registry=None,
     ) -> None:
+        from pinelib.reference.registry import NominalTypeRegistry
+        if nominal_registry is not None and (
+            type(nominal_registry) is not NominalTypeRegistry
+            or nominal_registry.pine_version != language.pine_version
+        ):
+            raise PineRuntimeError("nominal registry differs from heap language", code=PL_REFERENCE_TYPE)
+        self._nominal_registry = nominal_registry
+        self._loading_checkpoint = False
         self.language = language
         self.max_objects = max_objects
         self.max_elements = max_elements
         self._objects: dict[str, _HeapObject] = {}
         self._map_iterations: dict[str, int] = {}
+
+    @property
+    def nominal_registry(self):
+        return self._nominal_registry
 
     def contains(self, object_id: str) -> bool:
         return object_id in self._objects
@@ -209,7 +222,7 @@ class RuntimeReferenceHeap:
         handle = ReferenceHandle(object_id, kind)
         encoded = self._encode_value(payload)
         self._validate_payload_size(encoded)
-        self._objects[object_id] = _HeapObject(
+        item = _HeapObject(
             object_id,
             kind,
             type_descriptor,
@@ -220,6 +233,9 @@ class RuntimeReferenceHeap:
             False,
             udt_schema=clone_runtime_value(udt_schema),
         )
+        if not self._loading_checkpoint:
+            self._validate_nominal_payload(item, payload)
+        self._objects[object_id] = item
         return handle
 
     def copy(self, handle: ReferenceHandle, new_object_id: str) -> ReferenceHandle:
@@ -249,6 +265,74 @@ class RuntimeReferenceHeap:
         canonical = validate_udt_schema(self, item.type_descriptor, self._decode_value(payload), schema["fields"], schema["varip_fields"])
         if canonical != schema:
             raise PineRuntimeError("UDT schema is not canonical", code=PL_REFERENCE_TYPE)
+
+    def _has_nominal_value(self, value: object) -> bool:
+        pending = [value]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, PineEnumValue):
+                return True
+            if isinstance(value, ReferenceHandle):
+                actual = self.type_descriptor(value)
+                if value.kind == "udt" or (type(actual) is str and ("udt:" in actual or "enum:" in actual)):
+                    return True
+            if isinstance(value, dict):
+                pending.extend(value.values())
+            elif isinstance(value, list):
+                pending.extend(value)
+        return False
+
+    def _validate_nominal_payload(self, item: _HeapObject, payload: object, *, committed: bool = False) -> None:
+        """Validate each typed node once; reference edges do not recurse.
+
+        Complete heap validation visits every node after checkpoint loading, so
+        forward/cyclic UDT references do not require a value-derived schema.
+        """
+        decoded = self._decode_value(payload)
+        self._validate_udt_payload(item, decoded)
+        if item.kind not in {"array", "matrix", "map"}:
+            return
+        contains_nominal_value = self._has_nominal_value(decoded)
+        descriptor = item.type_descriptor
+        contains_nominal_type = type(descriptor) is str and ("udt:" in descriptor or "enum:" in descriptor)
+        if not contains_nominal_type and not contains_nominal_value:
+            return
+        if self.nominal_registry is None:
+            raise PineRuntimeError("nominal collection requires an admitted registry", code=PL_REFERENCE_TYPE)
+        dtype = descriptor if descriptor.startswith(item.kind + "<") else item.kind + "<" + descriptor + ">"
+        parsed = self.nominal_registry.parse_type(dtype)
+        from pinelib.reference.nominal import validate_field_value
+        if item.kind == "array":
+            slice_info = self._array_slice_descriptor(decoded)
+            if slice_info is not None:
+                parent, start, end = slice_info
+                if self.type_descriptor(parent) != item.type_descriptor:
+                    raise PineRuntimeError("nominal slice/backing type mismatch", code=PL_REFERENCE_TYPE)
+                backing = self._materialize(parent, committed=committed, active=set())
+                if not isinstance(backing, list) or end > len(backing):
+                    raise PineRuntimeError("nominal slice is out of backing bounds", code=PL_REFERENCE_BOUNDS)
+                decoded = backing[start:end]
+            if not isinstance(decoded, list):
+                raise PineRuntimeError("invalid nominal array payload", code=PL_REFERENCE_TYPE)
+            for value in decoded:
+                validate_field_value(self, value, parsed.arguments[0].text)
+        elif item.kind == "matrix":
+            if (not isinstance(decoded, dict) or set(decoded) != {"rows", "columns", "values"}
+                    or type(decoded["rows"]) is not int or type(decoded["columns"]) is not int
+                    or decoded["rows"] < 0 or decoded["columns"] < 0
+                    or not isinstance(decoded["values"], list)
+                    or len(decoded["values"]) != decoded["rows"] * decoded["columns"]):
+                raise PineRuntimeError("invalid nominal matrix payload", code=PL_REFERENCE_TYPE)
+            for value in decoded["values"]:
+                validate_field_value(self, value, parsed.arguments[0].text)
+        else:
+            if not isinstance(decoded, list):
+                raise PineRuntimeError("invalid nominal map payload", code=PL_REFERENCE_TYPE)
+            for pair in decoded:
+                if not isinstance(pair, list) or len(pair) != 2:
+                    raise PineRuntimeError("invalid nominal map pair", code=PL_REFERENCE_TYPE)
+                for value, expected in zip(pair, parsed.arguments):
+                    validate_field_value(self, value, expected.text)
 
     def _array_window(self, handle: ReferenceHandle) -> tuple[list[object], int, int]:
         """Resolve a live slice window without materializing or decoding the array."""
@@ -369,7 +453,7 @@ class RuntimeReferenceHeap:
             old_keys = [self._decode_value(p[0]) for p in item.working]
             if [p[0] for p in payload] != old_keys:
                 raise PineRuntimeError("map keys cannot change during direct iteration", code=PL_REFERENCE_INVALID)
-        self._validate_udt_payload(item, payload)
+        self._validate_nominal_payload(item, payload)
         if item.working_varip and item.kind != "udt":
             from pinelib.reference.persistence import validate_collection_payload
             validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version)
@@ -473,6 +557,8 @@ class RuntimeReferenceHeap:
         if isinstance(value, ReferenceHandle):
             return value.__pinelib_portable__()
         if isinstance(value, PineEnumValue):
+            from pinelib.reference.nominal import enum_coerce
+            enum_coerce(value, value.enum_id, self.language.pine_version, self.nominal_registry)
             return value.__pinelib_portable__()
         if isinstance(value, tuple):
             return [self._encode_value(item) for item in value]
@@ -483,6 +569,9 @@ class RuntimeReferenceHeap:
         return value
 
     def _decode_value(self, value: object) -> object:
+        if isinstance(value, PineEnumValue):
+            from pinelib.reference.nominal import enum_coerce
+            return enum_coerce(value, value.enum_id, self.language.pine_version, self.nominal_registry)
         if isinstance(value, dict):
             if "$pinelib_ref" in value:
                 return self._reference_handles(value)[0]
@@ -490,9 +579,8 @@ class RuntimeReferenceHeap:
             if "$pinelib_enum" in value:
                 if set(value) != {"$pinelib_enum"} or not isinstance(enum, dict) or set(enum) != {"enum_id", "member", "ordinal"}:
                     raise PineRuntimeError("invalid enum marker schema", code=PL_REFERENCE_TYPE)
-                return PineEnumValue(
-                    enum["enum_id"], enum["member"], enum["ordinal"]
-                )
+                from pinelib.reference.nominal import enum_coerce
+                return enum_coerce(value, enum["enum_id"], self.language.pine_version, self.nominal_registry)
             return {str(key): self._decode_value(item) for key, item in value.items()}
         if isinstance(value, list):
             return [self._decode_value(item) for item in value]
@@ -604,13 +692,12 @@ class RuntimeReferenceHeap:
 
     def _validate_closed_graph(self) -> None:
         for item in self._objects.values():
-            for payload in (item.committed, item.working):
+            for committed, payload in ((True, item.committed), (False, item.working)):
                 for handle in self._reference_handles(payload):
                     self._get(handle)
-            if item.kind == "array" and self._array_slice_descriptor(item.working):
-                handle = ReferenceHandle(item.object_id, "array")
-                self._materialize(handle, committed=True, active=set())
-                self._materialize(handle, committed=False, active=set())
+                if item.kind == "array" and self._array_slice_descriptor(payload):
+                    handle = ReferenceHandle(item.object_id, "array")
+                    self._materialize(handle, committed=committed, active=set())
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -642,8 +729,10 @@ class RuntimeReferenceHeap:
         *,
         max_objects: int,
         max_elements: int,
+        nominal_registry=None,
     ) -> RuntimeReferenceHeap:
-        heap = cls(language, max_objects=max_objects, max_elements=max_elements)
+        heap = cls(language, max_objects=max_objects, max_elements=max_elements, nominal_registry=nominal_registry)
+        heap._loading_checkpoint = True
         rows = data.get("objects")
         if not isinstance(rows, list):
             raise PineRuntimeError("reference heap objects must be a list")
@@ -694,10 +783,11 @@ class RuntimeReferenceHeap:
                     raise PineRuntimeError("invalid intrabar persistence checkpoint")
                 item.committed_varip = persistence["committed"]
                 item.working_varip = persistence["working"]
+        heap._loading_checkpoint = False
         heap._validate_closed_graph()
         for item in heap._objects.values():
-            heap._validate_udt_payload(item, item.committed)
-            heap._validate_udt_payload(item, item.working)
+            heap._validate_nominal_payload(item, item.committed, committed=True)
+            heap._validate_nominal_payload(item, item.working)
             if item.working_varip:
                 if language.pine_version < 5:
                     raise PineRuntimeError("varip collection checkpoint requires Pine v5/v6")
