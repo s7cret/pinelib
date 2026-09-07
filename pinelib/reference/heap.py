@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal
 
@@ -40,7 +41,9 @@ class PineEnumValue:
     ordinal: int
 
     def __post_init__(self) -> None:
-        if not self.enum_id or not self.member or self.ordinal < 0:
+        if (type(self.enum_id) is not str or not self.enum_id
+            or type(self.member) is not str or not self.member
+            or type(self.ordinal) is not int or self.ordinal < 0):
             raise PineRuntimeError("invalid enum value", code=PL_REFERENCE_TYPE)
 
     def __pinelib_portable__(self) -> dict[str, object]:
@@ -63,6 +66,9 @@ class _HeapObject:
     committed_revision: int
     working_revision: int
     committed_exists: bool
+    committed_varip: bool = False
+    working_varip: bool = False
+    udt_schema: dict[str, object] | None = None
 
 
 class RuntimeReferenceHeap:
@@ -79,23 +85,108 @@ class RuntimeReferenceHeap:
         self.max_objects = max_objects
         self.max_elements = max_elements
         self._objects: dict[str, _HeapObject] = {}
+        self._map_iterations: dict[str, int] = {}
 
-    def begin(self) -> None:
+    def contains(self, object_id: str) -> bool:
+        return object_id in self._objects
+
+    def begin(self, *, preserve_varip: bool = False) -> None:
+        # A retained UDT keeps its identity, not all of its field mutations.
+        # Its referenced initial objects must remain addressable after rollback.
+        retained: set[str] = set()
+        if preserve_varip:
+            pending = [item for item in self._objects.values() if item.working_varip and item.kind == "udt"]
+            while pending:
+                item = pending.pop()
+                if item.object_id in retained:
+                    continue
+                retained.add(item.object_id)
+                for payload in (item.committed, item.working):
+                    pending.extend(self._get(handle) for handle in self._reference_handles(payload))
         for object_id, item in tuple(self._objects.items()):
-            if not item.committed_exists:
+            if preserve_varip and item.working_varip and item.kind != "udt":
+                continue
+            if not item.committed_exists and object_id not in retained:
                 del self._objects[object_id]
                 continue
+            fields = ({key: clone_runtime_value(item.working[key]) for key in item.udt_schema["varip_fields"]}
+                      if preserve_varip and item.udt_schema is not None else {})
             item.working = clone_runtime_value(item.committed)
+            if fields:
+                item.working.update(fields)
             item.working_revision = item.committed_revision
+            if not preserve_varip:
+                item.working_varip = item.committed_varip
 
     def commit(self) -> None:
         for item in self._objects.values():
             item.committed = clone_runtime_value(item.working)
             item.committed_revision = item.working_revision
             item.committed_exists = True
+            item.committed_varip = item.working_varip
 
-    def rollback(self) -> None:
-        self.begin()
+    def rollback(self, *, preserve_varip: bool = False) -> None:
+        self.begin(preserve_varip=preserve_varip)
+
+    def retain_intrabar(self, handle: ReferenceHandle) -> None:
+        """Promote a typed collection and its slice backing as one validated change.
+
+        Persistence belongs to the object, so mutations through another alias see
+        the same policy. Copying an object does not copy this binding policy.
+        Ordinary objects continue to roll back. The policy is itself transactional
+        and serialized, rather than inferred from whichever name currently points
+        to an object or from an unverified checkpoint root.
+        """
+        if self.language.pine_version < 5:
+            raise PineRuntimeError("varip collection bindings require Pine v5 or v6", code=PL_REFERENCE_TYPE)
+        pending = [handle]
+        marked: set[str] = set()
+        while pending:
+            current = pending.pop()
+            item = self._get(current)
+            if item.object_id in marked:
+                continue
+            if item.kind == "udt":
+                self._validate_udt_payload(item, item.working)
+                if item.udt_schema is None:
+                    raise PineRuntimeError("varip UDT requires a declared field schema", code=PL_REFERENCE_TYPE)
+                parent = None
+            else:
+                parent = self._validate_intrabar_payload(item, item.working)
+            marked.add(item.object_id)
+            if parent is not None:
+                pending.append(parent)
+        # No flags are changed until every backing object has passed validation.
+        for object_id in marked:
+            self._objects[object_id].working_varip = True
+
+    def _validate_intrabar_payload(self, item: _HeapObject, payload: object) -> ReferenceHandle | None:
+        from pinelib.reference.persistence import validate_collection_payload
+
+        parent = None
+        if item.kind == "array":
+            descriptor = self._array_slice_descriptor(payload)
+            if descriptor is not None:
+                parent, _, _ = descriptor
+                backing = self._get(parent)
+                if backing.type_descriptor != item.type_descriptor:
+                    raise PineRuntimeError("varip slice/backing type mismatch", code=PL_REFERENCE_TYPE)
+                # The parent is validated separately; validate the window as well.
+                payload = self._materialize(ReferenceHandle(item.object_id, "array"), committed=False, active=set())
+        validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version)
+        return parent
+
+    def validate_intrabar_binding(self, value: object, *, committed: bool = False) -> None:
+        """Cross-check a serialized varip slot against admitted object policy."""
+        from pinelib.core.values import is_na
+        if is_na(value):
+            return
+        handles = self._reference_handles(value)
+        if len(handles) != 1 or not isinstance(value, dict) or set(value) != {"$pinelib_ref"}:
+            raise PineRuntimeError("varip slot has an invalid collection identity", code=PL_REFERENCE_INVALID)
+        item = self._get(handles[0])
+        if not item.working_varip or (committed and not item.committed_varip):
+            raise PineRuntimeError("varip slot points to nonpersistent collection", code=PL_REFERENCE_INVALID)
 
     def create(
         self,
@@ -103,6 +194,8 @@ class RuntimeReferenceHeap:
         kind: ReferenceKind,
         type_descriptor: str,
         payload: object,
+        *,
+        udt_schema: dict[str, object] | None = None,
     ) -> ReferenceHandle:
         if object_id in self._objects:
             raise PineRuntimeError(
@@ -125,6 +218,7 @@ class RuntimeReferenceHeap:
             0,
             0,
             False,
+            udt_schema=clone_runtime_value(udt_schema),
         )
         return handle
 
@@ -135,12 +229,26 @@ class RuntimeReferenceHeap:
             source.kind,
             source.type_descriptor,
             self.read_payload(handle),
+            udt_schema=source.udt_schema,
         )
 
     def read_payload(self, handle: ReferenceHandle) -> object:
-        return clone_runtime_value(
+        return self._decode_value(clone_runtime_value(
             self._materialize(handle, committed=False, active=set())
-        )
+        ))
+
+    def _validate_udt_payload(self, item: _HeapObject, payload: object) -> None:
+        if item.udt_schema is None:
+            if item.kind == "udt" and item.type_descriptor.startswith("udt:"):
+                raise PineRuntimeError("nominal UDT requires a field schema", code=PL_REFERENCE_TYPE)
+            return
+        from pinelib.reference.nominal import validate_udt_schema
+        schema = item.udt_schema
+        if item.kind != "udt" or not isinstance(schema, dict) or set(schema) != {"fields", "varip_fields"}:
+            raise PineRuntimeError("invalid UDT schema metadata", code=PL_REFERENCE_TYPE)
+        canonical = validate_udt_schema(self, item.type_descriptor, self._decode_value(payload), schema["fields"], schema["varip_fields"])
+        if canonical != schema:
+            raise PineRuntimeError("UDT schema is not canonical", code=PL_REFERENCE_TYPE)
 
     def _array_window(self, handle: ReferenceHandle) -> tuple[list[object], int, int]:
         """Resolve a live slice window without materializing or decoding the array."""
@@ -183,6 +291,52 @@ class RuntimeReferenceHeap:
         # Return a detached value, while reference elements keep reference identity.
         return self._decode_value(clone_runtime_value(payload[start + offset]))
 
+    def matrix_dimensions(self, handle: ReferenceHandle) -> tuple[int, int]:
+        if handle.kind != "matrix":
+            raise PineRuntimeError("expected matrix handle", code=PL_REFERENCE_TYPE)
+        p = self._get(handle).working
+        if (not isinstance(p, dict) or set(p) != {"rows", "columns", "values"}
+            or type(p["rows"]) is not int or type(p["columns"]) is not int
+            or p["rows"] < 0 or p["columns"] < 0 or not isinstance(p["values"], list)
+            or len(p["values"]) != p["rows"] * p["columns"]):
+            raise PineRuntimeError("invalid matrix payload", code=PL_REFERENCE_TYPE)
+        return p["rows"], p["columns"]
+
+    def read_matrix_row(self, handle: ReferenceHandle, index: int) -> list[object]:
+        rows, columns = self.matrix_dimensions(handle)
+        index = self.normalize_index(index, rows)
+        values = self._get(handle).working["values"]
+        return self._decode_value(clone_runtime_value(values[index * columns:(index + 1) * columns]))
+
+    @contextmanager
+    def map_iteration(self, handle: ReferenceHandle):
+        """Keep keys stable while reading each next value live, without whole-map copies.
+
+        The guard is ephemeral, lexical, and not part of a checkpoint. It is released
+        even when compiled loop control breaks or raises inside nested iterations.
+        """
+        if handle.kind != "map":
+            raise PineRuntimeError("expected map handle", code=PL_REFERENCE_TYPE)
+        item = self._get(handle)
+        if not isinstance(item.working, list) or any(not isinstance(p, list) or len(p) != 2 for p in item.working):
+            raise PineRuntimeError("invalid map payload", code=PL_REFERENCE_TYPE)
+        oid = handle.object_id
+        self._map_iterations[oid] = self._map_iterations.get(oid, 0) + 1
+        def pairs():
+            for index in range(len(item.working)):
+                if not self._map_iterations.get(oid):
+                    raise PineRuntimeError("map iterator used outside its lifetime", code=PL_REFERENCE_INVALID)
+                key, value = self._decode_value(clone_runtime_value(self._get(handle).working[index]))
+                yield key, value
+        iterator = pairs()
+        try:
+            yield iterator
+        finally:
+            iterator.close()
+            self._map_iterations[oid] -= 1
+            if not self._map_iterations[oid]:
+                del self._map_iterations[oid]
+
     def create_array_slice(
         self,
         parent: ReferenceHandle,
@@ -209,6 +363,16 @@ class RuntimeReferenceHeap:
 
     def mutate_payload(self, handle: ReferenceHandle, payload: object) -> None:
         item = self._get(handle)
+        if item.kind == "map" and self._map_iterations.get(item.object_id, 0):
+            if not isinstance(payload, list) or any(not isinstance(p, list) or len(p) != 2 for p in payload):
+                raise PineRuntimeError("invalid map payload during iteration", code=PL_REFERENCE_TYPE)
+            old_keys = [self._decode_value(p[0]) for p in item.working]
+            if [p[0] for p in payload] != old_keys:
+                raise PineRuntimeError("map keys cannot change during direct iteration", code=PL_REFERENCE_INVALID)
+        self._validate_udt_payload(item, payload)
+        if item.working_varip and item.kind != "udt":
+            from pinelib.reference.persistence import validate_collection_payload
+            validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version)
         descriptor = self._array_slice_descriptor(item.working)
         if descriptor is not None:
             if not isinstance(payload, list):
@@ -251,6 +415,8 @@ class RuntimeReferenceHeap:
         return self._get(handle).type_descriptor
 
     def _get(self, handle: ReferenceHandle) -> _HeapObject:
+        if not isinstance(handle, ReferenceHandle):
+            raise PineRuntimeError("expected a reference handle", code=PL_REFERENCE_TYPE)
         try:
             item = self._objects[handle.object_id]
         except KeyError as error:
@@ -318,13 +484,14 @@ class RuntimeReferenceHeap:
 
     def _decode_value(self, value: object) -> object:
         if isinstance(value, dict):
-            ref = value.get("$pinelib_ref")
-            if isinstance(ref, dict):
-                return ReferenceHandle(str(ref["object_id"]), str(ref["kind"]))  # type: ignore[arg-type]
+            if "$pinelib_ref" in value:
+                return self._reference_handles(value)[0]
             enum = value.get("$pinelib_enum")
-            if isinstance(enum, dict):
+            if "$pinelib_enum" in value:
+                if set(value) != {"$pinelib_enum"} or not isinstance(enum, dict) or set(enum) != {"enum_id", "member", "ordinal"}:
+                    raise PineRuntimeError("invalid enum marker schema", code=PL_REFERENCE_TYPE)
                 return PineEnumValue(
-                    str(enum["enum_id"]), str(enum["member"]), int(enum["ordinal"])
+                    enum["enum_id"], enum["member"], enum["ordinal"]
                 )
             return {str(key): self._decode_value(item) for key, item in value.items()}
         if isinstance(value, list):
@@ -457,6 +624,9 @@ class RuntimeReferenceHeap:
                     "committed_revision": item.committed_revision,
                     "working_revision": item.working_revision,
                     "committed_exists": item.committed_exists,
+                    **({"udt_schema": clone_runtime_value(item.udt_schema)} if item.udt_schema is not None else {}),
+                    **({"intrabar_persistence": {"committed": item.committed_varip, "working": item.working_varip}}
+                       if item.committed_varip or item.working_varip else {}),
                 }
                 for item in sorted(
                     self._objects.values(), key=lambda row: row.object_id
@@ -478,7 +648,7 @@ class RuntimeReferenceHeap:
         if not isinstance(rows, list):
             raise PineRuntimeError("reference heap objects must be a list")
         for raw in rows:
-            if not isinstance(raw, dict) or set(raw) != {
+            if not isinstance(raw, dict) or set(raw) - {"intrabar_persistence", "udt_schema"} != {
                 "object_id",
                 "kind",
                 "type_descriptor",
@@ -507,6 +677,7 @@ class RuntimeReferenceHeap:
                 kind,  # type: ignore[arg-type]
                 str(raw["type_descriptor"]),
                 heap._decode_value(from_portable(raw["committed"])),
+                udt_schema=raw.get("udt_schema"),
             )
             item = heap._get(handle)
             item.committed = from_portable(raw["committed"])
@@ -514,5 +685,36 @@ class RuntimeReferenceHeap:
             item.committed_revision = committed_revision
             item.working_revision = working_revision
             item.committed_exists = committed_exists
+            persistence = raw.get("intrabar_persistence")
+            if "intrabar_persistence" in raw:
+                if (not isinstance(persistence, dict) or set(persistence) != {"committed", "working"}
+                    or any(type(v) is not bool for v in persistence.values())
+                    or not persistence["working"]
+                    or (persistence["committed"] and not committed_exists)):
+                    raise PineRuntimeError("invalid intrabar persistence checkpoint")
+                item.committed_varip = persistence["committed"]
+                item.working_varip = persistence["working"]
         heap._validate_closed_graph()
+        for item in heap._objects.values():
+            heap._validate_udt_payload(item, item.committed)
+            heap._validate_udt_payload(item, item.working)
+            if item.working_varip:
+                if language.pine_version < 5:
+                    raise PineRuntimeError("varip collection checkpoint requires Pine v5/v6")
+                if item.kind == "udt":
+                    if item.udt_schema is None:
+                        raise PineRuntimeError("persistent UDT checkpoint lacks field schema")
+                    continue
+                parent = heap._validate_intrabar_payload(item, item.working)
+                if parent is not None and not heap._get(parent).working_varip:
+                    raise PineRuntimeError("varip slice checkpoint lacks persistent backing")
+                if item.committed_varip:
+                    descriptor = heap._array_slice_descriptor(item.committed) if item.kind == "array" else None
+                    if descriptor is not None and not heap._get(descriptor[0]).committed_varip:
+                        raise PineRuntimeError("committed varip slice lacks committed backing policy")
+                    from pinelib.reference.persistence import (
+                        validate_collection_payload,
+                    )
+                    committed = heap._materialize(ReferenceHandle(item.object_id, item.kind), committed=True, active=set())
+                    validate_collection_payload(item.kind, item.type_descriptor, committed, language.pine_version)
         return heap

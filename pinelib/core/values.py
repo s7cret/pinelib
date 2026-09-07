@@ -106,6 +106,17 @@ def pine_binary(
 
     left = normalize_na(left)
     right = normalize_na(right)
+    from pinelib.reference.heap import PineEnumValue
+    if isinstance(left, PineEnumValue) or isinstance(right, PineEnumValue):
+        if ctx.pine_version < 5:
+            raise PineRuntimeError("enum values require Pine v5/v6", code=PL_VALUE_TYPE)
+        if (operator not in {"==", "!="}
+            or (left is not na and right is not na and (
+                not isinstance(left, PineEnumValue) or not isinstance(right, PineEnumValue)
+                or left.enum_id != right.enum_id))):
+            raise PineRuntimeError("enum operands require matching nominal types and equality operators", code=PL_VALUE_TYPE)
+        if left is na or right is na:
+            return na if ctx.pine_version < 6 else False
     if operator in {"==", "!="}:
         equal = False if left is na or right is na else left == right
         return equal if operator == "==" else not equal

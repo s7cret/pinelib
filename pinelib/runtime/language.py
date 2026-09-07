@@ -120,22 +120,31 @@ class LanguageExecutionMixin:
         """A constructor occurrence is distinct from its persistent written callsite."""
         self._check()
         key = self.scoped_id_v1(source_id)
-        count = getattr(self, "_reference_occurrences", 0)
-        self._reference_occurrences = count + 1
-        return "allocation:" + sha(
-            {"source": key, "callback": self.frame.sequence, "occurrence": count}
-        )
+        while True:
+            count = getattr(self, "_reference_occurrences", 0)
+            self._reference_occurrences = count + 1
+            identity = "allocation:" + sha(
+                {"source": key, "callback": self.frame.sequence, "occurrence": count}
+            )
+            # An aborted intrabar callback may retain varip objects. Retrying
+            # that callback must not reuse their identities, while rolled-back
+            # ordinary allocations keep their deterministic replay identities.
+            if not self.references.contains(identity):
+                return identity
 
     def _check_reference_binding(self, value: object, dtype: str) -> object:
         from pinelib.errors import PL_REFERENCE_TYPE
         from pinelib.reference.heap import ReferenceHandle
 
         if not isinstance(dtype, str) or not dtype.startswith(
-            ("array<", "matrix<", "map<")
+            ("array<", "matrix<", "map<", "udt:")
         ):
             raise PineRuntimeError(
                 "unsupported reference binding type", code=PL_REFERENCE_TYPE
             )
+        if dtype.startswith("udt:"):
+            from pinelib.reference.nominal import nominal_type
+            nominal_type(dtype, "udt", self.session.language.pine_version)
         if is_na(value):
             return na
         if isinstance(value, dict) and set(value) == {"$pinelib_ref"}:
@@ -149,7 +158,7 @@ class LanguageExecutionMixin:
                     "malformed typed reference marker", code=PL_REFERENCE_TYPE
                 )
             value = ReferenceHandle(marker["object_id"], marker["kind"])
-        kind = dtype.split("<", 1)[0]
+        kind = "udt" if dtype.startswith("udt:") else dtype.split("<", 1)[0]
         if not isinstance(value, ReferenceHandle) or value.kind != kind:
             raise PineRuntimeError(
                 "reference binding kind differs from declared type",
@@ -157,7 +166,7 @@ class LanguageExecutionMixin:
             )
         actual = self.references.type_descriptor(value)
         # Native factories use element descriptors; requested arrays use full descriptors.
-        actual = actual if actual.startswith(kind + "<") else kind + "<" + actual + ">"
+        actual = actual if kind == "udt" or actual.startswith(kind + "<") else kind + "<" + actual + ">"
         if actual != dtype:
             raise PineRuntimeError(
                 "reference binding type differs from heap object",
@@ -176,19 +185,22 @@ class LanguageExecutionMixin:
     ) -> object:
         """Store typed handles in the established slots/series and transactional heap."""
         self._check()
-        if mode not in {"default", "var"}:
-            raise PineRuntimeError(
-                "varip reference heap persistence is not admitted", code=PL_VALUE_TYPE
-            )
+        if mode not in {"default", "var", "varip"}:
+            raise PineRuntimeError("unsupported reference declaration mode", code=PL_VALUE_TYPE)
+        if mode == "varip":
+            self._validate_varip_binding_type(dtype)
         if mode == "default":
             value = self._check_reference_binding(initializer(), dtype)
         else:
             key = "reference-binding:" + series_id
             if not self.session.slots.contains(key):
                 value = self._check_reference_binding(initializer(), dtype)
-                self.set_slot(key, value, owner="ast2python.reference.v1")
+                if mode == "varip" and not is_na(value):
+                    self.references.retain_intrabar(value)
+                self.set_slot(key, value, owner="ast2python.reference.v1", varip=mode == "varip")
             value = self.state(
-                key, owner="ast2python.reference.v1", schema_version="1", initial=na
+                key, owner="ast2python.reference.v1", schema_version="1", initial=na,
+                varip=mode == "varip",
             )
             value = self._check_reference_binding(value, dtype)
         self.set_series(series_id, value, dtype, history_policy=history_policy)
@@ -204,15 +216,82 @@ class LanguageExecutionMixin:
         history_policy: str = "each_bar",
     ) -> None:
         self._check()
-        if mode not in {"default", "var"}:
-            raise PineRuntimeError(
-                "varip reference heap persistence is not admitted", code=PL_VALUE_TYPE
-            )
+        if mode not in {"default", "var", "varip"}:
+            raise PineRuntimeError("unsupported reference declaration mode", code=PL_VALUE_TYPE)
+        if mode == "varip":
+            self._validate_varip_binding_type(dtype)
         value = self._check_reference_binding(value, dtype)
-        if mode == "var":
+        if mode == "varip" and not is_na(value):
+            self.references.retain_intrabar(value)
+        if mode != "default":
             self.set_slot(
-                "reference-binding:" + series_id, value, owner="ast2python.reference.v1"
+                "reference-binding:" + series_id, value, owner="ast2python.reference.v1", varip=mode == "varip"
             )
+        self.set_series(series_id, value, dtype, history_policy=history_policy)
+
+    def _validate_varip_binding_type(self, dtype):
+        if type(dtype) is str and dtype.startswith("udt:"):
+            from pinelib.reference.nominal import nominal_type
+            nominal_type(dtype, "udt", self.session.language.pine_version)
+        else:
+            from pinelib.reference.persistence import validate_varip_type
+            validate_varip_type(dtype.split("<", 1)[0], dtype, self.session.language.pine_version)
+
+    def new_udt_v1(self, object_id, dtype, fields, *, varip_fields=(), field_types=None):
+        self._check()
+        from pinelib.reference.udt import udt_new_typed
+        return udt_new_typed(self.references, object_id, dtype, fields, field_types, varip_fields)
+
+    def get_udt_field_v1(self, handle, field):
+        self._check()
+        from pinelib.reference.udt import udt_get
+        return udt_get(self.references, handle, field)
+
+    def set_udt_field_v1(self, handle, field, value):
+        self._check()
+        from pinelib.reference.udt import udt_set
+        return udt_set(self.references, handle, field, value)
+
+    def copy_udt_v1(self, handle, new_object_id):
+        self._check()
+        from pinelib.reference.udt import udt_copy
+        return udt_copy(self.references, handle, new_object_id)
+
+    def enum_value_v1(self, dtype, member, ordinal):
+        self._check()
+        from pinelib.reference.heap import PineEnumValue
+        from pinelib.reference.nominal import nominal_type
+        nominal_type(dtype, "enum", self.session.language.pine_version)
+        return PineEnumValue(dtype, member, ordinal)
+
+    def enum_coerce_v1(self, value, dtype):
+        self._check()
+        from pinelib.reference.nominal import enum_coerce
+        return enum_coerce(value, dtype, self.session.language.pine_version)
+
+    def declare_enum_v1(self, series_id, mode, initializer, dtype, *, history_policy="each_bar"):
+        self._check()
+        if mode not in {"default", "var", "varip"}:
+            raise PineRuntimeError("unsupported enum declaration mode", code=PL_VALUE_TYPE)
+        from pinelib.reference.nominal import nominal_type
+        nominal_type(dtype, "enum", self.session.language.pine_version)
+        key = "enum-binding:" + series_id
+        if mode == "default":
+            value = self.enum_coerce_v1(initializer(), dtype)
+        else:
+            if not self.session.slots.contains(key):
+                self.set_slot(key, self.enum_coerce_v1(initializer(), dtype), owner="ast2python.enum.v1", varip=mode == "varip")
+            value = self.enum_coerce_v1(self.state(key, owner="ast2python.enum.v1", schema_version="1", initial=na, varip=mode == "varip"), dtype)
+        self.set_series(series_id, value, dtype, history_policy=history_policy)
+        return value
+
+    def write_enum_v1(self, series_id, mode, value, dtype, *, history_policy="each_bar"):
+        self._check()
+        if mode not in {"default", "var", "varip"}:
+            raise PineRuntimeError("unsupported enum declaration mode", code=PL_VALUE_TYPE)
+        value = self.enum_coerce_v1(value, dtype)
+        if mode != "default":
+            self.set_slot("enum-binding:" + series_id, value, owner="ast2python.enum.v1", varip=mode == "varip")
         self.set_series(series_id, value, dtype, history_policy=history_policy)
 
     def consume_loop_iteration_v1(self):
@@ -236,4 +315,27 @@ class LanguageExecutionMixin:
         while index < array_size(self.references, handle):
             value = array_get(self.references, handle, index)
             yield (index, value) if indexed else value
+            index += 1
+
+
+    def iter_map_v1(self, handle):
+        self._check()
+        if self.session.language.pine_version < 5:
+            raise PineRuntimeError("map iteration requires Pine v5/v6", code=PL_VALUE_TYPE)
+        return self.references.map_iteration(handle)
+
+    def iter_matrix_v1(self, handle, source_id, *, indexed=False):
+        """Retrieve current rows as independent arrays; retain element references."""
+        self._check()
+        if self.session.language.pine_version < 5:
+            raise PineRuntimeError("matrix iteration requires Pine v5/v6", code=PL_VALUE_TYPE)
+        index = 0
+        dtype = self.references.type_descriptor(handle)
+        if dtype.startswith("matrix<") and dtype.endswith(">"):
+            dtype = dtype[len("matrix<"):-1]
+        while index < self.references.matrix_dimensions(handle)[0]:
+            self._check()
+            values = self.references.read_matrix_row(handle, index)
+            row = self.references.create(self.reference_id_v1(source_id), "array", dtype, values)
+            yield (index, row) if indexed else row
             index += 1

@@ -50,8 +50,10 @@ def test_maps_matrices_udt_enum_and_checkpoint_roundtrip():
     assert is_na(ref.map_put_v1(tx, mapping, "a", 1))
     assert ref.map_put_v1(tx, mapping, "a", 2) == 1
     ref.map_put_v1(tx, mapping, "b", 3)
-    assert ref.map_keys_v1(tx, mapping) == ("a", "b")
-    assert ref.map_values_v1(tx, mapping) == (2, 3)
+    keys = ref.map_keys_v1(tx, mapping, "array:keys", "string")
+    assert tx.references.read_payload(keys) == ["a", "b"]
+    values = ref.map_values_v1(tx, mapping, "array:values", "int")
+    assert tx.references.read_payload(values) == [2, 3]
     matrix = ref.matrix_new_v1(tx, "matrix:1", "matrix<int>", 2, 2, 0)
     ref.matrix_set_v1(tx, matrix, 1, 1, 7)
     assert ref.matrix_get_v1(tx, matrix, 1, 1) == 7

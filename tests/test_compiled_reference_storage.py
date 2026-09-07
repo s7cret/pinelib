@@ -143,6 +143,8 @@ def test_invalid_reference_binding_is_not_silently_coerced(fault):
         value = {"$pinelib_ref": {"object_id": 1, "kind": "array"}}
     if fault == "varip":
         mode = "varip"
+        value = array_new(tx.references, "unsupported", "label", 0, na)
+        typ = "array<label>"
     with pytest.raises(PineRuntimeError):
         tx.declare_reference_v1("x", mode, lambda: value, typ)
     tx.abort()

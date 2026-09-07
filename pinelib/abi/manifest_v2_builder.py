@@ -217,7 +217,7 @@ def _dynamic_length_policy(
 def _return_identity(name: str, target: CatalogRow | None) -> str:
     if name == "array.slice":
         return "PARENT_LINKED_SHALLOW_VIEW"
-    if name.startswith(("array.new", "map.new", "matrix.new")):
+    if name.startswith(("array.new", "map.new", "matrix.new")) or name in {"map.keys", "map.values"}:
         return "NEW_REFERENCE"
     if target is not None and target.tuple_arity:
         return "FIXED_TUPLE"
@@ -247,6 +247,10 @@ def _source_aliases(
     official: Mapping[str, Any], target: CatalogRow | None
 ) -> list[str]:
     aliases = [str(official["symbol_id"])]
+    if official["name"] in {"array.new<type>", "matrix.new<type>", "map.new<type,type>"}:
+        # Exact producer spelling of the declared generic template. Concrete type
+        # arguments stay in checked semantic result facts, not a wildcard binding.
+        aliases.append(str(official["symbol_id"]).replace("<", "u003c").replace(",", "u002c").replace(">", "u003e"))
     if official["name"] == "request.security":
         aliases.append("pine:function:security")
     if target is not None:
@@ -585,6 +589,25 @@ def build_manifest_v2(
             "identity": "callback-and-occurrence",
             "binding_modes": ["default", "var"],
             "reference_history_min_version": {"array": 5},
+        },
+        "compiled_nominal_types": {
+            "revision": 1,
+            "identity": "source-declaration",
+            "udt_binding_modes": ["default", "var", "varip"],
+            "udt_fields": "declared-schema-field-rollback",
+            "enum_storage": "nominal-portable-values",
+            "min_pine_version": 5,
+        },
+        "compiled_varip_reference_storage": {
+            "revision": 1,
+            "policy": "per-object-transactional-persistence",
+            "kinds": ["array", "matrix", "map"],
+            "element_types": ["int", "float", "bool", "color", "string"],
+            "min_pine_version": 5,
+        },
+        "compiled_collection_iteration": {
+            "revision": 1, "map": "insertion-order-stable-keys-live-values",
+            "matrix": "live-size-row-arrays", "min_pine_version": 5,
         },
         "compiled_loop_values": {
             "revision": 1,
