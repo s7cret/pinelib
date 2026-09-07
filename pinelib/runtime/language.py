@@ -115,3 +115,125 @@ class LanguageExecutionMixin:
         key = self.scoped_id_v1("expression-history:" + source_id, local=True)
         self.set_series(key, value, dtype, history_policy="on_evaluation")
         return self.op_series_history(key, offset)
+
+    def reference_id_v1(self, source_id: str) -> str:
+        """A constructor occurrence is distinct from its persistent written callsite."""
+        self._check()
+        key = self.scoped_id_v1(source_id)
+        count = getattr(self, "_reference_occurrences", 0)
+        self._reference_occurrences = count + 1
+        return "allocation:" + sha(
+            {"source": key, "callback": self.frame.sequence, "occurrence": count}
+        )
+
+    def _check_reference_binding(self, value: object, dtype: str) -> object:
+        from pinelib.errors import PL_REFERENCE_TYPE
+        from pinelib.reference.heap import ReferenceHandle
+
+        if not isinstance(dtype, str) or not dtype.startswith(
+            ("array<", "matrix<", "map<")
+        ):
+            raise PineRuntimeError(
+                "unsupported reference binding type", code=PL_REFERENCE_TYPE
+            )
+        if is_na(value):
+            return na
+        if isinstance(value, dict) and set(value) == {"$pinelib_ref"}:
+            marker = value["$pinelib_ref"]
+            if (
+                not isinstance(marker, dict)
+                or set(marker) != {"object_id", "kind"}
+                or any(type(v) is not str for v in marker.values())
+            ):
+                raise PineRuntimeError(
+                    "malformed typed reference marker", code=PL_REFERENCE_TYPE
+                )
+            value = ReferenceHandle(marker["object_id"], marker["kind"])
+        kind = dtype.split("<", 1)[0]
+        if not isinstance(value, ReferenceHandle) or value.kind != kind:
+            raise PineRuntimeError(
+                "reference binding kind differs from declared type",
+                code=PL_REFERENCE_TYPE,
+            )
+        actual = self.references.type_descriptor(value)
+        # Native factories use element descriptors; requested arrays use full descriptors.
+        actual = actual if actual.startswith(kind + "<") else kind + "<" + actual + ">"
+        if actual != dtype:
+            raise PineRuntimeError(
+                "reference binding type differs from heap object",
+                code=PL_REFERENCE_TYPE,
+            )
+        return value
+
+    def declare_reference_v1(
+        self,
+        series_id: str,
+        mode: str,
+        initializer,
+        dtype: str,
+        *,
+        history_policy: str = "each_bar",
+    ) -> object:
+        """Store typed handles in the established slots/series and transactional heap."""
+        self._check()
+        if mode not in {"default", "var"}:
+            raise PineRuntimeError(
+                "varip reference heap persistence is not admitted", code=PL_VALUE_TYPE
+            )
+        if mode == "default":
+            value = self._check_reference_binding(initializer(), dtype)
+        else:
+            key = "reference-binding:" + series_id
+            if not self.session.slots.contains(key):
+                value = self._check_reference_binding(initializer(), dtype)
+                self.set_slot(key, value, owner="ast2python.reference.v1")
+            value = self.state(
+                key, owner="ast2python.reference.v1", schema_version="1", initial=na
+            )
+            value = self._check_reference_binding(value, dtype)
+        self.set_series(series_id, value, dtype, history_policy=history_policy)
+        return value
+
+    def write_reference_v1(
+        self,
+        series_id: str,
+        mode: str,
+        value: object,
+        dtype: str,
+        *,
+        history_policy: str = "each_bar",
+    ) -> None:
+        self._check()
+        if mode not in {"default", "var"}:
+            raise PineRuntimeError(
+                "varip reference heap persistence is not admitted", code=PL_VALUE_TYPE
+            )
+        value = self._check_reference_binding(value, dtype)
+        if mode == "var":
+            self.set_slot(
+                "reference-binding:" + series_id, value, owner="ast2python.reference.v1"
+            )
+        self.set_series(series_id, value, dtype, history_policy=history_policy)
+
+    def consume_loop_iteration_v1(self):
+        """One shared callback budget also bounds nested while/for-in loops."""
+        self._check()
+        from pinelib.errors import PL_RESOURCE_LIMIT, PineRuntimeError
+
+        count = getattr(self, "_loop_iterations", 0) + 1
+        if count > self.session.policies.resource.max_loop_iterations:
+            raise PineRuntimeError(
+                "callback loop iteration budget exceeded", code=PL_RESOURCE_LIMIT
+            )
+        self._loop_iterations = count
+
+    def iter_array_v1(self, handle, *, indexed=False):
+        """Read the live array in index order without aliasing its Python payload."""
+        from pinelib.reference.array import array_get, array_size
+
+        self._check()
+        index = 0
+        while index < array_size(self.references, handle):
+            value = array_get(self.references, handle, index)
+            yield (index, value) if indexed else value
+            index += 1

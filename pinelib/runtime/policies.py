@@ -109,6 +109,8 @@ class RuntimePolicies:
 
     def identity(self) -> dict[str, object]:
         return {
+            "compiled_reference_storage": "typed-handles-occurrence-allocation-v1",
+            "compiled_loop_values": "last-completed-return-shared-budget-v1",
             "realtime": {
                 "require_explicit_ticks": self.realtime.require_explicit_ticks,
                 "max_recalculations_per_bar": self.realtime.max_recalculations_per_bar,

@@ -403,7 +403,7 @@ def build_manifest_v2(
         name = str(official_row["name"])
         # Verified reference contract absent in the frozen snapshot; do not infer
         # arbitrary source signatures from coincidental Python ABI names.
-        if name == "array.get" and not official_row.get("parameters"):
+        if name in {"array.get", "array.set"} and not official_row.get("parameters"):
             signature = [
                 {
                     "name": "id",
@@ -418,6 +418,15 @@ def build_manifest_v2(
                     "required": True,
                 },
             ]
+            if name == "array.set":
+                signature.append(
+                    {
+                        "name": "value",
+                        "type": "any",
+                        "qualifier_max": "series",
+                        "required": True,
+                    }
+                )
             official_row = {
                 **official_row,
                 "parameters": signature[1:]
@@ -570,6 +579,18 @@ def build_manifest_v2(
             "counts": official["counts"],
             "source_index_content_hash": official["source_index_content_hash"],
             "source_pack_hashes": official["source_pack_hashes"],
+        },
+        "compiled_reference_storage": {
+            "revision": 1,
+            "identity": "callback-and-occurrence",
+            "binding_modes": ["default", "var"],
+            "reference_history_min_version": {"array": 5},
+        },
+        "compiled_loop_values": {
+            "revision": 1,
+            "budget": "shared-callback",
+            "for_in": "live-array",
+            "empty_tuple": "typed-elements",
         },
         "compiler_operations": compiler_operations,
         "rows": rows,

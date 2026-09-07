@@ -192,7 +192,20 @@ class RuntimeTransaction(LanguageExecutionMixin):
             raise PineRuntimeError(
                 "history offset must be an int", code=PL_SERIES_HISTORY
             )
+        if (
+            offset > 0
+            and storage.dtype.startswith("array<")
+            and self.session.language.pine_version < 5
+        ):
+            raise PineRuntimeError(
+                "array instance history requires Pine v5 or later",
+                code=PL_SERIES_HISTORY,
+            )
         value = storage.read(offset)
+        if value is not None and storage.dtype.startswith(
+            ("array<", "map<", "matrix<")
+        ):
+            return self._check_reference_binding(value, storage.dtype)
         if (
             offset > 0
             and value is None

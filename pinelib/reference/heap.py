@@ -142,6 +142,47 @@ class RuntimeReferenceHeap:
             self._materialize(handle, committed=False, active=set())
         )
 
+    def _array_window(self, handle: ReferenceHandle) -> tuple[list[object], int, int]:
+        """Resolve a live slice window without materializing or decoding the array."""
+        seen: set[str] = set()
+        slices: list[tuple[int, int]] = []
+        while True:
+            if handle.kind != "array":
+                raise PineRuntimeError("expected array handle", code=PL_REFERENCE_TYPE)
+            if handle.object_id in seen:
+                raise PineRuntimeError(
+                    "array slice parent graph contains a cycle",
+                    code=PL_REFERENCE_INVALID,
+                )
+            seen.add(handle.object_id)
+            payload = self._get(handle).working
+            if isinstance(payload, list):
+                start, length = 0, len(payload)
+                for low, high in reversed(slices):
+                    if high > length:
+                        raise PineRuntimeError(
+                            "array slice is out of bounds of its parent",
+                            code=PL_REFERENCE_BOUNDS,
+                        )
+                    start, length = start + low, high - low
+                return payload, start, length
+            descriptor = self._array_slice_descriptor(payload)
+            if descriptor is None:
+                raise PineRuntimeError(
+                    "invalid array heap payload", code=PL_REFERENCE_TYPE
+                )
+            handle, low, high = descriptor
+            slices.append((low, high))
+
+    def array_length(self, handle: ReferenceHandle) -> int:
+        return self._array_window(handle)[2]
+
+    def read_array_element(self, handle: ReferenceHandle, index: int) -> object:
+        payload, start, length = self._array_window(handle)
+        offset = self.normalize_index(index, length)
+        # Return a detached value, while reference elements keep reference identity.
+        return self._decode_value(clone_runtime_value(payload[start + offset]))
+
     def create_array_slice(
         self,
         parent: ReferenceHandle,

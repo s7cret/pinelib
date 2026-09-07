@@ -34,14 +34,13 @@ def _values(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> list[object]
 
 
 def array_size(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> int:
-    return len(_values(heap, handle))
+    return heap.array_length(handle)
 
 
 def array_get(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, index: int
 ) -> object:
-    values = _values(heap, handle)
-    return values[heap.normalize_index(index, len(values))]
+    return heap.read_array_element(handle, index)
 
 
 def array_set(
