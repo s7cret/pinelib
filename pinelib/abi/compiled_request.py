@@ -20,7 +20,7 @@ from pinelib.request import (
 )
 from pinelib.request.snapshots import SnapshotRequestProvider
 from pinelib.runtime.metadata import BarValues, TimeframeContext
-from pinelib.runtime.session import CallbackFrame, RuntimeSession, RuntimeTransaction
+from pinelib.runtime.session import CallbackFrame, RuntimeTransaction
 from pinelib.state.checkpoint import sha
 
 # Bind the ephemeral evaluation context to exactly its child transaction.
@@ -59,16 +59,9 @@ class CompiledRequestExpression:
                     "request expression source is unbound", code=PL_REQUEST_DATA
                 )
             self._context = context
-            self._runtime = RuntimeSession(
-                self.parent.session.language,
-                self.parent.session.policies,
-                inputs=self.parent.session.inputs,
-                instrument=self.source.instrument,
-                timeframe=TimeframeContext.parse(self.source.timeframe),
-                request_provider=self.parent.session.requests.provider,
-                nominal_registry=self.parent.session.nominal_registry,
+            self._runtime = self.parent.session._new_compiled_request_runtime(
+                self.source.instrument, self.source.timeframe,
             )
-            self._runtime.commit_full_identity = False
             saved = context.state("compiled-runtime", None)
             if saved is not None:
                 self._runtime.restore(saved)
