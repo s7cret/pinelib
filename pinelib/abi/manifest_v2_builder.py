@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pinelib.abi.models import CatalogRow, TargetStatus
 from pinelib.errors import PL_ABI_MANIFEST, PineRuntimeError
@@ -127,6 +127,117 @@ _SOURCE_TO_ABI_ALIASES = {
     "initial_value": "initial",
     "from": "from_handle",
 }
+# Audited per-function spellings. These aliases must never become a global
+# argument-name fallback: e.g. `x` means a source in RSI, a number in exp.
+_AUDITED_ARGUMENT_ALIASES = {
+    "math.abs": {"number": "value"},
+    "math.ceil": {"number": "value"},
+    "math.floor": {"number": "value"},
+    "math.exp": {"number": "value"},
+    "math.round": {"number": "value"},
+    "math.sqrt": {"number": "value"},
+    "ta.macd": {"fastlen": "fast_length", "slowlen": "slow_length", "siglen": "signal_length"},
+    "exp": {"x": "value"},
+    "abs": {"x": "value"},
+    "ceil": {"x": "value"},
+    "floor": {"x": "value"},
+    "round": {"x": "value"},
+    "sqrt": {"x": "value"},
+    "rsi": {"x": "source", "y": "length"},
+    "macd": {"fastlen": "fast_length", "slowlen": "slow_length", "siglen": "signal_length"},
+}
+_HISTORICAL_BUILTINS = {"math.abs", "math.ceil", "math.floor", "math.exp", "math.round", "math.sqrt", "math.pow", "ta.macd", "ta.rsi", "ta.sma", "ta.wma"}
+_AUDITED_BUILTINS = _HISTORICAL_BUILTINS | {"math.round_to_mintick"}
+
+
+def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
+    """Correct the projection without rewriting the frozen source inventory.
+
+    TradingView v6 reference and v5 migration guide define these names,
+    qualifiers and arity-dependent returns. See docs/STAGE2_BUILTIN_BINDINGS.md.
+    """
+    name = official["name"]
+    if name == "float" and official["category"] == "functions":
+        return {**official, "parameters": [
+            {"name": "x", "type": "float", "qualifier_max": "series", "required": True}
+        ]}
+    if name not in _AUDITED_BUILTINS:
+        return official
+    def parameter(name: str, type_name: str, *, qualifier: str = "series", required: bool = True) -> dict[str, object]:
+        return {"name": name, "type": type_name, "qualifier_max": qualifier, "required": required}
+
+    if name in {"math.abs", "math.ceil", "math.floor", "math.exp", "math.round", "math.sqrt", "math.round_to_mintick"}:
+        parameters = [parameter("number", "float")]
+        if name == "math.round":
+            parameters.append(parameter("precision", "int", required=False))
+    elif name == "ta.macd":
+        parameters = [parameter("source", "float")] + [
+            parameter(item, "int", qualifier="simple") for item in ("fastlen", "slowlen", "siglen")
+        ]
+    elif name == "ta.rsi":
+        parameters = [parameter("source", "float"), parameter("length", "int", qualifier="simple")]
+    else:
+        return official
+    returns = {"math.round": "int|float", "math.abs": "int|float", "math.ceil": "int", "math.floor": "int"}
+    return {**official, "parameters": parameters, "returns": returns.get(name, official["returns"])}
+
+
+def _historical_call_bindings(
+    rows: list[dict[str, object]], by_symbol: Mapping[str, tuple[CatalogRow, ...]]
+) -> list[dict[str, object]]:
+    """Separate, version-bounded producer identities; not official-v6 rows."""
+    result: list[dict[str, object]] = []
+    for row in rows:
+        modern = str(row["name"])
+        if modern not in _HISTORICAL_BUILTINS:
+            continue
+        old_name = modern.split(".", 1)[1]
+        legacy = next((entry for entry in by_symbol.get("pine:function:" + old_name, ())
+                       if entry.status in _SUPPORTED), None)
+        if legacy is None or legacy.abi_callable != row["abi_callable"]:
+            raise PineRuntimeError("audited historical target disagrees with catalog", code=PL_ABI_MANIFEST)
+        historical = dict(row)
+        historical["name"] = old_name
+        historical["call_form"] = "global_function"
+        historical["producer_call_forms"] = ["FUNCTION"]
+        historical["version_availability"] = list(legacy.pine_versions)
+        historical["source_symbol_ids"] = [str(row["symbol_id"]), legacy.symbol_id]
+        historical["producer_overload_ids"] = [
+            str(row["symbol_id"]) + ("#overload:0" if old_name == "rsi" else "#canonical")
+        ]
+        if old_name == "abs":
+            historical["producer_overload_ids"] = [str(row["symbol_id"]) + suffix
+                                                   for suffix in ("#canonical", "#overload:0")]
+        renames = {"number": "x"} if old_name in {"abs", "ceil", "floor", "exp", "round", "sqrt"} else (
+            {"source": "x", "length": "y"} if old_name == "rsi" else {}
+        )
+        parameters = [{**item, "name": renames.get(str(item["name"]), item["name"])}
+                      for item in cast(list[dict[str, object]], row["parameters"])]
+        historical["parameters"] = parameters
+        historical["parameter_bindings"] = _parameter_bindings(
+            {"name": old_name, "category": "functions", "parameters": parameters},
+            cast(list[dict[str, object]], historical["abi_parameters"]),
+        )
+        if old_name == "rsi":
+            historical["dynamic_length_policy"] = {"y": "SIMPLE_STABLE"}
+        if old_name == "round":
+            # Precision was added in v4. Its producer overload has a separate
+            # identity and must not widen the one-argument v1-v3 signature.
+            precise = {**historical, "version_availability": [4],
+                       "producer_overload_ids": [str(row["symbol_id"]) + "#overload:0"],
+                       "parameters": [{**item, "required": True} for item in parameters],
+                       "return": {**cast(dict[str, object], row["return"]), "pine_type": "float"}}
+            historical["parameters"] = parameters[:1]
+            historical["parameter_bindings"] = _parameter_bindings(
+                {"name": old_name, "category": "functions", "parameters": parameters[:1]},
+                cast(list[dict[str, object]], historical["abi_parameters"]),
+            )
+            historical["producer_overload_ids"] = [str(row["symbol_id"]) + "#canonical"]
+            historical["return"] = {**cast(dict[str, object], row["return"]), "pine_type": "int"}
+            result.extend([historical, precise])
+        else:
+            result.append(historical)
+    return result
 
 
 def _load_official_surface() -> dict[str, Any]:
@@ -305,6 +416,7 @@ def _parameter_bindings(
                 name
                 for name in source_names
                 if name == abi_name or _SOURCE_TO_ABI_ALIASES.get(name) == abi_name
+                or _AUDITED_ARGUMENT_ALIASES.get(str(official["name"]), {}).get(name) == abi_name
             ),
             None,
         )
@@ -405,6 +517,7 @@ def build_manifest_v2(
                 "official surface row is invalid", code=PL_ABI_MANIFEST
             )
         name = str(official_row["name"])
+        official_row = _audited_signature(official_row)
         # Verified reference contract absent in the frozen snapshot; do not infer
         # arbitrary source signatures from coincidental Python ABI names.
         if name in {"array.get", "array.set"} and not official_row.get("parameters"):
@@ -558,6 +671,23 @@ def build_manifest_v2(
                 "diagnostic": diagnostic,
             }
         )
+        if name in _AUDITED_BUILTINS:
+            rows[-1]["producer_call_forms"] = ["NAMESPACE_FUNCTION"]
+        if name == "float" and official_row["category"] == "functions":
+            rows[-1]["producer_call_forms"] = ["FUNCTION"]
+            rows[-1]["call_form"] = "global_function"
+        if name == "math.round":
+            cast(dict[str, object], rows[-1]["return"])["by_source_arity"] = {"1": "int", "2": "float"}
+            rows[-1]["producer_overload_ids"] = [str(official_row["symbol_id"]) + suffix
+                                                for suffix in ("#canonical", "#overload:0")]
+        if name == "math.abs":
+            cast(dict[str, object], rows[-1]["return"])["by_source_type"] = {"int": "int", "float": "float"}
+            rows[-1]["producer_overload_ids"] = [str(official_row["symbol_id"]) + suffix
+                                                for suffix in ("#canonical", "#overload:0")]
+        if name == "ta.macd":
+            rows[-1]["dynamic_length_policy"] = {
+                item: "SIMPLE_STABLE" for item in ("fastlen", "slowlen", "siglen")
+            }
 
     counts = {
         "official_total": len(rows),
@@ -576,6 +706,7 @@ def build_manifest_v2(
         "schema_version": "2.0.0",
         "package_version": PACKAGE_VERSION,
         "producer": "pinelib-rc6-cross-stack-local-candidate",
+        "historical_call_bindings": _historical_call_bindings(rows, frozen_index),
         "official_surface": {
             "schema_id": official["schema_id"],
             "content_hash": official["content_hash"],

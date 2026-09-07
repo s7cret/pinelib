@@ -44,15 +44,15 @@ ROWS: list[CatalogRow] = []
 
 # Pure math namespace and historical global aliases.
 _math = {
-    "abs": "object",
+    "abs": "int|float",
     "acos": "object",
     "asin": "object",
     "atan": "object",
     "avg": "object",
-    "ceil": "object",
+    "ceil": "int",
     "cos": "object",
     "exp": "object",
-    "floor": "object",
+    "floor": "int",
     "log": "object",
     "log10": "object",
     "max": "object",
@@ -69,15 +69,17 @@ _math = {
     "toradians": "object",
 }
 for name, return_type in _math.items():
-    path = f"pinelib.abi.math.{name}_v1"
+    contextual = name == "round_to_mintick"
+    path = f"pinelib.abi.math.{name}{'_context' if contextual else ''}_v1"
     ROWS.append(
         _row(
             f"math.{name}",
             path,
             versions=NAMESPACE,
-            status=TargetStatus.SUPPORTED_PURE,
+            status=TargetStatus.SUPPORTED_CONTEXT if contextual else TargetStatus.SUPPORTED_PURE,
             return_type=return_type,
-            capabilities=("value.numeric",),
+            state_model="RUNTIME_CONTEXT" if contextual else "PURE",
+            capabilities=("value.numeric", "syminfo.context") if contextual else ("value.numeric",),
         )
     )
     if name not in {"round_to_mintick", "avg"}:
@@ -595,5 +597,8 @@ for name in ("gaps_off", "gaps_on", "lookahead_off", "lookahead_on"):
 ROWS.append(_row("na", "pinelib.abi.primitives.na_v1", versions=ALL_VERSIONS,
                  status=TargetStatus.SUPPORTED_CONTEXT, call_form="global_function",
                  return_type="bool", capabilities=("value.na",)))
+ROWS.append(_row("float", "pinelib.abi.primitives.float_v1", versions=ALL_VERSIONS,
+                 status=TargetStatus.SUPPORTED_PURE, call_form="global_function",
+                 return_type="float", capabilities=("value.numeric", "value.na")))
 
 CATALOG: tuple[CatalogRow, ...] = tuple(ROWS)

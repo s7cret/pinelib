@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pinelib.builtins import math as _math
+from pinelib.runtime.session import RuntimeTransaction
 
 
 def abs_v1(value: object) -> object:
@@ -59,12 +60,17 @@ def pow_v1(base: object, exponent: object) -> object:
     return _math.power(base, exponent)
 
 
-def round_v1(value: object, precision: int = 0) -> object:
+def round_v1(value: object, precision: object = None) -> object:
     return _math.round_value(value, precision)
 
 
 def round_to_mintick_v1(value: object, mintick: float) -> object:
     return _math.round_to_mintick(value, mintick)
+
+
+def round_to_mintick_context_v1(tx: RuntimeTransaction, number: object) -> object:
+    tx._check()
+    return _math.round_to_mintick(number, tx.value_syminfo_mintick)
 
 
 def sign_v1(value: object) -> object:

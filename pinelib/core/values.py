@@ -55,6 +55,19 @@ def require_number(value: object, *, name: str = "value") -> PineNumber:
     return value
 
 
+def pine_float(value: object) -> float | _NA:
+    """Explicit Pine numeric cast, sharing the canonical numeric/NA boundary."""
+    if is_na(value):
+        return na
+    number = require_number(value, name="x")
+    try:
+        return float(number)
+    except OverflowError as error:
+        raise PineRuntimeError(
+            "float conversion exceeds the finite numeric domain", code=PL_VALUE_DOMAIN
+        ) from error
+
+
 def pine_bool(value: object, ctx: RuntimeLanguageContext) -> bool | _NA:
     if value is na:
         if ctx.pine_version <= 5:
