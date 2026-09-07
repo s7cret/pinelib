@@ -25,7 +25,7 @@ def array_new(
 
 
 def _values(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> list[object]:
-    if handle.kind != "array":
+    if not isinstance(handle, ReferenceHandle) or handle.kind != "array":
         raise PineRuntimeError("expected array handle", code=PL_REFERENCE_TYPE)
     payload = heap.read_payload(handle)
     if not isinstance(payload, list):
@@ -34,14 +34,13 @@ def _values(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> list[object]
 
 
 def array_size(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> int:
-    return len(_values(heap, handle))
+    return heap.array_length(handle)
 
 
 def array_get(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, index: int
 ) -> object:
-    values = _values(heap, handle)
-    return values[heap.normalize_index(index, len(values))]
+    return heap.array_item(handle, index)
 
 
 def array_set(
@@ -259,10 +258,11 @@ def array_concat(
     heap: RuntimeReferenceHeap,
     target: ReferenceHandle,
     source: ReferenceHandle,
-) -> None:
+) -> ReferenceHandle:
     values = _values(heap, target)
     values.extend(_values(heap, source))
     heap.mutate_payload(target, values)
+    return target
 
 
 def array_binary_search_leftmost(

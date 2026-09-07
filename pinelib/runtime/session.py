@@ -17,7 +17,7 @@ from pinelib.errors import (
 )
 from pinelib.events import AlertEvent, AlertTape, SourceSpan, VisualEvent, VisualTape
 from pinelib.input import InputRegistry
-from pinelib.reference import RuntimeReferenceHeap
+from pinelib.reference import ReferenceHandle, RuntimeReferenceHeap
 from pinelib.request import RequestDataProvider, RequestEngine
 from pinelib.runtime.compact_transcript import CompactRuntimeTranscript
 from pinelib.runtime.context import RuntimeLanguageContext
@@ -34,6 +34,12 @@ from pinelib.runtime.metadata import (
     TimeframeContext,
 )
 from pinelib.runtime.policies import RuntimePolicies
+from pinelib.runtime.reference_values import (
+    REFERENCE_OWNER,
+    ReferenceValuesMixin,
+    stored_reference,
+    validate_reference,
+)
 from pinelib.runtime.semantic import ALGORITHM, semantic_state_digest
 from pinelib.runtime.state_machine import RuntimeState, RuntimeStateMachine
 from pinelib.runtime.transcript import RuntimeTranscript
@@ -102,7 +108,7 @@ class CallbackResult:
     revision_fingerprint: str | None = None
 
 
-class RuntimeTransaction(LanguageExecutionMixin):
+class RuntimeTransaction(LanguageExecutionMixin, ReferenceValuesMixin):
     def __init__(self, session: RuntimeSession, frame: CallbackFrame) -> None:
         self.session = session
         self.frame = frame
@@ -110,6 +116,7 @@ class RuntimeTransaction(LanguageExecutionMixin):
         self._new_series: set[str] = set()
         self._function_path: tuple[str, ...] = ()
         self._request_allocations = 0
+        self._reference_allocations = 0
         self._delegated_invocations: list[DelegatedInvocation] = []
         self._delegated_outputs: list[DelegatedOutput] = []
 
@@ -193,6 +200,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
                 "history offset must be an int", code=PL_SERIES_HISTORY
             )
         value = storage.read(offset)
+        if storage.dtype.startswith(("array<", "matrix<", "map<")):
+            return validate_reference(self.references, stored_reference(value), storage.dtype)
         if (
             offset > 0
             and value is None
@@ -732,7 +741,7 @@ class RuntimeSession:
         for storage in self.series.values():
             storage.begin()
         self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.references.begin()
+        self.references.begin(preserve=self._varip_references() if frame.realtime or frame.defer_bar_commit else ())
         self.visuals.begin()
         self.alerts.begin()
         self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
@@ -744,6 +753,11 @@ class RuntimeSession:
             transaction.set_series("time", values.time, "int")
             transaction.set_series("time_close", values.time_close, "int")
         return transaction
+
+    def _varip_references(self) -> tuple[ReferenceHandle, ...]:
+        # A varip slot must retain its working collection, not a dangling ID.
+        values = (stored_reference(value) for value in self.slots.varip_values(REFERENCE_OWNER))
+        return tuple(value for value in values if isinstance(value, ReferenceHandle))
 
     def _finish(self, transaction: RuntimeTransaction, commit: bool) -> CallbackResult:
         if self._active is not transaction:
@@ -780,7 +794,7 @@ class RuntimeSession:
             for storage in self.series.values():
                 storage.rollback()
             self.slots.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
-            self.references.rollback()
+            self.references.begin(preserve=self._varip_references() if frame.realtime or frame.defer_bar_commit else ())
             self.visuals.rollback()
             self.alerts.rollback()
             self.requests.finish(persist=False)
@@ -994,6 +1008,18 @@ class RuntimeSession:
             max_objects=self.policies.resource.max_reference_objects,
             max_elements=self.policies.resource.max_collection_elements,
         )
+        # Cross-segment references must be checked too, before atomic replacement.
+        from itertools import chain
+
+        from pinelib.state.checkpoint import from_portable
+        for storage in new_series.values():
+            if storage.dtype.startswith(("array<", "matrix<", "map<")):
+                for value in chain(storage.committed, (storage.working,)):
+                    validate_reference(new_references, stored_reference(value), storage.dtype)
+        for slot in new_slots.to_json():
+            if slot["owner"] == REFERENCE_OWNER:
+                for part in ("committed", "working"):
+                    validate_reference(new_references, stored_reference(from_portable(slot[part])), slot["schema_version"])
         new_visuals = VisualTape.from_json(
             visuals_data, self.policies.resource.max_visual_events
         )

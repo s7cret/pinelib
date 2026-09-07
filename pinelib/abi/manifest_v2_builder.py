@@ -113,8 +113,8 @@ _INTERNAL_ABI_BINDINGS = {
     "state_id": "SOURCE_LOCATION_STATE_ID",
     "call_site_id": "SOURCE_LOCATION_STATE_ID",
     "source_span": "SOURCE_SPAN",
-    "object_id": "SOURCE_LOCATION_OBJECT_ID",
-    "new_object_id": "SOURCE_LOCATION_OBJECT_ID",
+    "object_id": "REFERENCE_ALLOCATION_ID",
+    "new_object_id": "REFERENCE_ALLOCATION_ID",
     "type_descriptor": "SEMANTIC_TYPE_DESCRIPTOR",
     "result_shape": "SEMANTIC_RESULT_SHAPE",
     "chart_open_ms": "RUNTIME_CHART_OPEN_MS",
@@ -247,6 +247,20 @@ def _source_aliases(
     official: Mapping[str, Any], target: CatalogRow | None
 ) -> list[str]:
     aliases = [str(official["symbol_id"])]
+    # Explicit supported specializations bridge the producer's escaped IDs to
+    # this exact ABI row. The concrete result type still supplies the descriptor;
+    # unsupported UDT/object specializations do not match by a wildcard.
+    arity = {"array.new<type>": 1, "matrix.new<type>": 1, "map.new<type,type>": 2}.get(official["name"])
+    if arity is not None:
+        from itertools import product
+        primitive = ("bool", "color", "float", "int", "string")
+        names = [official["name"], *(
+            str(official["name"]).split("<")[0] + "<" + ",".join(args) + ">"
+            for args in product(primitive, repeat=arity)
+        )]
+        for name in names:
+            encoded = name.replace("<", "u003c").replace(",", "u002c").replace(">", "u003e")
+            aliases.append("pine:function:" + encoded)
     if official["name"] == "request.security":
         aliases.append("pine:function:security")
     if target is not None:
@@ -312,7 +326,7 @@ def _parameter_bindings(
                     "source": source_name,
                 }
             )
-        elif is_method and abi_name == "handle":
+        elif is_method and (abi_name == "handle" or (official["name"] == "array.concat" and abi_name == "id1")):
             rows.append(
                 {
                     "abi_parameter": abi_name,
@@ -403,7 +417,7 @@ def build_manifest_v2(
         name = str(official_row["name"])
         # Verified reference contract absent in the frozen snapshot; do not infer
         # arbitrary source signatures from coincidental Python ABI names.
-        if name == "array.get" and not official_row.get("parameters"):
+        if name in {"array.get", "array.set"} and not official_row.get("parameters"):
             signature = [
                 {
                     "name": "id",
@@ -418,6 +432,8 @@ def build_manifest_v2(
                     "required": True,
                 },
             ]
+            if name == "array.set":
+                signature.append({"name": "value", "type": "any", "qualifier_max": "series", "required": True})
             official_row = {
                 **official_row,
                 "parameters": signature[1:]

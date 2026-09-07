@@ -194,8 +194,8 @@ def array_concat_v1(
     tx: RuntimeTransaction,
     id1: ReferenceHandle,
     id2: ReferenceHandle,
-) -> None:
-    array_concat(tx.references, id1, id2)
+) -> ReferenceHandle:
+    return array_concat(tx.references, id1, id2)
 
 
 def array_binary_search_leftmost_v1(

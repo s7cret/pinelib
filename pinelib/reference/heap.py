@@ -80,8 +80,21 @@ class RuntimeReferenceHeap:
         self.max_elements = max_elements
         self._objects: dict[str, _HeapObject] = {}
 
-    def begin(self) -> None:
+    def begin(self, *, preserve: tuple[ReferenceHandle, ...] = ()) -> None:
+        # Retain the current graph reachable from intrabar-persistent slots.
+        # An array slice also retains its parent; ordinary aliases stay aliases.
+        keep: set[str] = set()
+        pending = list(preserve)
+        while pending:
+            handle = pending.pop()
+            if handle.object_id in keep:
+                continue
+            item = self._get(handle)
+            keep.add(handle.object_id)
+            pending.extend(self._reference_handles(item.working))
         for object_id, item in tuple(self._objects.items()):
+            if object_id in keep:
+                continue
             if not item.committed_exists:
                 del self._objects[object_id]
                 continue
@@ -127,6 +140,42 @@ class RuntimeReferenceHeap:
             False,
         )
         return handle
+
+    def has_id(self, object_id: str) -> bool:
+        return object_id in self._objects
+
+    def _array_window(self, handle: ReferenceHandle) -> tuple[list, int, int]:
+        """Locate the live list/window without materializing it per element."""
+        item = self._get(handle)
+        if item.kind != "array":
+            raise PineRuntimeError("expected array handle", code=PL_REFERENCE_TYPE)
+        windows, seen = [], set()
+        while not isinstance(item.working, list):
+            if item.object_id in seen:
+                raise PineRuntimeError("cyclic array slice", code=PL_REFERENCE_INVALID)
+            seen.add(item.object_id)
+            descriptor = self._array_slice_descriptor(item.working)
+            if descriptor is None:
+                raise PineRuntimeError("invalid array payload", code=PL_REFERENCE_TYPE)
+            parent, start, end = descriptor
+            windows.append((start, end))
+            item = self._get(parent)
+        data, offset, length = item.working, 0, len(item.working)
+        for start, end in reversed(windows):
+            if end > length:
+                raise PineRuntimeError("array slice is out of bounds of its parent", code=PL_REFERENCE_BOUNDS)
+            offset += start
+            length = end - start
+        return data, offset, length
+
+    def array_length(self, handle: ReferenceHandle) -> int:
+        return self._array_window(handle)[2]
+
+    def array_item(self, handle: ReferenceHandle, index: int) -> object:
+        data, offset, length = self._array_window(handle)
+        index = self.normalize_index(index, length)
+        # As with read_payload, callers never receive mutable heap internals.
+        return clone_runtime_value(self._decode_value(data[offset + index]))
 
     def copy(self, handle: ReferenceHandle, new_object_id: str) -> ReferenceHandle:
         source = self._get(handle)
@@ -210,6 +259,8 @@ class RuntimeReferenceHeap:
         return self._get(handle).type_descriptor
 
     def _get(self, handle: ReferenceHandle) -> _HeapObject:
+        if not isinstance(handle, ReferenceHandle):
+            raise PineRuntimeError("expected an initialized reference handle", code=PL_REFERENCE_INVALID)
         try:
             item = self._objects[handle.object_id]
         except KeyError as error:
@@ -293,6 +344,8 @@ class RuntimeReferenceHeap:
     def _array_slice_descriptor(
         self, payload: object
     ) -> tuple[ReferenceHandle, int, int] | None:
+        if not isinstance(payload, dict) or _ARRAY_SLICE_MARKER not in payload:
+            return None
         decoded = self._decode_value(payload)
         if not isinstance(decoded, dict) or _ARRAY_SLICE_MARKER not in decoded:
             return None

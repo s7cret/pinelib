@@ -450,7 +450,7 @@ _array = {
     "includes": "bool",
     "reverse": "void",
     "fill": "void",
-    "concat": "void",
+    "concat": "array<T>",
     "values": "tuple<T>",
 }
 for name, return_type in _array.items():
