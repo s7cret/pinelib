@@ -747,6 +747,14 @@ def build_manifest_v2(
             "element_types": ["int", "float", "bool", "color", "string"],
             "min_pine_version": 5,
         },
+        "compiled_varip_nominal_arrays": {
+            "revision": 1,
+            "registry_schema_id": "pinelib.nominal_registry.v1",
+            "element_type": "udt",
+            "field_profile": "fundamentals-and-ordinary-fundamental-array-matrix",
+            "persistence": "array-elements-and-declared-varip-fields",
+            "min_pine_version": 5,
+        },
         "compiled_collection_iteration": {
             "revision": 1, "map": "insertion-order-stable-keys-live-values",
             "matrix": "live-size-row-arrays", "min_pine_version": 5,

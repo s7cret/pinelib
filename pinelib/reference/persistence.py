@@ -1,7 +1,7 @@
 """Admitted intrabar collection profile, separate from heap transaction policy.
 
-This profile covers fundamental elements. UDT/chart-point/footprint references
-require their own recursively checked binding contracts, not guessed promotion.
+Fundamental collections retain their established profile. Nominal arrays use
+the admitted declaration owner; reference-valued varip fields remain separate.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ FUNDAMENTALS = frozenset({"int", "float", "bool", "color", "string"})
 
 
 def validate_varip_type(
-    kind: str, descriptor: str, pine_version: int
+    kind: str, descriptor: str, pine_version: int, *, nominal_registry=None
 ) -> tuple[str, ...]:
     if (
         kind not in {"array", "matrix", "map"}
@@ -28,6 +28,15 @@ def validate_varip_type(
     text = descriptor
     if text.startswith(kind + "<") and text.endswith(">"):
         text = text[len(kind) + 1 : -1]
+    if kind == "array" and text.startswith("udt:"):
+        from pinelib.reference.nominal import require_registry
+        definition = require_registry(nominal_registry, text, "udt")
+        if type(pine_version) is not int or nominal_registry.pine_version != pine_version:
+            raise PineRuntimeError("varip nominal array registry version mismatch", code=PL_REFERENCE_TYPE)
+        nominal_registry.validate_varip_collection("array<" + text + ">")
+        if any(field.varip and field.type.kind not in FUNDAMENTALS for field in definition.fields):
+            raise PineRuntimeError("varip nominal arrays require ordinary collection fields", code=PL_REFERENCE_TYPE)
+        return (text,)
     parts = tuple(p.strip() for p in text.split(","))
     if len(parts) != (2 if kind == "map" else 1) or any(
         p not in FUNDAMENTALS for p in parts
@@ -62,16 +71,21 @@ def _validate_value(value: object, expected: str) -> None:
 
 
 def validate_collection_payload(
-    kind: str, descriptor: str, payload: object, version: int
+    kind: str, descriptor: str, payload: object, version: int, *, heap=None
 ) -> None:
-    parts = validate_varip_type(kind, descriptor, version)
+    parts = validate_varip_type(kind, descriptor, version,
+                                nominal_registry=heap.nominal_registry if heap is not None else None)
     if kind == "array":
         if not isinstance(payload, list):
             raise PineRuntimeError(
                 "invalid varip array payload", code=PL_REFERENCE_TYPE
             )
         for value in payload:
-            _validate_value(value, parts[0])
+            if parts[0].startswith("udt:"):
+                from pinelib.reference.nominal import validate_field_value
+                validate_field_value(heap, value, parts[0])
+            else:
+                _validate_value(value, parts[0])
     elif kind == "matrix":
         if (
             not isinstance(payload, dict)

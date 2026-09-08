@@ -236,7 +236,8 @@ class LanguageExecutionMixin:
             nominal_type(dtype, "udt", self.session.language.pine_version)
         else:
             from pinelib.reference.persistence import validate_varip_type
-            validate_varip_type(dtype.split("<", 1)[0], dtype, self.session.language.pine_version)
+            validate_varip_type(dtype.split("<", 1)[0], dtype, self.session.language.pine_version,
+                                nominal_registry=self.session.nominal_registry)
 
     def new_udt_v1(self, object_id, dtype, fields, *, varip_fields=(), field_types=None):
         self._check()
