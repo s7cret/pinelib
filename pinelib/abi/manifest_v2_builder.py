@@ -438,7 +438,10 @@ def _parameter_bindings(
                     "source": source_name,
                 }
             )
-        elif is_method and abi_name == "handle":
+        elif is_method and (
+            abi_name == "handle"
+            or (official["name"] == "array.concat" and abi_name == "id1")
+        ):
             rows.append(
                 {
                     "abi_parameter": abi_name,

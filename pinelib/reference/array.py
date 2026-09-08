@@ -259,10 +259,11 @@ def array_concat(
     heap: RuntimeReferenceHeap,
     target: ReferenceHandle,
     source: ReferenceHandle,
-) -> None:
+) -> ReferenceHandle:
     values = _values(heap, target)
     values.extend(_values(heap, source))
     heap.mutate_payload(target, values)
+    return target
 
 
 def _numeric_boundary_search(
