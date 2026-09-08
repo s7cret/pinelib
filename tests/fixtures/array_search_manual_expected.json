@@ -1,0 +1,329 @@
+{
+  "schema_id": "openpine.array_search_manual_expected.v1",
+  "provenance": "manual_fixture",
+  "tradingview_export": false,
+  "profile": "finite numeric nonempty ascending arrays, no sort_field",
+  "cases": [
+    {
+      "case_id": "v5-interior-gap",
+      "version": 5,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": 3,
+      "expected_leftmost": 2,
+      "expected_rightmost": 3
+    },
+    {
+      "case_id": "v5-duplicates",
+      "version": 5,
+      "array": [
+        4,
+        5,
+        5,
+        5
+      ],
+      "target": 5,
+      "expected_leftmost": 1,
+      "expected_rightmost": 3
+    },
+    {
+      "case_id": "v5-first",
+      "version": 5,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": -2,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v5-last",
+      "version": 5,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": 9,
+      "expected_leftmost": 4,
+      "expected_rightmost": 4
+    },
+    {
+      "case_id": "v5-below",
+      "version": 5,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": -3,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v5-above",
+      "version": 5,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": 10,
+      "expected_leftmost": 4,
+      "expected_rightmost": 5
+    },
+    {
+      "case_id": "v5-single-match",
+      "version": 5,
+      "array": [
+        4
+      ],
+      "target": 4,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v5-single-below",
+      "version": 5,
+      "array": [
+        4
+      ],
+      "target": 3,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v5-single-above",
+      "version": 5,
+      "array": [
+        4
+      ],
+      "target": 5,
+      "expected_leftmost": 0,
+      "expected_rightmost": 1
+    },
+    {
+      "case_id": "v5-all-equal",
+      "version": 5,
+      "array": [
+        4,
+        4,
+        4
+      ],
+      "target": 4,
+      "expected_leftmost": 0,
+      "expected_rightmost": 2
+    },
+    {
+      "case_id": "v5-float-gap",
+      "version": 5,
+      "array": [
+        -1.5,
+        0.0,
+        0.5,
+        2.5
+      ],
+      "target": 1.0,
+      "expected_leftmost": 2,
+      "expected_rightmost": 3
+    },
+    {
+      "case_id": "v5-negative-gap",
+      "version": 5,
+      "array": [
+        -5,
+        -3,
+        -1
+      ],
+      "target": -2,
+      "expected_leftmost": 1,
+      "expected_rightmost": 2
+    },
+    {
+      "case_id": "v6-interior-gap",
+      "version": 6,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": 3,
+      "expected_leftmost": 2,
+      "expected_rightmost": 3
+    },
+    {
+      "case_id": "v6-duplicates",
+      "version": 6,
+      "array": [
+        4,
+        5,
+        5,
+        5
+      ],
+      "target": 5,
+      "expected_leftmost": 1,
+      "expected_rightmost": 3
+    },
+    {
+      "case_id": "v6-first",
+      "version": 6,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": -2,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v6-last",
+      "version": 6,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": 9,
+      "expected_leftmost": 4,
+      "expected_rightmost": 4
+    },
+    {
+      "case_id": "v6-below",
+      "version": 6,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": -3,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v6-above",
+      "version": 6,
+      "array": [
+        -2,
+        0,
+        1,
+        5,
+        9
+      ],
+      "target": 10,
+      "expected_leftmost": 4,
+      "expected_rightmost": 5
+    },
+    {
+      "case_id": "v6-single-match",
+      "version": 6,
+      "array": [
+        4
+      ],
+      "target": 4,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v6-single-below",
+      "version": 6,
+      "array": [
+        4
+      ],
+      "target": 3,
+      "expected_leftmost": 0,
+      "expected_rightmost": 0
+    },
+    {
+      "case_id": "v6-single-above",
+      "version": 6,
+      "array": [
+        4
+      ],
+      "target": 5,
+      "expected_leftmost": 0,
+      "expected_rightmost": 1
+    },
+    {
+      "case_id": "v6-all-equal",
+      "version": 6,
+      "array": [
+        4,
+        4,
+        4
+      ],
+      "target": 4,
+      "expected_leftmost": 0,
+      "expected_rightmost": 2
+    },
+    {
+      "case_id": "v6-float-gap",
+      "version": 6,
+      "array": [
+        -1.5,
+        0.0,
+        0.5,
+        2.5
+      ],
+      "target": 1.0,
+      "expected_leftmost": 2,
+      "expected_rightmost": 3
+    },
+    {
+      "case_id": "v6-negative-gap",
+      "version": 6,
+      "array": [
+        -5,
+        -3,
+        -1
+      ],
+      "target": -2,
+      "expected_leftmost": 1,
+      "expected_rightmost": 2
+    }
+  ],
+  "derivation": "Exact values select first/last matching indices. Missing values select predecessor (clamped to index zero) or successor (size after final element). Every index is authored directly from the listed array; no SUT or Python bisect output is used.",
+  "sources": [
+    {
+      "path": "rolling-reference-sources.json",
+      "official_v5_payload_module": 91998,
+      "official_v6_payload_module": 42609,
+      "official_v5_description_modules": [
+        384012,
+        329078
+      ],
+      "official_v6_description_modules": [
+        988425,
+        527750
+      ]
+    }
+  ],
+  "limitations": [
+    "Pine v4 availability is not established by these primary sources and must be reviewed separately.",
+    "V5 below-first leftmost boundary is inferred from v6 explicit documentation; v5 source describes predecessor generally.",
+    "Empty arrays, missing/nonfinite values, mixed types, unsorted arrays, object sort_field, and arbitrary duplicate result of ordinary binary_search are outside this table."
+  ]
+}
