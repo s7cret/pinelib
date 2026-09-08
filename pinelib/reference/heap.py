@@ -96,6 +96,7 @@ class RuntimeReferenceHeap:
         self.max_elements = max_elements
         self._objects: dict[str, _HeapObject] = {}
         self._map_iterations: dict[str, int] = {}
+        self._nominal_intrabar_roots: set[str] = set()
 
     @property
     def nominal_registry(self):
@@ -109,7 +110,8 @@ class RuntimeReferenceHeap:
         # Its referenced initial objects must remain addressable after rollback.
         retained: set[str] = set()
         if preserve_varip:
-            pending = [item for item in self._objects.values() if item.working_varip and item.kind == "udt"]
+            pending = [item for item in self._objects.values() if item.working_varip
+                       and (item.kind == "udt" or self._is_nominal_array(item))]
             while pending:
                 item = pending.pop()
                 if item.object_id in retained:
@@ -131,6 +133,8 @@ class RuntimeReferenceHeap:
             item.working_revision = item.committed_revision
             if not preserve_varip:
                 item.working_varip = item.committed_varip
+        self._nominal_intrabar_roots = {key for key, item in self._objects.items()
+                                       if item.working_varip and self._is_nominal_array(item)}
 
     def commit(self) -> None:
         for item in self._objects.values():
@@ -141,6 +145,43 @@ class RuntimeReferenceHeap:
 
     def rollback(self, *, preserve_varip: bool = False) -> None:
         self.begin(preserve_varip=preserve_varip)
+
+    @staticmethod
+    def _is_nominal_array(item: _HeapObject) -> bool:
+        descriptor = item.type_descriptor
+        return item.kind == "array" and (descriptor.startswith("udt:") or descriptor.startswith("array<udt:"))
+
+    def _validate_nominal_intrabar_graph(self, *, roots=(), override=None) -> None:
+        """Check typed nodes without promoting referents or materializing views.
+
+        Work is bounded by the heap's existing object/element limits. Both
+        constructor and working edges matter for newly retained UDTs. A legal
+        backing shrink may temporarily invalidate a view's upper bound; normal
+        slice access/restore owners enforce that separate invariant.
+        """
+        from pinelib.reference.persistence import validate_collection_payload
+        pending = [self._objects[key] for key in set(roots) | self._nominal_intrabar_roots
+                   if self._is_nominal_array(self._objects[key])]
+        visited = set()
+        while pending:
+            item = pending.pop()
+            if item.object_id in visited:
+                continue
+            visited.add(item.object_id)
+            for committed, payload in ((True, item.committed), (False,
+                    override[1] if override is not None and override[0] == item.object_id else item.working)):
+                decoded = self._decode_value(payload)
+                if item.kind == "udt":
+                    self._validate_udt_payload(item, decoded)
+                else:
+                    descriptor = self._array_slice_descriptor(decoded) if item.kind == "array" else None
+                    if descriptor is not None:
+                        parent = self._get(descriptor[0])
+                        if parent.kind != "array" or parent.type_descriptor != item.type_descriptor:
+                            raise PineRuntimeError("nominal field slice/backing type mismatch", code=PL_REFERENCE_TYPE)
+                    else:
+                        validate_collection_payload(item.kind, item.type_descriptor, decoded, self.language.pine_version, heap=self)
+                pending.extend(self._get(handle) for handle in self._reference_handles(payload))
 
     def retain_intrabar(self, handle: ReferenceHandle) -> None:
         """Promote a typed collection and its slice backing as one validated change.
@@ -170,9 +211,12 @@ class RuntimeReferenceHeap:
             marked.add(item.object_id)
             if parent is not None:
                 pending.append(parent)
+        self._validate_nominal_intrabar_graph(roots=marked)
         # No flags are changed until every backing object has passed validation.
         for object_id in marked:
             self._objects[object_id].working_varip = True
+            if self._is_nominal_array(self._objects[object_id]):
+                self._nominal_intrabar_roots.add(object_id)
 
     def _validate_intrabar_payload(self, item: _HeapObject, payload: object) -> ReferenceHandle | None:
         from pinelib.reference.persistence import validate_collection_payload
@@ -187,7 +231,7 @@ class RuntimeReferenceHeap:
                     raise PineRuntimeError("varip slice/backing type mismatch", code=PL_REFERENCE_TYPE)
                 # The parent is validated separately; validate the window as well.
                 payload = self._materialize(ReferenceHandle(item.object_id, "array"), committed=False, active=set())
-        validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version)
+        validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version, heap=self)
         return parent
 
     def validate_intrabar_binding(self, value: object, *, committed: bool = False) -> None:
@@ -458,7 +502,8 @@ class RuntimeReferenceHeap:
         self._validate_nominal_payload(item, payload)
         if item.working_varip and item.kind != "udt":
             from pinelib.reference.persistence import validate_collection_payload
-            validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version)
+            validate_collection_payload(item.kind, item.type_descriptor, payload, self.language.pine_version, heap=self)
+        self._validate_nominal_intrabar_graph(override=(item.object_id, payload))
         descriptor = self._array_slice_descriptor(item.working)
         if descriptor is not None:
             if not isinstance(payload, list):
@@ -667,7 +712,9 @@ class RuntimeReferenceHeap:
 
     def _reference_handles(self, value: object) -> list[ReferenceHandle]:
         handles: list[ReferenceHandle] = []
-        if isinstance(value, dict):
+        if isinstance(value, ReferenceHandle):
+            handles.append(value)
+        elif isinstance(value, dict):
             if "$pinelib_ref" in value:
                 if set(value) != {"$pinelib_ref"}:
                     raise PineRuntimeError(
@@ -807,6 +854,8 @@ class RuntimeReferenceHeap:
                     raise PineRuntimeError("invalid intrabar persistence checkpoint")
                 item.committed_varip = persistence["committed"]
                 item.working_varip = persistence["working"]
+                if heap._is_nominal_array(item):
+                    heap._nominal_intrabar_roots.add(object_id)
         heap._loading_checkpoint = False
         heap._validate_closed_graph()
         for item in heap._objects.values():
@@ -830,6 +879,7 @@ class RuntimeReferenceHeap:
                         validate_collection_payload,
                     )
                     committed = heap._materialize(ReferenceHandle(item.object_id, item.kind), committed=True, active=set())
-                    validate_collection_payload(item.kind, item.type_descriptor, committed, language.pine_version)
+                    validate_collection_payload(item.kind, item.type_descriptor, committed, language.pine_version, heap=heap)
+        heap._validate_nominal_intrabar_graph()
         heap._transient_slice_bounds = False
         return heap

@@ -1,0 +1,1990 @@
+{
+  "cases": [
+    {
+      "checkpoint": {
+        "content_hash": "sha256:979d5d78c269f30af8ec438ccb4ee119ff52a59aaee1f0155a69ed0fb770fb1b",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.highest",
+              "schema_version": "ta.highest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:a68b56f1e84fb8ba99d58b00cf62fcd8544ecc2d98c25acd86c116deb2b75f91",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:c7407b2f666db6e1323631b834d0610af32517b9b43ff4b98e8b1a1d24e2df46",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:9d7259c0a7d85bdee3df1d8d32d6e0615b8a13c59d7d2a99a23a7c0c9401a1fb",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:b91cfb5310dc3c4d717c428d9ae7ebe986d30efa83969411214e9ae81cfe6eb5",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "highest",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:94a1da7a68fb2b7ffe115bd6712b445c08a40186eb7ccadda3c2f73102578eb3",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.lowest",
+              "schema_version": "ta.lowest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:505a6367b8f2ed9aafed74f8796abdb081d8dd68b5fae5b1d635240837305d22",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:86eb76594dc9d8d17a7065368e1b49d24ec21bf33742436d8a8a53e17ee52684",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:7e65d2b06c475f87977a0e13998555559315b644b34ccea394a801f5725456eb",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:9731adef73b29a1012994fa077cba1720cb6a33e237f882b05fda62423d9d6d5",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "lowest",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:5945e9d9516ca59651f9589b77c6cb220a4133c52ad16dc465875b9ce255b548",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.variance",
+              "schema_version": "ta.variance.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:a94cbb9a2d7f7e57a9695f429c284f1ea7f8cbdd6f77400165df268ff84a6c35",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:0745b0fa165e5f7747420a6af0bb44c3961973c7f449829dc2d74dc066d9f032",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:9a5df704d0310ec6b0a35517354c1fcf92093847657fd39e70dfc9877f485e63",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:4e6af8ead6200195cef396c1b29e544cb2d0e5807498fa87060569a54aeda3a7",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "variance",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:4fc0faa4afaee0eda33202e231ff69182813f5281f04ecfdb83c4aebd77c8da3",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.stdev",
+              "schema_version": "ta.stdev.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:fdb7a59001e85cd54db947acb254671364ec295a513aac3aa1026eb2859e8523",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:933b3a5adb3e4e745213cef23c102314d0d5b7884df4e665c26c89a76849858f",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:025941e237a0b153dc19e8a1f0f65b86a7c2c60aa34627f5f5f92866b1622f20",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:715679a4796a9e7b1309e7cb24607b5e154a2e78aa313553fbade10faf2e2655",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "stdev",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:76b63f8d9ea4d4dc8888ac0e1f94e0aea5053cc2854794b0e73456cb73be7c89",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.highest",
+              "schema_version": "ta.highest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:baf7557f368b13c880153ef652613e2a106eef8134ec67377e06ad10051197dc",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:599c82d50aae1c5ddd84b97c8917c9d9ca6b8bd4bb5ac14f701febb525b88fc6",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:41fec6c32fbcf4c98dd782a672353f5d52c96928181394ba822e17de54852cc9",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:1a728e1865ec6ebd0330dccf2171e7a35706dbd36dd08819c0ac5d8429e738eb",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "highest",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:d90a96ea327851a8be5d0dc54e5cf8337b34827a4cd168187e8afc468b85e8bb",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.lowest",
+              "schema_version": "ta.lowest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:33d7356281824ae1c081159b90a64923f046e7919f4efa8daac57a422b597d80",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:aff8081edc665855befcf804008e1aa2e2ab38349c032a0a0ac7d263d99ec73d",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:7b421d28c250c75d18ecbcd4b7026aad02cf73f8d53dad5666adbbb064887f20",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:f23825b153221e0bf1378692c1ed71635fdb1faa626c10dfc8ca7deaa34e0a2a",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "lowest",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:fae7c73887e87dc48403529ce72c3272ad6a14dda21ea700e001511286e51916",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.variance",
+              "schema_version": "ta.variance.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:06b98067cccc883d3bbabd7e8692c0c5af3fed642dff24d6a2444d98bf1d498c",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:053dcb79b1b3603da8b00dec10f152d683f68de304e93536ee6a3564f652a269",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:5c8232a06b6275c0a3e07c7eab5ca2f34a7f61f0333af27f3c379b2bd8372582",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:7ce88303c4014bcdaa3cad0a0dff24380bfa7b37102ec8dfbf072d1c0e6503b4",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "variance",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:0bbeb6f236aeacd0ebebc21ebcdb30fc2fa1fdc8de9b182a424ce80ae48f6130",
+        "identity_hash": "sha256:06dce31d37299ca19767395c98a43e98521eac0e38dffeda7a0e86ececa03b47",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.stdev",
+              "schema_version": "ta.stdev.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:1f5f78039ac44c2c67f31f1535d0461de706a9e444238f233b1812d78e38dd60",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:aabefffd524125de30448f8a811dd248317a7f27ce29382f35047ddb0b49a58a",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:1647d785ac92f05c96e47d4a0ff38db154fd072a9bffa3e3479ac759ca5be2d8",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:4b5e2d9f6b6719a45b095e584af941db1fc312597df90cb7e706551c5f5f276f",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "stdev",
+      "version": 5
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:2f0b87f6718ebd92c45b88e232fae4c13e8f762dadf09c8590b4f6b66a251c82",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.highest",
+              "schema_version": "ta.highest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:a68b56f1e84fb8ba99d58b00cf62fcd8544ecc2d98c25acd86c116deb2b75f91",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:c7407b2f666db6e1323631b834d0610af32517b9b43ff4b98e8b1a1d24e2df46",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:9d7259c0a7d85bdee3df1d8d32d6e0615b8a13c59d7d2a99a23a7c0c9401a1fb",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:b91cfb5310dc3c4d717c428d9ae7ebe986d30efa83969411214e9ae81cfe6eb5",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "highest",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:1128567d015af1b1fa41092d54f64ff23b478ab10eb771a897b39a49002b3e10",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.lowest",
+              "schema_version": "ta.lowest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:505a6367b8f2ed9aafed74f8796abdb081d8dd68b5fae5b1d635240837305d22",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:86eb76594dc9d8d17a7065368e1b49d24ec21bf33742436d8a8a53e17ee52684",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:7e65d2b06c475f87977a0e13998555559315b644b34ccea394a801f5725456eb",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:9731adef73b29a1012994fa077cba1720cb6a33e237f882b05fda62423d9d6d5",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "lowest",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:f569b68c585cc05207f567f0089aa9c94a00eb89bf354cd5b78a732d714b03e5",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.variance",
+              "schema_version": "ta.variance.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:a94cbb9a2d7f7e57a9695f429c284f1ea7f8cbdd6f77400165df268ff84a6c35",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:0745b0fa165e5f7747420a6af0bb44c3961973c7f449829dc2d74dc066d9f032",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:9a5df704d0310ec6b0a35517354c1fcf92093847657fd39e70dfc9877f485e63",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:4e6af8ead6200195cef396c1b29e544cb2d0e5807498fa87060569a54aeda3a7",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "variance",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:6b77da9946b1f694a626778f604102bd61f9317cd3c3739218ae7f5bfa90d841",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.stdev",
+              "schema_version": "ta.stdev.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:fdb7a59001e85cd54db947acb254671364ec295a513aac3aa1026eb2859e8523",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:933b3a5adb3e4e745213cef23c102314d0d5b7884df4e665c26c89a76849858f",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:025941e237a0b153dc19e8a1f0f65b86a7c2c60aa34627f5f5f92866b1622f20",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:715679a4796a9e7b1309e7cb24607b5e154a2e78aa313553fbade10faf2e2655",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v1",
+            "schema_version": "1.1.0"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": false,
+      "function": "stdev",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:a929ae0519cc92e74f296c3041f20f73bf1645b0c975ef8fee4316722e6ca5d4",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.highest",
+              "schema_version": "ta.highest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.highest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:e2c8afdd8a97ffec35c989f3af69a642f936b6ebdaa87a60f1d83ef76f016498",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:44a100446594da8a2c425885f2f277c386787639b723f96883fe7846fea03273",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:615114731074c8e2039b671f6905194bcc1270049736d96601270217cc987bca",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:ebe46dbb1b1f0706a8ff8403a0398098fa7a90f926c2bdb0139e9fc01e9f6975",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "highest",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:d99faa2c2a910e7ea5817a9814d8b9e8474808550695d426f204195491ab52bb",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.lowest",
+              "schema_version": "ta.lowest.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.lowest",
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:20fa00344eecdc802cb8733310cb80f68767922d9aa5c0ee2e32066ca7a4804d",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:2196605efdf6beee29013139df36e0bd1b3259fdbe6a042bdeb40537d4d71244",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:5c4b3ea1d47d637cf1e4604c11a7b7d30d91aaf94d0247b6a38130d90abf467f",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:bf6ced9fe02dd5ef692a838f7d78ffa7801c2df515d3b694453e32fa3ed00617",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "lowest",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:ccb5ca49422d67183ebe48e1ab9a11ab59dce7e00b0dceb484e6f846d9e33665",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.variance",
+              "schema_version": "ta.variance.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.variance",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:46677530d73c4936e56a29181989322d1b48059c1610d778b6383b73ff2f984c",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:8f0a8d480a75431687c7bab979b6e3681f517ef6c5c02769d36a7b438764702f",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:b30ae333011c2a750f91145ca86227ccb80bacf283f4b5b7eef6a90e3a28455e",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:93a5498737c176f75dfa2b7db82d7a6d37c50aac9cb7d3c115c74f113b04500c",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "variance",
+      "version": 6
+    },
+    {
+      "checkpoint": {
+        "content_hash": "sha256:1b2f9df559e2d242975f216855221d0796dcd795220118fde7a4d128f7fa20b3",
+        "identity_hash": "sha256:ae8c5a3025f56cbb7b4ad65d977052d429abdf1d655dac56794779614c2dae27",
+        "schema_id": "openpine.runtime_checkpoint.v1",
+        "schema_version": "1.1.0",
+        "state": {
+          "alerts": {
+            "committed": [],
+            "working": []
+          },
+          "references": {
+            "objects": []
+          },
+          "requests": {
+            "evaluators": [],
+            "provider_identity": {
+              "provider": null,
+              "provider_hash": null
+            },
+            "registry": {
+              "cursors": [],
+              "datasets": [],
+              "discovery": []
+            },
+            "static_contexts": []
+          },
+          "sequence": 2,
+          "series": {},
+          "slots": [
+            {
+              "committed": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              },
+              "committed_exists": true,
+              "owner": "ta.stdev",
+              "schema_version": "ta.stdev.state.v1",
+              "state_id": "legacy",
+              "varip": false,
+              "working": {
+                "kernel": "ta.stdev",
+                "parameters": {
+                  "biased": true
+                },
+                "values": [
+                  9.0,
+                  3.0
+                ]
+              }
+            }
+          ],
+          "transcript": {
+            "content_hash": "sha256:786bbc2a978752c887ee3c8beb8df7ae4ffe4e68dcc09a1e5065c644ce4cc83d",
+            "entries": [
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 0,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 0,
+                "state_hash": "sha256:4f4d38bfb313115770138d57937ffecfb3d2d45d2e8e2e586e445e63a807cf2b",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 1,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 1,
+                "state_hash": "sha256:06e3eb7562b7513363c918c5952ae221cde662b01028b040db12fbd597d5cdde",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              },
+              {
+                "alert_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e",
+                "bar_index": 2,
+                "committed": true,
+                "control": {
+                  "bar_commit_mode": "callback",
+                  "boundary": "callback"
+                },
+                "final_tick": true,
+                "phase": "HISTORICAL_EVAL",
+                "projection_hash": null,
+                "realtime": false,
+                "sequence": 2,
+                "state_hash": "sha256:fbe1a2c656df63004a6b41a35b9dd94691b7d8cc31afedb3e0bc045ade6e16d7",
+                "tick_index": 0,
+                "visual_batch_hash": "sha256:24de1c4a19c43ad41b013f13dcd858c17b0daa7f33a53f19913e5b11366d1c2e"
+              }
+            ],
+            "schema_id": "openpine.runtime_transcript.v2",
+            "schema_version": "2.1.0",
+            "state_hash_algorithm": "pinelib.semantic-state.merkle.v1"
+          },
+          "visuals": {
+            "committed": [],
+            "working": []
+          }
+        }
+      },
+      "compact": true,
+      "function": "stdev",
+      "version": 6
+    }
+  ],
+  "input": [
+    9.0,
+    {
+      "$pine": "na"
+    },
+    3.0
+  ],
+  "kernel_sha256": "2479744cfec85bf35b46e290bdab601e252bf3c09071b135bada785f10839b14",
+  "length": 2,
+  "schema_id": "pinelib.test.rolling_state_legacy_capture.v1"
+}

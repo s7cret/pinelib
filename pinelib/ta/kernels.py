@@ -8,7 +8,7 @@ from itertools import pairwise
 from typing import TypeVar, cast
 
 from pinelib.core.values import is_na, na, require_number
-from pinelib.errors import PL_TA_KERNEL, PL_TA_STATE, PineRuntimeError
+from pinelib.errors import PL_RESOURCE_LIMIT, PL_TA_KERNEL, PL_TA_STATE, PineRuntimeError
 from pinelib.runtime.session import RuntimeTransaction
 from pinelib.ta.types import (
     BandsResult,
@@ -51,8 +51,8 @@ KERNEL_SPECS: tuple[KernelSpec, ...] = (
     KernelSpec("ta.pivotlow", "trend", "ta.pivotlow.state.v1", 1, "propagate_na"),
     KernelSpec("ta.rising", "trend", "ta.rising.state.v1", 1, "ignore_na"),
     KernelSpec("ta.falling", "trend", "ta.falling.state.v1", 1, "ignore_na"),
-    KernelSpec("ta.highest", "trend", "ta.highest.state.v1", 1, "ignore_na"),
-    KernelSpec("ta.lowest", "trend", "ta.lowest.state.v1", 1, "ignore_na"),
+    KernelSpec("ta.highest", "trend", "ta.highest.state.v2", 1, "ignore_na"),
+    KernelSpec("ta.lowest", "trend", "ta.lowest.state.v2", 1, "ignore_na"),
     KernelSpec("ta.highestbars", "trend", "ta.highestbars.state.v1", 1, "ignore_na"),
     KernelSpec("ta.lowestbars", "trend", "ta.lowestbars.state.v1", 1, "ignore_na"),
     KernelSpec("ta.variance", "statistics", "ta.variance.state.v1", 1, "ignore_na"),
@@ -117,7 +117,8 @@ def _state(
     state = tx.state(
         state_id,
         owner=symbol,
-        schema_version=spec.state_schema,
+        schema_version=(symbol + ".state.v1" if symbol in {"ta.highest", "ta.lowest"}
+                        and tx.session.language.pine_version < 5 else spec.state_schema),
         initial={"kernel": symbol, **initial},
     )
     if not isinstance(state, dict) or state.get("kernel") != symbol:
@@ -1132,13 +1133,36 @@ def _extreme(
 def highest(
     tx: RuntimeTransaction, state_id: str, source: object, length: int
 ) -> object:
-    return _extreme(tx, state_id, "ta.highest", source, length, True, False)
+    if tx.session.language.pine_version < 5:
+        return _extreme(tx, state_id, "ta.highest", source, length, True, False)
+    return _bar_extreme(tx, state_id, "ta.highest", source, length, True)
 
 
 def lowest(
     tx: RuntimeTransaction, state_id: str, source: object, length: int
 ) -> object:
-    return _extreme(tx, state_id, "ta.lowest", source, length, False, False)
+    if tx.session.language.pine_version < 5:
+        return _extreme(tx, state_id, "ta.lowest", source, length, False, False)
+    return _bar_extreme(tx, state_id, "ta.lowest", source, length, False)
+
+
+def _bar_extreme(tx, state_id, symbol, source, length, highest_mode):
+    from pinelib.ta.state import validate_extrema_payload
+
+    length = _length(length)
+    number = _number(source)
+    limit = tx.session.policies.resource.max_collection_elements
+    if length > limit:
+        raise PineRuntimeError("extrema requested history limit exceeded", code=PL_RESOURCE_LIMIT)
+    state = _state(tx, state_id, symbol, {"bars": []})
+    bars = validate_extrema_payload(symbol, state, limit)
+    if len(bars) >= limit:
+        raise PineRuntimeError("extrema retained history limit exceeded", code=PL_RESOURCE_LIMIT)
+    bars.append(na if number is None else number)
+    if len(bars) < length:
+        return na
+    values = [value for value in bars[-length:] if not is_na(value)]
+    return (max(values) if highest_mode else min(values)) if values else na
 
 
 def highestbars(
@@ -1174,9 +1198,7 @@ def variance(
     length: int,
     biased: bool = True,
 ) -> object:
-    _, values = _stat_values(
-        tx, state_id, "ta.variance", source, length, biased=bool(biased)
-    )
+    _, values = _estimate_values(tx, state_id, "ta.variance", source, length, biased)
     if len(values) < length or (not biased and length < 2):
         return na
     mean = _sma_values(values)
@@ -1191,14 +1213,28 @@ def stdev(
     length: int,
     biased: bool = True,
 ) -> object:
-    _, values = _stat_values(
-        tx, state_id, "ta.stdev", source, length, biased=bool(biased)
-    )
+    _, values = _estimate_values(tx, state_id, "ta.stdev", source, length, biased)
     if len(values) < length or (not biased and length < 2):
         return na
     mean = _sma_values(values)
     denominator = length if biased else length - 1
     return math.sqrt(math.fsum((value - mean) ** 2 for value in values) / denominator)
+
+
+def _estimate_values(tx, state_id, symbol, source, length, biased):
+    if tx.session.language.pine_version < 5:
+        return _stat_values(tx, state_id, symbol, source, length, biased=bool(biased))
+    if type(biased) is not bool:
+        raise PineRuntimeError("biased must be an exact ABI bool", code=PL_TA_KERNEL)
+    length = _length(length)
+    _number(source)  # Validate arguments before creating a state slot.
+    state = _state(tx, state_id, symbol, {})
+    initial_mode = state.setdefault("parameters", {"biased": biased})
+    if (type(initial_mode) is not dict or set(initial_mode) != {"biased"}
+            or type(initial_mode["biased"]) is not bool):
+        raise PineRuntimeError("invalid estimate initial-mode metadata", code=PL_TA_STATE)
+    # Preserve legacy v1 metadata for round trips, without freezing the divisor.
+    return state, _rolling_non_na(state, "values", source, length, dynamic_length=True)
 
 
 def dev(tx: RuntimeTransaction, state_id: str, source: object, length: int) -> object:
