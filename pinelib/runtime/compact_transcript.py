@@ -45,7 +45,7 @@ class CompactRuntimeTranscript(RuntimeTranscript):
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_id": "openpine.runtime_transcript.v2",
-            "schema_version": "2.0.0",
+            "schema_version": "2.1.0" if self.control_mode is not None else "2.0.0",
             "state_hash_algorithm": ALGORITHM,
             "entries": to_portable(list(self.entries)),
             "content_hash": self.content_hash,
@@ -65,7 +65,7 @@ class CompactRuntimeTranscript(RuntimeTranscript):
             )
         if (
             data["schema_id"] != "openpine.runtime_transcript.v2"
-            or data["schema_version"] != "2.0.0"
+            or data["schema_version"] not in ("2.0.0", "2.1.0")
             or data["state_hash_algorithm"] != ALGORITHM
             or not isinstance(data["entries"], list)
         ):

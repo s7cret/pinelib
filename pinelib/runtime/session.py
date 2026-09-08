@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, fields, replace
 
 from pinelib.core.values import na, pine_binary, pine_unary
 from pinelib.errors import (
@@ -34,6 +34,7 @@ from pinelib.runtime.metadata import (
     TimeframeContext,
 )
 from pinelib.runtime.policies import RuntimePolicies
+from pinelib.runtime.pending_abort import AbortBaseline, validate_abort_attempt
 from pinelib.runtime.semantic import ALGORITHM, semantic_state_digest
 from pinelib.runtime.state_machine import RuntimeState, RuntimeStateMachine
 from pinelib.runtime.transcript import RuntimeTranscript
@@ -692,6 +693,9 @@ class RuntimeSession:
         self._pending_bar_frame: CallbackFrame | None = None
         self._last_published_bar: int | None = None
         self._deferred_mode: bool | None = None
+        self._pending_abort: dict[str, object] | None = None
+        self._pending_abort_attempt_bytes = 0
+        self._abort_baseline: AbortBaseline | None = None
         self.machine.transition(RuntimeState.ADMITTED)
         self.machine.transition(RuntimeState.INITIALIZED)
         self.requests.bind_parent_identity(self.identity_hash)
@@ -722,6 +726,7 @@ class RuntimeSession:
     def begin(
         self, frame: CallbackFrame, *, values: BarValues | None = None
     ) -> RuntimeTransaction:
+        preattempt = AbortBaseline(self)
         if type(self.commit_full_identity) is not bool:
             raise PineRuntimeError("commit_full_identity must be boolean")
         if self._identity_mode is None:
@@ -765,6 +770,9 @@ class RuntimeSession:
                 # normal variables; no past chart-bar history was committed.
                 self.requests.finish(persist=False)
                 self._pending_bar_frame = None
+        # Preserve mutable successful values before begin rolls them back. Growing
+        # append-only histories are serialized only if the attempt aborts.
+        self._abort_baseline = preattempt
         self._deferred_mode = frame.defer_bar_commit
         if frame.phase == "ORDER_FILL_RECALC":
             target = RuntimeState.FILL_RECALC
@@ -773,13 +781,7 @@ class RuntimeSession:
         else:
             target = RuntimeState.HISTORICAL_CALLBACK
         self.machine.transition(target)
-        for storage in self.series.values():
-            storage.begin()
-        self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.references.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.visuals.begin()
-        self.alerts.begin()
-        self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
+        self._begin_segments(frame)
         transaction = RuntimeTransaction(self, frame)
         self._active = transaction
         if values is not None:
@@ -789,7 +791,37 @@ class RuntimeSession:
             transaction.set_series("time_close", values.time_close, "int")
         return transaction
 
-    def _finish(self, transaction: RuntimeTransaction, commit: bool) -> CallbackResult:
+    def _begin_segments(self, frame):
+        """Shared begin projection; it never executes an evaluator or callback."""
+        for storage in self.series.values():
+            storage.begin()
+        self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
+        self.references.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
+        self.visuals.begin()
+        self.alerts.begin()
+        self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
+
+    def _rollback_segments(self, frame, new_series):
+        """The actual abort projection, shared with scratch proof replay."""
+        preserve_varip = frame.realtime or frame.defer_bar_commit
+        retained_declarations = set()
+        if preserve_varip:
+            for row in self.slots.to_json():
+                prefix = ("reference-binding:" if row["owner"] == "ast2python.reference.v1"
+                          else "enum-binding:" if row["owner"] == "ast2python.enum.v1" else None)
+                if prefix and row["varip"] and row["state_id"].startswith(prefix):
+                    retained_declarations.add(row["state_id"][len(prefix):])
+        for name in set(new_series) - retained_declarations:
+            self.series.pop(name, None)
+        for storage in self.series.values():
+            storage.rollback()
+        self.slots.rollback(preserve_varip=preserve_varip)
+        self.references.rollback(preserve_varip=preserve_varip)
+        self.visuals.rollback()
+        self.alerts.rollback()
+        self.requests.finish(persist=False)
+
+    def _finish(self, transaction: RuntimeTransaction, commit: bool, *, publish_bar: bool = False) -> CallbackResult:
         if self._active is not transaction:
             raise PineRuntimeError(
                 "transaction is not active", code=PL_RUNTIME_TRANSACTION_CLOSED
@@ -801,6 +833,8 @@ class RuntimeSession:
         visual_hash = self.visuals.working_hash
         alert_hash = self.alerts.working_hash
         if commit:
+            self._pending_abort = None
+            self._pending_abort_attempt_bytes = 0
             self.machine.transition(RuntimeState.COMMITTING)
             if frame.defer_bar_commit:
                 # Leave working values available for BAR_COMMIT. The next
@@ -819,20 +853,57 @@ class RuntimeSession:
             self.machine.transition(RuntimeState.COMMITTED)
             self.sequence = frame.sequence
         else:
-            for name in transaction._new_series:
-                self.series.pop(name, None)
-            for storage in self.series.values():
-                storage.rollback()
-            self.slots.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
-            self.references.rollback(preserve_varip=frame.realtime or frame.defer_bar_commit)
-            self.visuals.rollback()
-            self.alerts.rollback()
-            self.requests.finish(persist=False)
+            attempted_state = self._state_json()
+            successful_state = (self._pending_abort["successful_state"] if self._pending_abort is not None
+                                else self._abort_baseline.materialize(self))
+            previous_attempts = self._pending_abort["attempts"] if self._pending_abort is not None else []
+            self._rollback_segments(frame, transaction._new_series)
             self.machine.transition(RuntimeState.ABORTED)
         self._active = None
         state_hash = (
             self.state_hash if self.commit_full_identity else self.semantic_state_hash
         )
+        if not commit:
+            successful_state["requests"] = self.requests.to_json()
+            control_changed = (frame.defer_bar_commit and
+                               (self._abort_baseline.deferred_mode is None or self._abort_baseline.pending_bar_frame is not None))
+            needs_abort_evidence = (control_changed or self._pending_abort is not None
+                                    or self._state_json() != successful_state)
+            record = {
+                "schema_id": "pinelib.pending_abort.v1",
+                "transcript_hash": self.transcript.content_hash,
+                "state_hash_algorithm": "pinelib.snapshot-json.v1" if self.commit_full_identity else ALGORITHM,
+                "state_hash": state_hash,
+                "successful_state": successful_state,
+                "attempts": [],
+            }
+            if needs_abort_evidence:
+                witness = {"frame": asdict(frame), "attempted_state": attempted_state,
+                           "new_series": sorted(transaction._new_series)}
+                attempt_bytes = self._pending_abort_attempt_bytes + len(canonical_json(witness))
+                # Hash strings have a fixed canonical width. Count the complete
+                # envelope with an empty attempts list, then add exact witness
+                # bytes and separators. Previous witnesses are not re-encoded.
+                skeleton = {"schema_id": "openpine.runtime_checkpoint.v1", "schema_version": "1.1.0",
+                    "identity_hash": self.identity_hash,
+                    "state": {**self._state_json(), "transcript": self.transcript.to_dict(), "pending_abort": record},
+                    "content_hash": "sha256:" + "0" * 64}
+                size = len(canonical_json(skeleton)) + attempt_bytes + len(previous_attempts)
+                if size > self.policies.resource.max_checkpoint_bytes:
+                    self._abort_baseline.restore_rejected_attempt(self)
+                    self._abort_baseline = None
+                    raise PineRuntimeError("pending abort witness exceeds checkpoint byte budget", code=PL_RESOURCE_LIMIT)
+                record["attempts"] = [*previous_attempts, witness]
+                self._pending_abort = record
+                self._pending_abort_attempt_bytes = attempt_bytes
+            else:
+                self._pending_abort = None
+                self._pending_abort_attempt_bytes = 0
+            if not needs_abort_evidence:
+                # A transaction with no persistent effect cannot establish a new
+                # control mode. Its ordinary checkpoint remains byte-compatible.
+                self._deferred_mode = self._abort_baseline.deferred_mode
+        self._abort_baseline = None
         revision_fingerprint = sha(
             {
                 "algorithm": "pinelib.revision-fingerprint.v1",
@@ -856,6 +927,8 @@ class RuntimeSession:
                     "state_hash": state_hash,
                     "visual_batch_hash": visual_hash,
                     "alert_batch_hash": alert_hash,
+                    "control": {"bar_commit_mode": "deferred" if self._deferred_mode else "callback",
+                                "boundary": "bar_commit" if publish_bar else "callback"},
                 }
             )
         transcript_hash = self.transcript.content_hash
@@ -911,7 +984,7 @@ class RuntimeSession:
             if frame.realtime
             else RuntimeState.HISTORICAL_CALLBACK
         )
-        result = self._finish(transaction, True)
+        result = self._finish(transaction, True, publish_bar=True)
         self._pending_bar_frame = None
         self._last_published_bar = bar_index
         return result
@@ -964,6 +1037,8 @@ class RuntimeSession:
             **self._state_json(),
             "transcript": self.transcript.to_dict(),
         }
+        if self._pending_abort is not None:
+            checkpoint_state["pending_abort"] = self._pending_abort
         checkpoint = RuntimeCheckpoint.seal(self.identity_hash, checkpoint_state)
         if (
             len(canonical_json(checkpoint.to_dict()))
@@ -1096,39 +1171,85 @@ class RuntimeSession:
                 child._restore_checkpoint(saved, validate_children=False)
                 pending.append((child, child.requests, depth + 1))
 
-    def _restore_checkpoint(self, data, *, validate_children):
-        if self._active is not None or self._pending_bar_frame is not None:
-            raise PineRuntimeError("cannot restore an active or provisional bar")
-        checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
-        # Segment parsers own NA/reference decoding and portable round-trip checks.
-        state = checkpoint.state
-        if not isinstance(state, dict):
-            raise PineRuntimeError("checkpoint state must decode to an object")
-        required_state = {
-            "sequence",
-            "series",
-            "slots",
-            "references",
-            "visuals",
-            "alerts",
-            "requests",
-            "transcript",
-        }
-        if set(state) != required_state:
-            raise PineRuntimeError(
-                "checkpoint runtime schema mismatch", code=PL_CHECKPOINT_INVALID
-            )
+    def _restore_scratch(self):
+        return RuntimeSession(self.language, self.policies, inputs=self.inputs,
+            instrument=self.instrument, timeframe=self.timeframe, request_provider=self.requests.provider,
+            nominal_registry=self.nominal_registry)
+
+    def _admit_pending_abort(self, record, candidate, transcript, expected_state_hash):
+        required = {"schema_id", "transcript_hash", "state_hash_algorithm", "state_hash", "successful_state", "attempts"}
+        runtime_fields = {"sequence", "series", "slots", "references", "visuals", "alerts", "requests"}
+        if (type(record) is not dict or set(record) != required
+                or record["schema_id"] != "pinelib.pending_abort.v1"
+                or type(record["successful_state"]) is not dict
+                or set(record["successful_state"]) != runtime_fields
+                or type(record["attempts"]) is not list or not record["attempts"]):
+            raise PineRuntimeError("pending abort schema mismatch", code=PL_CHECKPOINT_INVALID)
+        algorithm = ALGORITHM if isinstance(transcript, CompactRuntimeTranscript) else "pinelib.snapshot-json.v1"
+        if (record["transcript_hash"] != transcript.content_hash
+                or record["state_hash_algorithm"] != algorithm
+                or record["state_hash"] != expected_state_hash):
+            raise PineRuntimeError("pending abort anchor mismatch", code=PL_CHECKPOINT_INVALID)
+        baseline = self._restore_scratch()
+        if not transcript.entries and record["successful_state"] != baseline._state_json():
+            raise PineRuntimeError("pending abort initial state is not empty", code=PL_CHECKPOINT_INVALID)
+        saved_baseline = RuntimeCheckpoint.seal(self.identity_hash,
+            {**record["successful_state"], "transcript": transcript.to_dict()})
+        baseline._restore_checkpoint(saved_baseline.to_dict(), validate_children=False)
+        established_mode = baseline._deferred_mode
+        initial_mode = established_mode
+        published_bar = baseline._last_published_bar
+        previous = baseline
+        last = transcript.entries[-1] if transcript.entries else None
+        provisional_bar = (last["bar_index"] if last is not None and last.get("control") ==
+                           {"bar_commit_mode": "deferred", "boundary": "callback"} else None)
+        for index, witness in enumerate(record["attempts"]):
+            if (type(witness) is not dict or set(witness) != {"frame", "attempted_state", "new_series"}
+                    or type(witness["frame"]) is not dict
+                    or set(witness["frame"]) != {field.name for field in fields(CallbackFrame)}):
+                raise PineRuntimeError("pending abort attempt schema mismatch", code=PL_CHECKPOINT_INVALID)
+            try:
+                frame = CallbackFrame(**witness["frame"])
+            except (TypeError, PineRuntimeError) as error:
+                raise PineRuntimeError("pending abort frame is invalid", code=PL_CHECKPOINT_INVALID) from error
+            if (frame.sequence <= candidate.sequence
+                    or (established_mode is not None and frame.defer_bar_commit != established_mode)
+                    or (frame.defer_bar_commit and published_bar is not None and frame.bar_index <= published_bar)
+                    or (index == 0 and provisional_bar is not None and frame.bar_index != provisional_bar)):
+                raise PineRuntimeError("pending abort frame differs from bound control", code=PL_CHECKPOINT_INVALID)
+            established_mode = frame.defer_bar_commit
+            previous._begin_segments(frame)
+            attempted = self._decode_runtime_state(witness["attempted_state"], attempted=True)
+            validate_abort_attempt(previous, attempted, witness["new_series"], frame)
+            # Request witnesses contain committed state only. Open its scratch
+            # transaction so the same rollback owner can discard that attempt.
+            attempted.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
+            attempted._rollback_segments(frame, witness["new_series"])
+            control_changed = frame.defer_bar_commit and (initial_mode is None or provisional_bar is not None)
+            if index == 0 and not control_changed and attempted._state_json() == record["successful_state"]:
+                raise PineRuntimeError("pending abort witness has no retained effect", code=PL_CHECKPOINT_INVALID)
+            previous = attempted
+        if previous._state_json() != candidate._state_json():
+            raise PineRuntimeError("pending abort state differs from replayed rollback", code=PL_CHECKPOINT_INVALID)
+        return frame, baseline
+
+    def _decode_runtime_state(self, state, *, attempted=False):
+        """Decode closed runtime segments into scratch owners, without a transcript.
+
+        This private owner is shared by ordinary checkpoint admission and bounded
+        abort witnesses. Only their enclosing proof admits the decoded state.
+        """
+        required = {"sequence", "series", "slots", "references", "visuals", "alerts", "requests"}
+        if type(state) is not dict or set(state) != required:
+            raise PineRuntimeError("checkpoint runtime segment schema mismatch", code=PL_CHECKPOINT_INVALID)
         if type(state["sequence"]) is not int or state["sequence"] < -1:
-            raise PineRuntimeError(
-                "checkpoint sequence is invalid", code=PL_CHECKPOINT_INVALID
-            )
+            raise PineRuntimeError("checkpoint sequence is invalid", code=PL_CHECKPOINT_INVALID)
         series_data = state["series"]
         slots_data = state["slots"]
         references_data = state["references"]
         visuals_data = state["visuals"]
         alerts_data = state["alerts"]
         requests_data = state["requests"]
-        transcript_data = state["transcript"]
         if not isinstance(series_data, dict) or not isinstance(slots_data, list):
             raise PineRuntimeError("checkpoint runtime segments are invalid")
         if not all(
@@ -1138,7 +1259,6 @@ class RuntimeSession:
                 visuals_data,
                 alerts_data,
                 requests_data,
-                transcript_data,
             )
         ):
             raise PineRuntimeError("checkpoint Stage 4 segments are invalid")
@@ -1156,7 +1276,8 @@ class RuntimeSession:
         new_slots = StateSlotRegistry.from_json(
             slots_data, self.policies.resource.max_state_slots
         )
-        new_references = RuntimeReferenceHeap.from_json(
+        reference_decoder = (RuntimeReferenceHeap._from_abort_witness_json if attempted else RuntimeReferenceHeap.from_json)
+        new_references = reference_decoder(
             references_data,
             self.language,
             max_objects=self.policies.resource.max_reference_objects,
@@ -1204,51 +1325,52 @@ class RuntimeSession:
         new_alerts = AlertTape.from_json(
             alerts_data, self.policies.resource.max_alert_events
         )
-        new_transcript = RuntimeTranscript.from_dict(transcript_data)
-        if (not new_transcript.entries and state["sequence"] != -1) or (
-            new_transcript.entries
-            and new_transcript.entries[-1]["sequence"] != state["sequence"]
-        ):
-            raise PineRuntimeError(
-                "runtime transcript does not end at checkpoint sequence",
-                code=PL_CHECKPOINT_INVALID,
-            )
         new_requests = RequestEngine(
             self.language, self.policies, self.requests.provider
         )
         new_requests.bind_parent_identity(self.identity_hash)
         new_requests.restore(requests_data)
-        new_sequence = state["sequence"]
-        normalized_state = {
-            "sequence": new_sequence,
-            "series": {
-                key: value.to_json() for key, value in sorted(new_series.items())
-            },
-            "slots": new_slots.to_json(),
-            "references": new_references.to_json(),
-            "visuals": new_visuals.to_json(),
-            "alerts": new_alerts.to_json(),
-            "requests": new_requests.to_json(),
-            "transcript": new_transcript.to_dict(),
-        }
-        normalized_runtime_state = {
-            key: value for key, value in normalized_state.items() if key != "transcript"
-        }
-        expected_state_hash = (
-            semantic_state_digest(
-                self.identity_hash,
-                new_sequence,
-                new_series,
-                new_slots,
-                new_references,
-                new_visuals,
-                new_alerts,
-                new_requests,
-            )
-            if isinstance(new_transcript, CompactRuntimeTranscript)
-            else sha(normalized_runtime_state)
-        )
-        if (
+        candidate = self._restore_scratch()
+        candidate.sequence = state["sequence"]
+        candidate.series, candidate.slots, candidate.references = new_series, new_slots, new_references
+        candidate.visuals, candidate.alerts, candidate.requests = new_visuals, new_alerts, new_requests
+        if candidate._state_json() != state:
+            raise PineRuntimeError("checkpoint segments are not round-trip stable", code=PL_CHECKPOINT_INVALID)
+        return candidate
+
+    def _restore_checkpoint(self, data, *, validate_children):
+        if self._active is not None or self._pending_bar_frame is not None:
+            raise PineRuntimeError("cannot restore an active or provisional bar")
+        checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
+        state = checkpoint.state
+        required = {"sequence", "series", "slots", "references", "visuals", "alerts", "requests", "transcript"}
+        has_pending = "pending_abort" in state
+        if has_pending:
+            required.add("pending_abort")
+        if set(state) != required:
+            raise PineRuntimeError("checkpoint runtime schema mismatch", code=PL_CHECKPOINT_INVALID)
+        new_transcript = RuntimeTranscript.from_dict(state["transcript"])
+        required_version = "1.1.0" if has_pending or new_transcript.control_mode is not None else "1.0.0"
+        if checkpoint.schema_version != required_version:
+            raise PineRuntimeError("checkpoint version differs from its state profile", code=PL_CHECKPOINT_INVALID)
+        candidate = self._decode_runtime_state({key: value for key, value in state.items()
+            if key not in ("transcript", "pending_abort")})
+        new_sequence = candidate.sequence
+        if (not new_transcript.entries and new_sequence != -1) or (
+                new_transcript.entries and new_transcript.entries[-1]["sequence"] != new_sequence):
+            raise PineRuntimeError("runtime transcript does not end at checkpoint sequence", code=PL_CHECKPOINT_INVALID)
+        new_series, new_slots, new_references = candidate.series, candidate.slots, candidate.references
+        new_visuals, new_alerts, new_requests = candidate.visuals, candidate.alerts, candidate.requests
+        normalized_state = {**candidate._state_json(), "transcript": new_transcript.to_dict()}
+        expected_state_hash = (candidate.semantic_state_hash if isinstance(new_transcript, CompactRuntimeTranscript)
+                               else candidate.state_hash)
+        abort_record = state.get("pending_abort")
+        abort_frame = successful_runtime = None
+        if has_pending:
+            abort_frame, successful_runtime = self._admit_pending_abort(
+                abort_record, candidate, new_transcript, expected_state_hash)
+            normalized_state["pending_abort"] = abort_record
+        elif (
             new_transcript.entries
             and new_transcript.entries[-1]["state_hash"] != expected_state_hash
         ):
@@ -1261,6 +1383,9 @@ class RuntimeSession:
                 "checkpoint is not round-trip stable", code=PL_CHECKPOINT_INVALID
             )
         if validate_children:
+            # The abort transition requires byte-equal committed requests in its
+            # successful evidence. This one traversal validates both copies and
+            # does not charge the same child twice against request-count limits.
             self._validate_compiled_request_checkpoints(new_requests)
         # Atomic replacement only after every segment has validated.
         self.series = new_series
@@ -1273,10 +1398,17 @@ class RuntimeSession:
         self.sequence = new_sequence
         last = new_transcript.entries[-1] if new_transcript.entries else None
         self._pending_bar_frame = None
-        self._deferred_mode = None if last is None else last["phase"] == "BAR_COMMIT"
+        self._pending_abort = abort_record
+        self._pending_abort_attempt_bytes = (sum(len(canonical_json(witness)) for witness in abort_record["attempts"])
+                                             if abort_record is not None else 0)
+        self._abort_baseline = None
+        self._deferred_mode = (abort_frame.defer_bar_commit if abort_frame is not None
+                               else new_transcript.control_mode == "deferred" if new_transcript.control_mode is not None
+                               else None if last is None else last["phase"] == "BAR_COMMIT")
+        published = [entry for entry in new_transcript.entries if new_transcript.is_publication(entry)]
         self._last_published_bar = (
-            last["bar_index"]
-            if last is not None and last["phase"] == "BAR_COMMIT"
+            published[-1]["bar_index"]
+            if published
             else None
         )
         self.commit_full_identity = not isinstance(
