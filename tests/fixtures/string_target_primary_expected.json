@@ -1,0 +1,232 @@
+{
+  "authority_sha256": "d299bd8eee900afcf9a991cb911c028960bc47e286f831bd6c252e8e4a6d159a",
+  "rows": [
+    {
+      "abi_callable": "pinelib.abi.string.lower_v2",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "source",
+          "position": 1
+        }
+      ],
+      "call_form": "namespace_function",
+      "capabilities": [
+        "string"
+      ],
+      "category": "functions",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "str.lower",
+      "overload_id": "pine:function:str.lower#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "source",
+          "binding": "SOURCE_PARAMETER",
+          "source": "source"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "source",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:function:str.lower#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "string",
+        "runtime_type": "string",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:function:str.lower",
+        "pine:function:str.lower#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "PURE",
+      "symbol_id": "pine:function:str.lower",
+      "version_availability": [
+        5,
+        6
+      ]
+    },
+    {
+      "abi_callable": "pinelib.abi.string.tonumber_v2",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "source",
+          "position": 1
+        }
+      ],
+      "call_form": "namespace_function",
+      "capabilities": [
+        "string"
+      ],
+      "category": "functions",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "str.tonumber",
+      "overload_id": "pine:function:str.tonumber#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "source",
+          "binding": "SOURCE_PARAMETER",
+          "source": "string"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "string",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:function:str.tonumber#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "float",
+        "runtime_type": "float",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:function:str.tonumber",
+        "pine:function:str.tonumber#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "PURE",
+      "symbol_id": "pine:function:str.tonumber",
+      "version_availability": [
+        5,
+        6
+      ]
+    },
+    {
+      "abi_callable": "pinelib.abi.string.upper_v2",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "source",
+          "position": 1
+        }
+      ],
+      "call_form": "namespace_function",
+      "capabilities": [
+        "string"
+      ],
+      "category": "functions",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "str.upper",
+      "overload_id": "pine:function:str.upper#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "source",
+          "binding": "SOURCE_PARAMETER",
+          "source": "source"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "source",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:function:str.upper#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "string",
+        "runtime_type": "string",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:function:str.upper",
+        "pine:function:str.upper#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "PURE",
+      "symbol_id": "pine:function:str.upper",
+      "version_availability": [
+        5,
+        6
+      ]
+    }
+  ],
+  "remainder_sha256": "3507155758c86256b619ed5c95b52ae385f8fdefea263131e38471cccba2226d",
+  "expected_content_hash": "sha256:7a545c1a749dede42e6a8a98606d059350c5160b8d1a8e4baf8415b87b5089cf"
+}

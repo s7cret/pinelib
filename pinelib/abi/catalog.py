@@ -124,7 +124,8 @@ _string = {
     "format_time": "string",
 }
 for name, return_type in _string.items():
-    path = f"pinelib.abi.string.{name}_v1"
+    revision = "v2" if name in {"lower", "upper", "trim", "tonumber"} else "v1"
+    path = f"pinelib.abi.string.{name}_{revision}"
     state_model = "REFERENCE_HEAP" if name == "split" else "PURE"
     status = (
         TargetStatus.SUPPORTED_STATEFUL

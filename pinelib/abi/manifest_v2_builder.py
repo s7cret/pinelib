@@ -157,6 +157,25 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
     qualifiers and arity-dependent returns. See docs/STAGE2_BUILTIN_BINDINGS.md.
     """
     name = official["name"]
+    if name in {"str.upper", "str.lower", "str.tonumber"} and official["category"] == "functions":
+        # Version-specific v5/v6 primary reference: exactly one string input.
+        return {**official, "parameters": [
+            {"name": "string" if name == "str.tonumber" else "source",
+             "type": "string", "qualifier_max": "series", "required": True}
+        ]}
+    if name in {"map.put", "map.put_all"} and official["category"] in {"functions", "methods"}:
+        # Both v5/v6 reference signatures use the declared key/value types.
+        # put returns the previous V (or na); put_all(id, id2) returns void.
+        # Keep this correction separate from the immutable source inventory.
+        parameters = ([{"name": "id", "type": "map", "qualifier_max": "series", "required": True}]
+                      if official["category"] == "functions" else [])
+        parameters += ([
+            {"name": "key", "type": "K", "qualifier_max": "series", "required": True},
+            {"name": "value", "type": "V", "qualifier_max": "series", "required": True},
+        ] if name == "map.put" else [
+            {"name": "id2", "type": "map", "qualifier_max": "series", "required": True},
+        ])
+        return {**official, "parameters": parameters, "returns": "V" if name == "map.put" else "void"}
     if name in {"ta.variance", "ta.stdev"}:
         return {**official, "supported_versions": [5, 6], "parameters": [
             {"name": "source", "type": "float", "qualifier_max": "series", "required": True},
@@ -427,6 +446,12 @@ def _parameter_bindings(
                 for name in source_names
                 if name == abi_name or _SOURCE_TO_ABI_ALIASES.get(name) == abi_name
                 or _AUDITED_ARGUMENT_ALIASES.get(str(official["name"]), {}).get(name) == abi_name
+                or (official["name"] == "map.put_all"
+                    and official.get("category") in {"functions", "methods"}
+                    and name == "id2" and abi_name == "from_handle")
+                or (official["name"] == "str.tonumber"
+                    and official.get("category") == "functions"
+                    and name == "string" and abi_name == "source")
             ),
             None,
         )

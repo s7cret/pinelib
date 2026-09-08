@@ -33,6 +33,21 @@ def trim_v1(source: str) -> str:
     return _string.trim(source)
 
 
+def lower_v2(tx: RuntimeTransaction, source: str) -> str:
+    tx._check()
+    return _string.lower(source, ctx=tx.session.language)
+
+
+def upper_v2(tx: RuntimeTransaction, source: str) -> str:
+    tx._check()
+    return _string.upper(source, ctx=tx.session.language)
+
+
+def trim_v2(tx: RuntimeTransaction, source: str) -> str:
+    tx._check()
+    return _string.trim(source, ctx=tx.session.language)
+
+
 def pos_v1(source: str, substring: str) -> int:
     return _string.pos(source, substring)
 
@@ -63,6 +78,11 @@ def split_v1(
 
 def tonumber_v1(source: str) -> object:
     return _string.tonumber(source)
+
+
+def tonumber_v2(tx: RuntimeTransaction, source: str) -> object:
+    tx._check()
+    return _string.tonumber(source, ctx=tx.session.language)
 
 
 def tostring_v1(

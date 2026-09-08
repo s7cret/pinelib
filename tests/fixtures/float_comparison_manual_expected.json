@@ -1,0 +1,647 @@
+{
+  "authority": "https://www.tradingview.com/pine-script-docs/language/type-system/#float",
+  "bool_cases": [
+    {
+      "eq": true,
+      "left": false,
+      "ne": false,
+      "right": false
+    },
+    {
+      "eq": false,
+      "left": true,
+      "ne": true,
+      "right": false
+    },
+    {
+      "eq": true,
+      "left": true,
+      "ne": false,
+      "right": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "positive_inside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1.0000000001,
+      "primary_midpoint": false,
+      "right": 1.0
+    },
+    {
+      "case_id": "positive_near_cell_edge",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1.0000000004,
+      "primary_midpoint": false,
+      "right": 1.0
+    },
+    {
+      "case_id": "positive_outside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "left": 1.0000000006,
+      "primary_midpoint": false,
+      "right": 1.0
+    },
+    {
+      "case_id": "same_positive_cell",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1.0000000006,
+      "primary_midpoint": false,
+      "right": 1.0000000011
+    },
+    {
+      "case_id": "positive_below_inside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 0.9999999996,
+      "primary_midpoint": false,
+      "right": 1.0
+    },
+    {
+      "case_id": "positive_below_outside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "left": 0.9999999994,
+      "primary_midpoint": false,
+      "right": 1.0
+    },
+    {
+      "case_id": "negative_inside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -1.0000000001,
+      "primary_midpoint": false,
+      "right": -1.0
+    },
+    {
+      "case_id": "negative_outside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "left": -1.0000000006,
+      "primary_midpoint": false,
+      "right": -1.0
+    },
+    {
+      "case_id": "negative_below_inside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -0.9999999996,
+      "primary_midpoint": false,
+      "right": -1.0
+    },
+    {
+      "case_id": "negative_below_outside",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "left": -0.9999999994,
+      "primary_midpoint": false,
+      "right": -1.0
+    },
+    {
+      "case_id": "positive_near_zero",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1e-10,
+      "primary_midpoint": false,
+      "right": 0.0
+    },
+    {
+      "case_id": "negative_near_zero",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -1e-10,
+      "primary_midpoint": false,
+      "right": 0.0
+    },
+    {
+      "case_id": "positive_outside_zero",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "left": 6e-10,
+      "primary_midpoint": false,
+      "right": 0.0
+    },
+    {
+      "case_id": "negative_outside_zero",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "left": -6e-10,
+      "primary_midpoint": false,
+      "right": 0.0
+    },
+    {
+      "case_id": "large_fraction",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1234567.123456789,
+      "primary_midpoint": false,
+      "right": 1234567.1234567892
+    },
+    {
+      "case_id": "large_negative_fraction",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -1234567.123456789,
+      "primary_midpoint": false,
+      "right": -1234567.1234567892
+    },
+    {
+      "case_id": "mixed_int_right",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1.0000000001,
+      "primary_midpoint": false,
+      "right": 1
+    },
+    {
+      "case_id": "mixed_int_left",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1,
+      "primary_midpoint": false,
+      "right": 1.0000000001
+    },
+    {
+      "case_id": "mixed_large_cast",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 9007199254740992.0,
+      "primary_midpoint": false,
+      "right": 9007199254740993
+    },
+    {
+      "case_id": "mixed_large_negative_cast",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -9007199254740992.0,
+      "primary_midpoint": false,
+      "right": -9007199254740993
+    },
+    {
+      "case_id": "pure_int_precision",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "left": 9007199254740993,
+      "primary_midpoint": false,
+      "right": 9007199254740992
+    },
+    {
+      "case_id": "pure_int_negative",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "left": -9007199254740993,
+      "primary_midpoint": false,
+      "right": -9007199254740992
+    },
+    {
+      "case_id": "positive_subnormal",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": false,
+        "<=": false,
+        "==": false,
+        ">": true,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 5e-324,
+      "primary_midpoint": false,
+      "right": 0.0
+    },
+    {
+      "case_id": "negative_subnormal",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": true,
+        "<": true,
+        "<=": true,
+        "==": false,
+        ">": false,
+        ">=": false
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -5e-324,
+      "primary_midpoint": false,
+      "right": 0.0
+    },
+    {
+      "case_id": "large_finite_equal",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": 1e+308,
+      "primary_midpoint": false,
+      "right": 1e+308
+    },
+    {
+      "case_id": "signed_zero",
+      "evidence_status": "manual_fixture",
+      "expected_v1_to_v5": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "expected_v6": {
+        "!=": false,
+        "<": false,
+        "<=": true,
+        "==": true,
+        ">": false,
+        ">=": true
+      },
+      "left": -0.0,
+      "primary_midpoint": false,
+      "right": 0.0
+    }
+  ],
+  "full_stage2_accepted": false,
+  "legacy_authority_limit": "v5 page has no nine-fractional-digits rule; legacy expected is native compatibility, not new Pine parity certification",
+  "midpoint_pine_parity": "UNVERIFIED; no comparison result in this fixture establishes Pine midpoint policy",
+  "na_authority": "https://www.tradingview.com/pine-script-docs/language/type-system/#na-value",
+  "na_v1_to_v5_native_compatibility": {
+    "!=": true,
+    "<": false,
+    "<=": false,
+    "==": false,
+    ">": false,
+    ">=": false
+  },
+  "na_v6_expected": {
+    "!=": false,
+    "<": false,
+    "<=": false,
+    "==": false,
+    ">": false,
+    ">=": false
+  },
+  "rounding_description": "Round both float-domain operands to nine fractional places; mixed numeric operands first use float domain; all pairs exclude decimal midpoints",
+  "schema_id": "pinelib.float_comparison_manual.v1",
+  "semantic_sut_executed_before_authoring": false,
+  "tradingview_export": false
+}

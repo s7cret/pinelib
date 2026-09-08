@@ -6,8 +6,13 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from pinelib.core.values import is_na, na, require_number
 from pinelib.errors import PL_STRING_FORMAT, PL_VALUE_TYPE, PineRuntimeError
+from pinelib.runtime.context import RuntimeLanguageContext
 from pinelib.time.calendar import from_unix_ms
 
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+_ASCII_UPPER = str.maketrans("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+_ASCII_WHITESPACE = " \t\n\r\f\v"
+_DECIMAL_NUMBER = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)")
 _PLACEHOLDER_RE = re.compile(
     r"\{(?P<index>[0-9]+)(?:,(?P<kind>number|date),(?P<pattern>[^{}]+))?\}"
 )
@@ -29,16 +34,21 @@ def length(source: str) -> int:
     return len(_string(source, "source"))
 
 
-def lower(source: str) -> str:
-    return _string(source, "source").lower()
+def lower(source: str, *, ctx: RuntimeLanguageContext | None = None) -> str:
+    text = _string(source, "source")
+    return text.translate(_ASCII_LOWER) if ctx is not None and ctx.pine_version == 6 else text.lower()
 
 
-def upper(source: str) -> str:
-    return _string(source, "source").upper()
+def upper(source: str, *, ctx: RuntimeLanguageContext | None = None) -> str:
+    text = _string(source, "source")
+    return text.translate(_ASCII_UPPER) if ctx is not None and ctx.pine_version == 6 else text.upper()
 
 
-def trim(source: str) -> str:
-    return _string(source, "source").strip()
+def trim(source: str, *, ctx: RuntimeLanguageContext | None = None) -> str:
+    if ctx is not None and ctx.pine_version >= 5 and is_na(source):
+        return ""
+    text = _string(source, "source")
+    return text.strip(_ASCII_WHITESPACE) if ctx is not None and ctx.pine_version == 6 else text.strip()
 
 
 def pos(source: str, substring: str) -> int:
@@ -91,8 +101,15 @@ def split(source: str, separator: str) -> tuple[str, ...]:
     return tuple(text.split(delimiter))
 
 
-def tonumber(source: str) -> object:
-    text = _string(source, "source").strip()
+def tonumber(source: str, *, ctx: RuntimeLanguageContext | None = None) -> object:
+    text = _string(source, "source")
+    if ctx is not None and ctx.pine_version == 6:
+        # Full input admission forbids Unicode digits and implicit whitespace,
+        # exponent or underscore normalization before the existing float cast.
+        if _DECIMAL_NUMBER.fullmatch(text) is None:
+            return na
+    else:
+        text = text.strip()
     if not text:
         return na
     try:
