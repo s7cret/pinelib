@@ -1,0 +1,412 @@
+{
+  "authority_sha256": "d299bd8eee900afcf9a991cb911c028960bc47e286f831bd6c252e8e4a6d159a",
+  "base": "d33fdea2ff3d2fa3c567c2c83da08664c8937fc1",
+  "baseline_manifest_sha256": "a2bbe511ec6c7c9b57b3ad57ec3b9afdfe8f8ceed6e466f1d705f4da97566503",
+  "changed_rows": 4,
+  "derivation": "Read frozen base metadata; apply only literal map.put key K/value V/return V and map.put_all from->id2 in source names/binding. No ABI builder or semantic runtime import.",
+  "expected_content_hash": "sha256:7a545c1a749dede42e6a8a98606d059350c5160b8d1a8e4baf8415b87b5089cf",
+  "remainder_sha256": "1accfa132d7ce10af5f76933ef6f20e5c340c4c9b7516e6cfc285e66ff285020",
+  "rows": [
+    {
+      "abi_callable": "pinelib.abi.reference.map_put_v1",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "ReferenceHandle",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "handle",
+          "position": 1
+        },
+        {
+          "annotation": "object",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "key",
+          "position": 2
+        },
+        {
+          "annotation": "object",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "value",
+          "position": 3
+        }
+      ],
+      "call_form": "namespace_function",
+      "capabilities": [
+        "reference.map"
+      ],
+      "category": "functions",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "map.put",
+      "overload_id": "pine:function:map.put#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "handle",
+          "binding": "SOURCE_PARAMETER",
+          "source": "id"
+        },
+        {
+          "abi_parameter": "key",
+          "binding": "SOURCE_PARAMETER",
+          "source": "key"
+        },
+        {
+          "abi_parameter": "value",
+          "binding": "SOURCE_PARAMETER",
+          "source": "value"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "map"
+        },
+        {
+          "name": "key",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "K"
+        },
+        {
+          "name": "value",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "V"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:function:map.put#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "V",
+        "runtime_type": "V",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:function:map.put",
+        "pine:function:map.put#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "REFERENCE_HEAP",
+      "symbol_id": "pine:function:map.put",
+      "version_availability": [
+        5,
+        6
+      ]
+    },
+    {
+      "abi_callable": "pinelib.abi.reference.map_put_all_v1",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "ReferenceHandle",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "handle",
+          "position": 1
+        },
+        {
+          "annotation": "ReferenceHandle",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "from_handle",
+          "position": 2
+        }
+      ],
+      "call_form": "namespace_function",
+      "capabilities": [
+        "reference.map"
+      ],
+      "category": "functions",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "map.put_all",
+      "overload_id": "pine:function:map.put_all#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "handle",
+          "binding": "SOURCE_PARAMETER",
+          "source": "id"
+        },
+        {
+          "abi_parameter": "from_handle",
+          "binding": "SOURCE_PARAMETER",
+          "source": "id2"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "map"
+        },
+        {
+          "name": "id2",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "map"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:function:map.put_all#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "void",
+        "runtime_type": "void",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:function:map.put_all",
+        "pine:function:map.put_all#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "REFERENCE_HEAP",
+      "symbol_id": "pine:function:map.put_all",
+      "version_availability": [
+        5,
+        6
+      ]
+    },
+    {
+      "abi_callable": "pinelib.abi.reference.map_put_v1",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "ReferenceHandle",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "handle",
+          "position": 1
+        },
+        {
+          "annotation": "object",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "key",
+          "position": 2
+        },
+        {
+          "annotation": "object",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "value",
+          "position": 3
+        }
+      ],
+      "call_form": "method",
+      "capabilities": [
+        "reference.map"
+      ],
+      "category": "methods",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "map.put",
+      "overload_id": "pine:method:map.put#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "handle",
+          "binding": "METHOD_RECEIVER",
+          "source": "receiver"
+        },
+        {
+          "abi_parameter": "key",
+          "binding": "SOURCE_PARAMETER",
+          "source": "key"
+        },
+        {
+          "abi_parameter": "value",
+          "binding": "SOURCE_PARAMETER",
+          "source": "value"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "key",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "K"
+        },
+        {
+          "name": "value",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "V"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:method:map.put#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "V",
+        "runtime_type": "V",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:method:map.put",
+        "pine:function:map.put",
+        "pine:method:map.put#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "REFERENCE_HEAP",
+      "symbol_id": "pine:method:map.put",
+      "version_availability": [
+        5,
+        6
+      ]
+    },
+    {
+      "abi_callable": "pinelib.abi.reference.map_put_all_v1",
+      "abi_parameters": [
+        {
+          "annotation": "RuntimeTransaction",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "tx",
+          "position": 0
+        },
+        {
+          "annotation": "ReferenceHandle",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "handle",
+          "position": 1
+        },
+        {
+          "annotation": "ReferenceHandle",
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "from_handle",
+          "position": 2
+        }
+      ],
+      "call_form": "method",
+      "capabilities": [
+        "reference.map"
+      ],
+      "category": "methods",
+      "delegation": null,
+      "diagnostic": null,
+      "disposition": "TARGET_DIRECT",
+      "dynamic_length_policy": {},
+      "evaluation_mode": "EAGER_ARGUMENTS",
+      "na_policy": {
+        "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+        "propagation": "PINE_FUNCTION_SPECIFIC"
+      },
+      "name": "map.put_all",
+      "overload_id": "pine:method:map.put_all#v1",
+      "parameter_bindings": [
+        {
+          "abi_parameter": "tx",
+          "binding": "INJECTED",
+          "source": "RUNTIME_TRANSACTION"
+        },
+        {
+          "abi_parameter": "handle",
+          "binding": "METHOD_RECEIVER",
+          "source": "receiver"
+        },
+        {
+          "abi_parameter": "from_handle",
+          "binding": "SOURCE_PARAMETER",
+          "source": "id2"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id2",
+          "qualifier_max": "series",
+          "required": true,
+          "type": "map"
+        }
+      ],
+      "producer_overload_ids": [
+        "pine:method:map.put_all#canonical"
+      ],
+      "return": {
+        "identity": "VALUE",
+        "pine_type": "void",
+        "runtime_type": "void",
+        "tuple_arity": 0
+      },
+      "source_symbol_ids": [
+        "pine:method:map.put_all",
+        "pine:function:map.put_all",
+        "pine:method:map.put_all#canonical"
+      ],
+      "state_identity_inputs": [],
+      "state_model": "REFERENCE_HEAP",
+      "symbol_id": "pine:method:map.put_all",
+      "version_availability": [
+        5,
+        6
+      ]
+    }
+  ],
+  "schema_id": "openpine.map_target_metadata_expected.v1",
+  "versioned_tuples": 8,
+  "composition_basis": "Frozen d33 plus literal reviewed string4/map4 metadata; original standalone expectations retained in source bundle3358."
+}

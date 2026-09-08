@@ -1,1 +1,7 @@
 tests/fixtures/array_concat_manual_expected.json text eol=lf
+tests/fixtures/float_comparison_manual_expected.json text eol=lf
+tests/fixtures/map_operations_manual_expected.json text eol=lf
+tests/fixtures/map_target_metadata_expected.json text eol=lf
+tests/fixtures/string_context_supplement.json text eol=lf
+tests/fixtures/string_manual_expected.json text eol=lf
+tests/fixtures/string_target_primary_expected.json text eol=lf
