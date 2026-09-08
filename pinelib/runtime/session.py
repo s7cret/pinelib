@@ -1276,6 +1276,9 @@ class RuntimeSession:
         new_slots = StateSlotRegistry.from_json(
             slots_data, self.policies.resource.max_state_slots
         )
+        from pinelib.ta.state import validate_extrema_slots
+        validate_extrema_slots(slots_data, pine_version=self.language.pine_version,
+                               max_observations=self.policies.resource.max_collection_elements)
         reference_decoder = (RuntimeReferenceHeap._from_abort_witness_json if attempted else RuntimeReferenceHeap.from_json)
         new_references = reference_decoder(
             references_data,

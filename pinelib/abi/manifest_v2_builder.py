@@ -157,6 +157,12 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
     qualifiers and arity-dependent returns. See docs/STAGE2_BUILTIN_BINDINGS.md.
     """
     name = official["name"]
+    if name in {"ta.variance", "ta.stdev"}:
+        return {**official, "supported_versions": [5, 6], "parameters": [
+            {"name": "source", "type": "float", "qualifier_max": "series", "required": True},
+            {"name": "length", "type": "int", "qualifier_max": "series", "required": True},
+            {"name": "biased", "type": "bool", "qualifier_max": "series", "required": False, "default": True},
+        ]}
     if name == "float" and official["category"] == "functions":
         # The v4 type-system manual dates explicit casts to v4. Scope this
         # correction to the callable row: a type/input constant or a numeric
