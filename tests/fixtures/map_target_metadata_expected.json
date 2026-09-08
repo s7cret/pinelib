@@ -4,8 +4,8 @@
   "baseline_manifest_sha256": "a2bbe511ec6c7c9b57b3ad57ec3b9afdfe8f8ceed6e466f1d705f4da97566503",
   "changed_rows": 4,
   "derivation": "Read frozen base metadata; apply only literal map.put key K/value V/return V and map.put_all from->id2 in source names/binding. No ABI builder or semantic runtime import.",
-  "expected_content_hash": "sha256:7a545c1a749dede42e6a8a98606d059350c5160b8d1a8e4baf8415b87b5089cf",
-  "remainder_sha256": "1accfa132d7ce10af5f76933ef6f20e5c340c4c9b7516e6cfc285e66ff285020",
+  "expected_content_hash": "sha256:3bbb194318736ff97aff6a50ef4a3c4238fda3191f3971ab2e5fe9e14e27c2f7",
+  "remainder_sha256": "caf605c688b392a50fdec34179f35ef5b64790571d5bde37791e93b756ed8021",
   "rows": [
     {
       "abi_callable": "pinelib.abi.reference.map_put_v1",

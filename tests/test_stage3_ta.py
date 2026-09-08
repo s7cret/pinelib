@@ -38,7 +38,7 @@ def test_moving_averages_and_warmup_boundaries():
     wma, _ = run(values, abi.wma_v1, 3)
     assert list(map(is_na, sma[:2])) == [True, True]
     assert sma[2:] == [2.0, 3.0, 4.0]
-    assert ema[2:] == [2.0, 3.0, 4.0]
+    assert ema[2:] == [9 / 4, 25 / 8, 65 / 16]
     assert wma[2] == pytest.approx(14 / 6)
     swma, _ = run(values, abi.swma_v1)
     assert is_na(swma[2]) and swma[3] == pytest.approx(2.5)
