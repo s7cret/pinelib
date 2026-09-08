@@ -1,0 +1,148 @@
+{
+  "before_content_hash": "sha256:73f71769c6652b79c4fd648597e1aa1d22a031ce80bc93ec1d65290978478e2e",
+  "expected_content_hash": "sha256:3bbb194318736ff97aff6a50ef4a3c4238fda3191f3971ab2e5fe9e14e27c2f7",
+  "expected_other_rows": 1107,
+  "expected_tsi_row": {
+    "abi_callable": "pinelib.abi.ta.tsi_v1",
+    "abi_parameters": [
+      {
+        "annotation": "RuntimeTransaction",
+        "has_default": false,
+        "kind": "POSITIONAL_OR_KEYWORD",
+        "name": "tx",
+        "position": 0
+      },
+      {
+        "annotation": "str",
+        "has_default": false,
+        "kind": "POSITIONAL_OR_KEYWORD",
+        "name": "state_id",
+        "position": 1
+      },
+      {
+        "annotation": "object",
+        "has_default": false,
+        "kind": "POSITIONAL_OR_KEYWORD",
+        "name": "source",
+        "position": 2
+      },
+      {
+        "annotation": "int",
+        "has_default": false,
+        "kind": "POSITIONAL_OR_KEYWORD",
+        "name": "short_length",
+        "position": 3
+      },
+      {
+        "annotation": "int",
+        "has_default": false,
+        "kind": "POSITIONAL_OR_KEYWORD",
+        "name": "long_length",
+        "position": 4
+      }
+    ],
+    "call_form": "namespace_function",
+    "capabilities": [
+      "state.ta",
+      "series.history"
+    ],
+    "category": "functions",
+    "delegation": null,
+    "diagnostic": null,
+    "disposition": "TARGET_DIRECT",
+    "dynamic_length_policy": {},
+    "evaluation_mode": "EAGER_ARGUMENTS",
+    "na_policy": {
+      "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+      "propagation": "PINE_FUNCTION_SPECIFIC"
+    },
+    "name": "ta.tsi",
+    "overload_id": "pine:function:ta.tsi#v1",
+    "parameter_bindings": [
+      {
+        "abi_parameter": "tx",
+        "binding": "INJECTED",
+        "source": "RUNTIME_TRANSACTION"
+      },
+      {
+        "abi_parameter": "state_id",
+        "binding": "INJECTED",
+        "source": "SOURCE_LOCATION_STATE_ID"
+      },
+      {
+        "abi_parameter": "source",
+        "binding": "SOURCE_PARAMETER",
+        "source": "source"
+      },
+      {
+        "abi_parameter": "short_length",
+        "binding": "SOURCE_PARAMETER",
+        "source": "short_length"
+      },
+      {
+        "abi_parameter": "long_length",
+        "binding": "SOURCE_PARAMETER",
+        "source": "long_length"
+      }
+    ],
+    "parameters": [
+      {
+        "name": "source",
+        "qualifier_max": "series",
+        "required": true,
+        "type": "float"
+      },
+      {
+        "name": "short_length",
+        "qualifier_max": "simple",
+        "required": true,
+        "type": "int"
+      },
+      {
+        "name": "long_length",
+        "qualifier_max": "simple",
+        "required": true,
+        "type": "int"
+      }
+    ],
+    "producer_overload_ids": [
+      "pine:function:ta.tsi#canonical"
+    ],
+    "return": {
+      "identity": "VALUE",
+      "pine_type": "float",
+      "runtime_type": "object",
+      "tuple_arity": 0
+    },
+    "source_symbol_ids": [
+      "pine:function:ta.tsi",
+      "pine:function:ta.tsi#canonical"
+    ],
+    "state_identity_inputs": [
+      "state_id"
+    ],
+    "state_model": "TA_KERNEL_SLOT",
+    "symbol_id": "pine:function:ta.tsi",
+    "version_availability": [
+      5,
+      6
+    ]
+  },
+  "legacy_profiles_unchanged": true,
+  "numeric_kernel_or_abi_changed": false,
+  "primary_manual_sha256": "bb7c32877244350a0fc1f92d7172eba55626352610cd6b965826d0a62297c1aa",
+  "producer_parameters": {
+    "ta.macd": [
+      "fastlen",
+      "slowlen",
+      "siglen"
+    ],
+    "ta.tsi": [
+      "short_length",
+      "long_length"
+    ]
+  },
+  "runtime_macd_already_simple_unchanged": true,
+  "schema_id": "openpine.recursive_length_literal_metadata.v1",
+  "sut_generator_executed_before_freeze": false
+}

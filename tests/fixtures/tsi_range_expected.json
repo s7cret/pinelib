@@ -1,0 +1,286 @@
+{
+  "schema_id": "openpine.tsi_range_expected.v1",
+  "oracle": "primary_range_predicate_only",
+  "manual_sha256": "19b562cd1d7b37af215bbb300014b4e728b1efbce01cddf384fcc775ae2ced29",
+  "range_authority_sha256": "039ed0a6f24b35ecd249598a0bf3e26a9b446f6922dd99d8a7afb8eae46f1a89",
+  "authored_before_execution": true,
+  "predicate": {
+    "finite_float": {
+      "lower_inclusive": -1.0,
+      "upper_inclusive": 1.0
+    },
+    "na": "retained_observation_timing_unverified"
+  },
+  "version_cases": 16,
+  "total_events": 90,
+  "complete_direct_assignments": [],
+  "full_stage2_accepted": false,
+  "cases": [
+    {
+      "manual_row_id": "tsi-finite-1-1",
+      "version": 5,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 1,
+        "long": 1
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-1-1",
+      "version": 6,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 1,
+        "long": 1
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-1-2",
+      "version": 5,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 1,
+        "long": 2
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-1-2",
+      "version": 6,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 1,
+        "long": 2
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-2-3",
+      "version": 5,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-2-3",
+      "version": 6,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-3-3",
+      "version": 5,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 3,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-finite-3-3",
+      "version": 6,
+      "source": [
+        3,
+        1,
+        4,
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 3,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-leading-na-2-3",
+      "version": 5,
+      "source": [
+        "na",
+        "na",
+        3,
+        1,
+        4,
+        2
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-leading-na-2-3",
+      "version": 6,
+      "source": [
+        "na",
+        "na",
+        3,
+        1,
+        4,
+        2
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-all-na-2-3",
+      "version": 5,
+      "source": [
+        "na",
+        "na",
+        "na",
+        "na"
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-all-na-2-3",
+      "version": 6,
+      "source": [
+        "na",
+        "na",
+        "na",
+        "na"
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-flat-2-3",
+      "version": 5,
+      "source": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-flat-2-3",
+      "version": 6,
+      "source": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-internal-na-2-3",
+      "version": 5,
+      "source": [
+        3,
+        1,
+        4,
+        "na",
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    },
+    {
+      "manual_row_id": "tsi-internal-na-2-3",
+      "version": 6,
+      "source": [
+        3,
+        1,
+        4,
+        "na",
+        2,
+        5,
+        1
+      ],
+      "parameters": {
+        "short": 2,
+        "long": 3
+      },
+      "complete_trajectory_authority": "UNVERIFIED"
+    }
+  ]
+}
