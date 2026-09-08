@@ -20,7 +20,7 @@ from pinelib.ta.types import (
 
 KERNEL_SPECS: tuple[KernelSpec, ...] = (
     KernelSpec("ta.sma", "moving_average", "ta.sma.state.v1", 1, "ignore_na"),
-    KernelSpec("ta.ema", "moving_average", "ta.ema.state.v1", 1, "ignore_na"),
+    KernelSpec("ta.ema", "moving_average", "ta.ema.state.v2", 1, "ignore_na"),
     KernelSpec("ta.rma", "moving_average", "ta.rma.state.v1", 1, "ignore_na"),
     KernelSpec("ta.wma", "moving_average", "ta.wma.state.v1", 1, "ignore_na"),
     KernelSpec("ta.vwma", "moving_average", "ta.vwma.state.v1", 1, "ignore_na"),
@@ -28,11 +28,11 @@ KERNEL_SPECS: tuple[KernelSpec, ...] = (
     KernelSpec("ta.alma", "moving_average", "ta.alma.state.v1", 1, "ignore_na"),
     KernelSpec("ta.hma", "moving_average", "ta.hma.state.v1", 1, "ignore_na"),
     KernelSpec("ta.rsi", "momentum", "ta.rsi.state.v1", 2, "ignore_na"),
-    KernelSpec("ta.macd", "momentum", "ta.macd.state.v1", 2, "ignore_na", 3),
+    KernelSpec("ta.macd", "momentum", "ta.macd.state.v2", 1, "ignore_na", 3),
     KernelSpec("ta.mom", "momentum", "ta.mom.state.v1", 2, "propagate_na"),
     KernelSpec("ta.roc", "momentum", "ta.roc.state.v1", 2, "propagate_na"),
     KernelSpec("ta.cmo", "momentum", "ta.cmo.state.v1", 2, "ignore_na"),
-    KernelSpec("ta.tsi", "momentum", "ta.tsi.state.v1", 2, "ignore_na"),
+    KernelSpec("ta.tsi", "momentum", "ta.tsi.state.v2", 2, "ignore_na"),
     KernelSpec("ta.stoch", "momentum", "ta.stoch.state.v1", 1, "propagate_na"),
     KernelSpec("ta.tr", "volatility", "ta.tr.state.v1", 1, "propagate_na"),
     KernelSpec("ta.atr", "volatility", "ta.atr.state.v1", 1, "ignore_na"),
@@ -114,15 +114,26 @@ def _state(
     initial: dict[str, object],
 ) -> dict[str, object]:
     spec = kernel_spec(symbol)
+    modern_ema = symbol in {"ta.ema", "ta.macd"} and tx.session.language.pine_version >= 5
+    modern_tsi = symbol == "ta.tsi" and tx.session.language.pine_version >= 5
+    payload = {"kernel": symbol, **initial}
+    if modern_ema:
+        payload["profile"] = "ema_first_source_v1"
+    if modern_tsi:
+        payload["profile"] = "tsi_ratio_legacy_seed_v1"
     state = tx.state(
         state_id,
         owner=symbol,
-        schema_version=(symbol + ".state.v1" if symbol in {"ta.highest", "ta.lowest"}
+        schema_version=(symbol + ".state.v1" if symbol in {"ta.highest", "ta.lowest", "ta.ema", "ta.macd", "ta.tsi"}
                         and tx.session.language.pine_version < 5 else spec.state_schema),
-        initial={"kernel": symbol, **initial},
+        initial=payload,
     )
     if not isinstance(state, dict) or state.get("kernel") != symbol:
         raise PineRuntimeError("invalid TA state payload", code=PL_TA_STATE)
+    if modern_ema and state.get("profile") != "ema_first_source_v1":
+        raise PineRuntimeError("invalid EMA/MACD state profile", code=PL_TA_STATE)
+    if modern_tsi and state.get("profile") != "tsi_ratio_legacy_seed_v1":
+        raise PineRuntimeError("invalid TSI state profile", code=PL_TA_STATE)
     return state
 
 
@@ -226,18 +237,23 @@ def _weighted(values: list[float]) -> float:
     )
 
 
-def _ema_step(state: dict[str, object], value: object, length: int) -> object:
+def _ema_step(
+    state: dict[str, object], value: object, length: int, *, first_source: bool = False
+) -> object:
     number = _number(value)
     if number is None:
         current = state.get("value")
         return na if current is None else current
     current = state.get("value")
     if current is None:
-        warmup = _numeric_buffer(state, "warmup")
-        _append(warmup, number, length)
-        if len(warmup) < length:
-            return na
-        current = _sma_values(warmup)
+        if first_source:
+            current = number
+        else:
+            warmup = _numeric_buffer(state, "warmup")
+            _append(warmup, number, length)
+            if len(warmup) < length:
+                return na
+            current = _sma_values(warmup)
     else:
         alpha = 2.0 / (length + 1.0)
         current = alpha * number + (1.0 - alpha) * _stored_number(current)
@@ -274,7 +290,7 @@ def ema(tx: RuntimeTransaction, state_id: str, source: object, length: int) -> o
     length = _length(length)
     state = _state(tx, state_id, "ta.ema", {})
     _stable(state, length=length)
-    return _ema_step(state, source, length)
+    return _ema_step(state, source, length, first_source=tx.session.language.pine_version >= 5)
 
 
 def rma(tx: RuntimeTransaction, state_id: str, source: object, length: int) -> object:
@@ -422,12 +438,13 @@ def macd(
         isinstance(item, dict) for item in (fast_state, slow_state, signal_state)
     ):
         raise PineRuntimeError("invalid MACD state", code=PL_TA_STATE)
-    fast = _ema_step(fast_state, source, fast_length)  # type: ignore[arg-type]
-    slow = _ema_step(slow_state, source, slow_length)  # type: ignore[arg-type]
+    first_source = tx.session.language.pine_version >= 5
+    fast = _ema_step(fast_state, source, fast_length, first_source=first_source)  # type: ignore[arg-type]
+    slow = _ema_step(slow_state, source, slow_length, first_source=first_source)  # type: ignore[arg-type]
     if is_na(fast) or is_na(slow):
         return MacdResult(na, na, na)
     value = _stored_number(fast) - _stored_number(slow)
-    signal = _ema_step(signal_state, value, signal_length)  # type: ignore[arg-type]
+    signal = _ema_step(signal_state, value, signal_length, first_source=first_source)  # type: ignore[arg-type]
     histogram = na if is_na(signal) else value - _stored_number(signal)
     return MacdResult(value, signal, histogram)
 
@@ -502,6 +519,9 @@ def tsi(
 ) -> object:
     short_length = _length(short_length, "short_length")
     long_length = _length(long_length, "long_length")
+    modern = tx.session.language.pine_version >= 5
+    if modern and max(short_length, long_length) > tx.session.policies.resource.max_collection_elements:
+        raise PineRuntimeError("TSI warmup length exceeds resource limit", code=PL_RESOURCE_LIMIT)
     state = _state(tx, state_id, "ta.tsi", {})
     _stable(state, short_length=short_length, long_length=long_length)
     number = _number(source)
@@ -531,6 +551,8 @@ def tsi(
         or _stored_number(second_absolute) == 0
     ):
         return na
+    if modern:
+        return _stored_number(second_change) / _stored_number(second_absolute)
     return 100.0 * _stored_number(second_change) / _stored_number(second_absolute)
 
 

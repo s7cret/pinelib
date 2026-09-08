@@ -157,6 +157,22 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
     qualifiers and arity-dependent returns. See docs/STAGE2_BUILTIN_BINDINGS.md.
     """
     name = official["name"]
+    if name == "ta.tsi" and official["category"] == "functions":
+        # The v5/v6 reference restricts both lengths to simple int. Keep the
+        # source profile, result, ABI and state ownership unchanged.
+        return {**official, "parameters": [
+            {**parameter, "qualifier_max": "simple"}
+            if parameter["name"] in {"short_length", "long_length"} else parameter
+            for parameter in official["parameters"]
+        ]}
+    if name == "ta.valuewhen" and official["category"] == "functions":
+        # All four v5/v6 primary overloads require simple occurrence. Preserve
+        # the existing canonical float profile; other overloads remain separate.
+        return {**official, "parameters": [
+            {**parameter, "qualifier_max": "simple"}
+            if parameter["name"] == "occurrence" else parameter
+            for parameter in official["parameters"]
+        ]}
     if name in {"str.upper", "str.lower", "str.tonumber"} and official["category"] == "functions":
         # Version-specific v5/v6 primary reference: exactly one string input.
         return {**official, "parameters": [
