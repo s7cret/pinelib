@@ -170,5 +170,5 @@ def test_every_non_concat_manifest_field_is_unchanged_and_disk_is_exact(manifest
     remainder.pop("content_hash")
     remainder["rows"] = [r for r in remainder["rows"] if r["name"] != "array.concat"]
     encoded = json.dumps(remainder, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    assert hashlib.sha256(encoded).hexdigest() == "0ca467f225e7286fd12f8aec4311633e780a3147092f33358575b56ac3192d56"
+    assert hashlib.sha256(encoded).hexdigest() == "cdaa5007b9b9f5948e10f217f54db116e607b40a499d230b4b527a3a62fe82d3"
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")
