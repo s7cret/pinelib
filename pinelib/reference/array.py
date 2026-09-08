@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from operator import lt
 from typing import Any, cast
 
@@ -264,6 +265,16 @@ def array_concat(
     heap.mutate_payload(target, values)
 
 
+def _numeric_boundary_search(
+    heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
+) -> bool:
+    return (
+        heap.language.pine_version >= 5
+        and heap.type_descriptor(handle) in {"array<int>", "array<float>"}
+        and (type(value) is int or (type(value) is float and math.isfinite(value)))
+    )
+
+
 def array_binary_search_leftmost(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> int:
@@ -280,7 +291,11 @@ def array_binary_search_leftmost(
         raise PineRuntimeError(
             "array values are not searchable", code=PL_REFERENCE_TYPE
         ) from error
-    return low if low < len(values) and values[low] == value else -1
+    if low < len(values) and values[low] == value:
+        return low
+    if values and _numeric_boundary_search(heap, handle, value):
+        return max(0, low - 1)
+    return -1
 
 
 def array_binary_search_rightmost(
@@ -300,4 +315,8 @@ def array_binary_search_rightmost(
             "array values are not searchable", code=PL_REFERENCE_TYPE
         ) from error
     index = low - 1
-    return index if index >= 0 and values[index] == value else -1
+    if index >= 0 and values[index] == value:
+        return index
+    if values and _numeric_boundary_search(heap, handle, value):
+        return low
+    return -1
