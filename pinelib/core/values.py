@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import TypeGuard
+from typing import TypeGuard, cast
 
 from pinelib.errors import (
     PL_VALUE_BOOL,
@@ -130,6 +130,16 @@ def pine_binary(
             raise PineRuntimeError("enum operands require matching nominal types and equality operators", code=PL_VALUE_TYPE)
         if left is na or right is na:
             return na if ctx.pine_version < 6 else False
+    if ctx.pine_version == 6 and operator in {"==", "!=", "<", "<=", ">", ">="}:
+        if left is na or right is na:
+            return False
+        if (is_number(left) and is_number(right)
+            and (type(left) is float or type(right) is float)):
+            # Mixed numeric comparisons first enter the float domain. Pine v6
+            # specifies nine fractional digits; its midpoint tie policy is not
+            # established here. Use Python's binary-float round policy locally.
+            left = round(cast(float, pine_float(left)), 9)
+            right = round(cast(float, pine_float(right)), 9)
     if operator in {"==", "!="}:
         equal = False if left is na or right is na else left == right
         return equal if operator == "==" else not equal
