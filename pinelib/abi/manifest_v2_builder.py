@@ -434,7 +434,19 @@ def _parameter_bindings(
             rows.append(
                 {
                     "abi_parameter": abi_name,
-                    "binding": "SOURCE_PARAMETER",
+                    "binding": (
+                        "SOURCE_VARIADIC"
+                        if parameter.get("kind") == "VAR_POSITIONAL"
+                        and official["name"] in {"math.min", "math.max"}
+                        and official.get("category") == "functions"
+                        and source_name == "values"
+                        and any(
+                            item.get("name") == source_name
+                            and item.get("variadic") is True
+                            for item in source_parameters
+                        )
+                        else "SOURCE_PARAMETER"
+                    ),
                     "source": source_name,
                 }
             )
@@ -579,6 +591,13 @@ def build_manifest_v2(
                     }
                 ],
             }
+        if name in {"math.min", "math.max"} and official_row["category"] == "functions":
+            original_parameters = official_row.get("parameters", [])
+            if len(original_parameters) == 1 and original_parameters[0].get("name") == "values":
+                official_row = {
+                    **official_row,
+                    "parameters": [{**original_parameters[0], "variadic": True}],
+                }
         parameters = [
             dict(item)
             for item in official_row.get("parameters", [])
