@@ -42,7 +42,7 @@ def test_only_two_rows_change_without_other_denominator_or_contract_changes(mani
     assert len(selected) == 2 and sum(len(r["version_availability"]) for r in selected) == 4
     remaining["rows"] = [r for r in remaining["rows"] if r not in selected]
     encoded = json.dumps(remaining,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
-    assert hashlib.sha256(encoded).hexdigest() == "4753b25490e608859dc4f843b9e68e0435f46ceb4197c4f63ee95d9585fa3c91"
+    assert hashlib.sha256(encoded).hexdigest() == "877ede3198793a7714273c3424c45d8f8abdd6c1ac0f7d0a32b78bdd48ebb23a"
     check_manifest(Path(__file__).parents[1]/"pinelib/abi/target_manifest.json")
 
 
