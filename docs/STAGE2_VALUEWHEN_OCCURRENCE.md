@@ -1,0 +1,11 @@
+# Modern valuewhen occurrence target contract
+
+The existing canonical `ta.valuewhen` target now declares `occurrence` as simple int, matching both [v5](https://www.tradingview.com/pine-script-reference/v5/#fun_ta.valuewhen) and [v6](https://www.tradingview.com/pine-script-reference/v6/#fun_ta.valuewhen) primary signatures. This is exactly one row / two versioned tuples. The existing ABI callable, injected parameters, names, return/source types, availability, state identity, schemas, capabilities, and all other rows remain unchanged.
+
+The independent eight-entry reference extract has SHA256 `044485bcb410b41697e15b1fdb7b64bf9dfc3044af3c81c45b7672a2e495f964`. Each version has float/int/bool/color overloads, all requiring simple/input/const occurrence. Only the existing canonical float profile is projected here. Exact non-float overload identities and return specialization remain separate residuals; no whole-function coverage claim follows from this change.
+
+The sole literal metadata delta was frozen before the builder edit, SHA256 `0fc8c1252cca3c39abbc8bf255b205c45d37d8066a9586545588f0761f944044`. New tests compare the entire row and the whole remaining manifest, including historical bindings. Their baseline result was six failures and thirteen passing controls on each Python. Existing whole-manifest guards may require separately reviewed metadata-only fixture identity updates; this change does not rewrite their assertions or numeric expectations.
+
+No kernel change is made. Read-only exact-2148 ABI observations matched all 20 eligible cases / 160 events of the previously authored table. Eight additional cases / 64 events retain UNVERIFIED authority even though their candidate values matched. Missing-event timing, selected source NA, conditional execution, and other overloads are not certified here. Numeric table SHA256 is `53ea9e00e9bdfbc21404937b343ba850a6df2d0dc5de288dc2c71238f41167f8`.
+
+The producer companion rejects series occurrence in the source contract and preserves const/input/simple admission. Runtime's existing stable-argument check is unchanged. Formal generated historical/realtime/rollback/checkpoint acceptance remains a separate gate; complete Stage2 remains open.
