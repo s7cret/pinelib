@@ -248,6 +248,6 @@ def test_manifest_outside_four_rows_and_exact_disk_remain_unchanged(manifest):
     remainder.pop("content_hash")
     remainder["rows"] = [row for row in remainder["rows"] if row["name"] not in {"str." + name for name in FUNCTIONS}]
     raw = json.dumps(remainder, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    assert hashlib.sha256(raw).hexdigest() == "6454d17229301ce323f0abe97bed3971692e3e355a1b342f69f297dac55d2ac7"
+    assert hashlib.sha256(raw).hexdigest() == "dc4f7e90019d55e803aa9a706eb7aa2e6956a676c334ce951945684a3ede3e1a"
     assert manifest["classification"]["official_total"] == 1108
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")

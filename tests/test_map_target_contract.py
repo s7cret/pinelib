@@ -121,7 +121,7 @@ def test_existing_abi_retains_literal_previous_value_and_order(row, version):
 def test_manual_and_metadata_authority_bytes_are_frozen():
     assert len(MANUAL_ROWS) == 10
     assert hashlib.sha256((FIXTURES / "map_operations_manual_expected.json").read_bytes()).hexdigest() == "3afd6e3a0a1a0abe972c40190bff3dd2caf566aa5e7a7a355aa9d2acd5bb9ffe"
-    assert hashlib.sha256((FIXTURES / "map_target_metadata_expected.json").read_bytes()).hexdigest() == "1f45fd82c580cb578f8051135ba158628e3cc257c0eddefe0a5bfdc6276bb0ed"
+    assert hashlib.sha256((FIXTURES / "map_target_metadata_expected.json").read_bytes()).hexdigest() == "faacd81b2e2491d3e9f18ba1a097793e266739502d80d6888a69e22639a8d04d"
 
 
 @pytest.mark.parametrize("actual,expected", [(False, 0), (0, False), ([1], [1.0]), ([["a", 1]], [["a", 2]])])

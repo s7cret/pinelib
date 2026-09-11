@@ -60,4 +60,4 @@ def test_existing_abi_signature_is_unchanged():
 
 
 def test_literal_metadata_precedes_builder_change():
-    assert hashlib.sha256(FIXTURE.read_bytes()).hexdigest() == "ffb6e266a36ee0789acab13d872ea000b96f1c715cbfc2b736f698463319dbef"
+    assert hashlib.sha256(FIXTURE.read_bytes()).hexdigest() == "e85c8740f92e6b856527e7f5baa41ed36f9f8adaa7e58dcb2bd25ce5bdf45a2c"

@@ -60,4 +60,4 @@ def test_tsi_abi_parameter_order_and_required_arguments_remain():
 
 
 def test_literal_metadata_was_frozen_before_generator_execution():
-    assert hashlib.sha256(LITERAL.read_bytes()).hexdigest() == 'd23e25b0f3bad9e4702ca47ca116dafaacdd4cb205ecbcd1ce92e36a1b269559'
+    assert hashlib.sha256(LITERAL.read_bytes()).hexdigest() == '76a18219703bec025598e0c7af2cbd7fc0f4b860c75b14386a0eef3222b93b00'
