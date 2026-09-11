@@ -1,0 +1,38 @@
+name: Preserve original qualifier candidate via API upload
+'on':
+  push:
+    branches: ['ops/publish-qualifiers-api-20260911']
+permissions:
+  contents: write
+concurrency:
+  group: qualifier-api-upload
+  cancel-in-progress: false
+jobs:
+  publish-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Assemble original bundle and verify exact source identities
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64,json,pathlib
+          root=pathlib.Path('.github/qualifier-upload')
+          plan=json.loads((root/'plan.json').read_text())
+          parts=sorted((root/'bundle').glob('part*'))
+          if [p.name for p in parts] != [f'part{i:02}' for i in range(plan['bundle_parts'])]:
+              raise SystemExit('missing or unexpected bundle part')
+          data=base64.b64decode(''.join(p.read_text() for p in parts),validate=True)
+          (root/'source.bundle').write_bytes(data)
+          PY
+          python .github/qualifier-upload/publish.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualifier-source-publication-${{ github.run_id }}
+          path: ${{ runner.temp }}/qualifier-publication/
+          if-no-files-found: error
+          retention-days: 30
