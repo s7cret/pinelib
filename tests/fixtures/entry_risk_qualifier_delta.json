@@ -1,0 +1,301 @@
+{
+  "base": "97902943bd8f1300c3bb3e3e314465ac92fa057a",
+  "base_content_hash": "sha256:3bbb194318736ff97aff6a50ef4a3c4238fda3191f3971ab2e5fe9e14e27c2f7",
+  "expected_content_hash": "sha256:9a9e710c1b22669b9e146e07e28c1dd5d1cf5a83ef00e45ddf4b2bf9cce054fb",
+  "unchanged_remainder_sha256": "9a3e37acd39c9e372dd6c81f1a6d8fc51b9b2a08935d2688dacf9a5377d3504a",
+  "row_changes": [
+    {
+      "before": {
+        "abi_callable": null,
+        "abi_parameters": [],
+        "call_form": "namespace_function",
+        "capabilities": [],
+        "category": "functions",
+        "delegation": {
+          "capability_id": "strategy.risk.allow_entry_in",
+          "owner": "backtest-engine",
+          "schema_id": "openpine.backtest.engine.v1"
+        },
+        "diagnostic": null,
+        "disposition": "TARGET_DELEGATED",
+        "dynamic_length_policy": {},
+        "evaluation_mode": "EAGER_ARGUMENTS",
+        "na_policy": {
+          "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+          "propagation": "PINE_FUNCTION_SPECIFIC"
+        },
+        "name": "strategy.risk.allow_entry_in",
+        "overload_id": "pine:function:strategy.risk.allow_entry_in#canonical",
+        "parameter_bindings": [],
+        "parameters": [
+          {
+            "name": "value",
+            "qualifier_max": "const",
+            "required": true,
+            "type": "strategy.direction"
+          }
+        ],
+        "producer_overload_ids": [
+          "pine:function:strategy.risk.allow_entry_in#canonical"
+        ],
+        "return": {
+          "identity": "VALUE",
+          "pine_type": "void",
+          "runtime_type": null,
+          "tuple_arity": 0
+        },
+        "source_symbol_ids": [
+          "pine:function:strategy.risk.allow_entry_in"
+        ],
+        "state_identity_inputs": [],
+        "state_model": "EXTERNAL_CAPABILITY",
+        "symbol_id": "pine:function:strategy.risk.allow_entry_in",
+        "version_availability": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "after": {
+        "abi_callable": null,
+        "abi_parameters": [],
+        "call_form": "namespace_function",
+        "capabilities": [],
+        "category": "functions",
+        "delegation": {
+          "capability_id": "strategy.risk.allow_entry_in",
+          "owner": "backtest-engine",
+          "schema_id": "openpine.backtest.engine.v1"
+        },
+        "diagnostic": null,
+        "disposition": "TARGET_DELEGATED",
+        "dynamic_length_policy": {},
+        "evaluation_mode": "EAGER_ARGUMENTS",
+        "na_policy": {
+          "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+          "propagation": "PINE_FUNCTION_SPECIFIC"
+        },
+        "name": "strategy.risk.allow_entry_in",
+        "overload_id": "pine:function:strategy.risk.allow_entry_in#canonical",
+        "parameter_bindings": [],
+        "parameters": [
+          {
+            "name": "value",
+            "qualifier_max": "simple",
+            "required": true,
+            "type": "strategy.direction"
+          }
+        ],
+        "producer_overload_ids": [
+          "pine:function:strategy.risk.allow_entry_in#canonical"
+        ],
+        "return": {
+          "identity": "VALUE",
+          "pine_type": "void",
+          "runtime_type": null,
+          "tuple_arity": 0
+        },
+        "source_symbol_ids": [
+          "pine:function:strategy.risk.allow_entry_in"
+        ],
+        "state_identity_inputs": [],
+        "state_model": "EXTERNAL_CAPABILITY",
+        "symbol_id": "pine:function:strategy.risk.allow_entry_in",
+        "version_availability": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    },
+    {
+      "before": {
+        "abi_callable": null,
+        "abi_parameters": [],
+        "call_form": "namespace_function",
+        "capabilities": [],
+        "category": "functions",
+        "delegation": {
+          "capability_id": "strategy.risk.max_position_size",
+          "owner": "backtest-engine",
+          "schema_id": "openpine.backtest.engine.v1"
+        },
+        "diagnostic": null,
+        "disposition": "TARGET_DELEGATED",
+        "dynamic_length_policy": {},
+        "evaluation_mode": "EAGER_ARGUMENTS",
+        "na_policy": {
+          "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+          "propagation": "PINE_FUNCTION_SPECIFIC"
+        },
+        "name": "strategy.risk.max_position_size",
+        "overload_id": "pine:function:strategy.risk.max_position_size#canonical",
+        "parameter_bindings": [],
+        "parameters": [
+          {
+            "name": "contracts",
+            "qualifier_max": "const",
+            "required": true,
+            "type": "float"
+          }
+        ],
+        "producer_overload_ids": [
+          "pine:function:strategy.risk.max_position_size#canonical"
+        ],
+        "return": {
+          "identity": "VALUE",
+          "pine_type": "void",
+          "runtime_type": null,
+          "tuple_arity": 0
+        },
+        "source_symbol_ids": [
+          "pine:function:strategy.risk.max_position_size"
+        ],
+        "state_identity_inputs": [],
+        "state_model": "EXTERNAL_CAPABILITY",
+        "symbol_id": "pine:function:strategy.risk.max_position_size",
+        "version_availability": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "after": {
+        "abi_callable": null,
+        "abi_parameters": [],
+        "call_form": "namespace_function",
+        "capabilities": [],
+        "category": "functions",
+        "delegation": {
+          "capability_id": "strategy.risk.max_position_size",
+          "owner": "backtest-engine",
+          "schema_id": "openpine.backtest.engine.v1"
+        },
+        "diagnostic": null,
+        "disposition": "TARGET_DELEGATED",
+        "dynamic_length_policy": {},
+        "evaluation_mode": "EAGER_ARGUMENTS",
+        "na_policy": {
+          "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+          "propagation": "PINE_FUNCTION_SPECIFIC"
+        },
+        "name": "strategy.risk.max_position_size",
+        "overload_id": "pine:function:strategy.risk.max_position_size#canonical",
+        "parameter_bindings": [],
+        "parameters": [
+          {
+            "name": "contracts",
+            "qualifier_max": "simple",
+            "required": true,
+            "type": "float"
+          }
+        ],
+        "producer_overload_ids": [
+          "pine:function:strategy.risk.max_position_size#canonical"
+        ],
+        "return": {
+          "identity": "VALUE",
+          "pine_type": "void",
+          "runtime_type": null,
+          "tuple_arity": 0
+        },
+        "source_symbol_ids": [
+          "pine:function:strategy.risk.max_position_size"
+        ],
+        "state_identity_inputs": [],
+        "state_model": "EXTERNAL_CAPABILITY",
+        "symbol_id": "pine:function:strategy.risk.max_position_size",
+        "version_availability": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    }
+  ],
+  "identity_only_replacements": {
+    "sha256:3bbb194318736ff97aff6a50ef4a3c4238fda3191f3971ab2e5fe9e14e27c2f7": "sha256:9a9e710c1b22669b9e146e07e28c1dd5d1cf5a83ef00e45ddf4b2bf9cce054fb",
+    "060c459df456f7d27e59c50b8477b67d1cc5d1b287e84f9a6b110273e10763ed": "46aa154700259398aaee753eb7441bd952b07030ae076480dc6dfb7e0356d854",
+    "f93148868ada8979df7095ceff7f423e481792123a9ed4ab0f6e9f516569e76c": "b57be456482dd0d95614d9edfdb01f41c6f9ed0d673479a467236dd46abb3556",
+    "6454d17229301ce323f0abe97bed3971692e3e355a1b342f69f297dac55d2ac7": "dc4f7e90019d55e803aa9a706eb7aa2e6956a676c334ce951945684a3ede3e1a",
+    "caf605c688b392a50fdec34179f35ef5b64790571d5bde37791e93b756ed8021": "7b75ac91314893eef5a1aa9ddb78d5b6f596507e04488078cd8c16412a67a502",
+    "1fd9888220d2e6cf9e02c6f879aa5b7e4f83e1cbfb50b543d60bec00f5129ee0": "f790f1d0eec606fd205990b2e2d49218586f8f5e3aeabbcee35eb78aa93df27d",
+    "717fdf2c97593fc2e15510d69fdbd9651029a7353362fdb67cc7e11f09276bff": "157461e2d5be968a74c0106610e5d7d743f82d07eee5535d4d1557e303b4802f",
+    "355d13c18d33772c4e88685845d7bf53da0b294c41f39b44827f6ce7b2d92b3c": "c23fb7fbc7530b0fffa6e02a455b57dd4c0c23c6cc4b43f6c069c4da0b053669",
+    "1f45fd82c580cb578f8051135ba158628e3cc257c0eddefe0a5bfdc6276bb0ed": "faacd81b2e2491d3e9f18ba1a097793e266739502d80d6888a69e22639a8d04d",
+    "74a1e01e8572b0678d02e4c6a4f38db30ff7493a34633a67103201736dadb992": "a38dbe879779384e65bd372b6cf6cf137f4012d9bbb47e86a33cd23169bfdea2",
+    "d23e25b0f3bad9e4702ca47ca116dafaacdd4cb205ecbcd1ce92e36a1b269559": "76a18219703bec025598e0c7af2cbd7fc0f4b860c75b14386a0eef3222b93b00",
+    "73e16570265024781349495491bfed0ac15b61af80b67b194734d15b8c3e721d": "d22bf4059b69176ea4f76256227ddf9939d6a1d2fdc081e80dc30a3d0c336686",
+    "ffb6e266a36ee0789acab13d872ea000b96f1c715cbfc2b736f698463319dbef": "e85c8740f92e6b856527e7f5baa41ed36f9f8adaa7e58dcb2bd25ce5bdf45a2c"
+  },
+  "changed_snapshot_files": [
+    {
+      "path": "tests/fixtures/map_target_metadata_expected.json",
+      "before_sha256": "1f45fd82c580cb578f8051135ba158628e3cc257c0eddefe0a5bfdc6276bb0ed",
+      "after_sha256": "faacd81b2e2491d3e9f18ba1a097793e266739502d80d6888a69e22639a8d04d"
+    },
+    {
+      "path": "tests/fixtures/string_target_primary_expected.json",
+      "before_sha256": "74a1e01e8572b0678d02e4c6a4f38db30ff7493a34633a67103201736dadb992",
+      "after_sha256": "a38dbe879779384e65bd372b6cf6cf137f4012d9bbb47e86a33cd23169bfdea2"
+    },
+    {
+      "path": "tests/fixtures/recursive_length_literal_metadata.json",
+      "before_sha256": "d23e25b0f3bad9e4702ca47ca116dafaacdd4cb205ecbcd1ce92e36a1b269559",
+      "after_sha256": "76a18219703bec025598e0c7af2cbd7fc0f4b860c75b14386a0eef3222b93b00"
+    },
+    {
+      "path": "tests/fixtures/recursive_length_scope.json",
+      "before_sha256": "73e16570265024781349495491bfed0ac15b61af80b67b194734d15b8c3e721d",
+      "after_sha256": "d22bf4059b69176ea4f76256227ddf9939d6a1d2fdc081e80dc30a3d0c336686"
+    },
+    {
+      "path": "tests/fixtures/valuewhen_occurrence_metadata.json",
+      "before_sha256": "ffb6e266a36ee0789acab13d872ea000b96f1c715cbfc2b736f698463319dbef",
+      "after_sha256": "e85c8740f92e6b856527e7f5baa41ed36f9f8adaa7e58dcb2bd25ce5bdf45a2c"
+    },
+    {
+      "path": "tests/test_array_concat_identity.py",
+      "before_sha256": "d7d2ae51b0e4962a1c04ec5dc781b2bc484b821f92b58f9673e3d2bb23a6b473",
+      "after_sha256": "289ff6c5844f857e6fe034274ed7f159e304a9010a743f111b084acd4a3cf276"
+    },
+    {
+      "path": "tests/test_map_target_contract.py",
+      "before_sha256": "9647df4a1bf0441b5c78c6b7c890dc8c1d91c41fbf521154a2ac1306553872ec",
+      "after_sha256": "48b1741f2196fdb0bab2ad6fde790ba26d433fdea40906be0db0f7bef5a1b4c7"
+    },
+    {
+      "path": "tests/test_minmax_variadic_manifest.py",
+      "before_sha256": "5fcdfda3da6997ea11c1d07d958b1e2816c21618878667bbdac031fc22ad361d",
+      "after_sha256": "a5f87850ad8e6b94dc94d20148b0a1cb82e3f8ee15b7b4c40af6ac2e2258371b"
+    },
+    {
+      "path": "tests/test_string_context_semantics.py",
+      "before_sha256": "f9772f99e210269f01c4ce37ec922bea421fec3209f3759bf4c7f69c26777636",
+      "after_sha256": "9537cbef849a7721d3adf03cbeaed1fe6f7bb905040eeabc2284291f8767a59f"
+    },
+    {
+      "path": "tests/test_tsi_length_target.py",
+      "before_sha256": "6001319b5c080d49e750e3fc381c97d6ba7da06fe3533c51849c91c1b37e069b",
+      "after_sha256": "2b53adc0ef60fc6554d91256d3acb24b88b6dbde98b489212b48533f9f414229"
+    },
+    {
+      "path": "tests/test_valuewhen_occurrence_target.py",
+      "before_sha256": "253e709f4724aa9035debe52bbcac154b6dea00e36e4a4546271af94202ed92c",
+      "after_sha256": "68cc3317a458d0d4f13193afe07f01b37a98c164c5e07cfd56609f7099e2d2fb"
+    }
+  ],
+  "manual_numerical_fixtures_modified": false
+}

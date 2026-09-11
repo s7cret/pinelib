@@ -157,6 +157,17 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
     qualifiers and arity-dependent returns. See docs/STAGE2_BUILTIN_BINDINGS.md.
     """
     name = official["name"]
+    if (
+        name in {"strategy.risk.allow_entry_in", "strategy.risk.max_position_size"}
+        and official["category"] == "functions"
+    ):
+        # The coordinated producer and broker already accept fixed-per-run
+        # inputs/simple values. The old frozen surface said const and was not
+        # enforcing the host contract. Preserve the frozen inventory itself.
+        return {**official, "parameters": [
+            {**parameter, "qualifier_max": "simple"}
+            for parameter in official["parameters"]
+        ]}
     if name == "ta.tsi" and official["category"] == "functions":
         # The v5/v6 reference restricts both lengths to simple int. Keep the
         # source profile, result, ABI and state ownership unchanged.
