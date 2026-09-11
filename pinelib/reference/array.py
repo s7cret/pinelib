@@ -271,7 +271,7 @@ def _numeric_boundary_search(
 ) -> bool:
     return (
         heap.language.pine_version >= 5
-        and heap.type_descriptor(handle) in {"array<int>", "array<float>"}
+        and heap.normalized_type_descriptor(handle) in {"array<int>", "array<float>"}
         and (type(value) is int or (type(value) is float and math.isfinite(value)))
     )
 

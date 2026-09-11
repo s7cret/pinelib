@@ -74,9 +74,7 @@ def validate_field_value(heap, value: object, dtype: str) -> None:
         kind = "udt" if dtype.startswith("udt:") else dtype.split("<", 1)[0]
         if not isinstance(value, ReferenceHandle) or value.kind != kind:
             raise PineRuntimeError("UDT reference field kind mismatch", code=PL_REFERENCE_TYPE)
-        actual = heap.type_descriptor(value)
-        if kind != "udt" and not actual.startswith(kind + "<"):
-            actual = kind + "<" + actual + ">"
+        actual = heap.normalized_type_descriptor(value)
         if actual != dtype:
             raise PineRuntimeError("UDT reference field nominal type mismatch", code=PL_REFERENCE_TYPE)
         return

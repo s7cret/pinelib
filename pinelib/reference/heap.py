@@ -149,7 +149,7 @@ class RuntimeReferenceHeap:
     @staticmethod
     def _is_nominal_array(item: _HeapObject) -> bool:
         descriptor = item.type_descriptor
-        return item.kind == "array" and (descriptor.startswith("udt:") or descriptor.startswith("array<udt:"))
+        return item.kind == "array" and descriptor.startswith(("udt:", "array<udt:"))
 
     def _validate_nominal_intrabar_graph(self, *, roots=(), override=None) -> None:
         """Check typed nodes without promoting referents or materializing views.
@@ -544,6 +544,21 @@ class RuntimeReferenceHeap:
 
     def type_descriptor(self, handle: ReferenceHandle) -> str:
         return self._get(handle).type_descriptor
+
+    def normalized_type_descriptor(self, handle: ReferenceHandle) -> str:
+        """Canonical type identity without changing stored/checkpoint descriptors.
+
+        Native factories historically store an element descriptor (``float``),
+        while request/host allocation may store ``array<float>``. Every consumer
+        doing a type comparison must see the same identity. The original wire
+        descriptor stays intact; nominal/schema/value validation has its existing
+        owners and must not be replaced with payload-based type inference.
+        """
+        item = self._get(handle)
+        descriptor = item.type_descriptor
+        if item.kind in {"array", "map", "matrix"} and not descriptor.startswith(item.kind + "<"):
+            return item.kind + "<" + descriptor + ">"
+        return descriptor
 
     def _get(self, handle: ReferenceHandle) -> _HeapObject:
         if not isinstance(handle, ReferenceHandle):

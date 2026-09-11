@@ -163,9 +163,7 @@ class LanguageExecutionMixin:
                 "reference binding kind differs from declared type",
                 code=PL_REFERENCE_TYPE,
             )
-        actual = self.references.type_descriptor(value)
-        # Native factories use element descriptors; requested arrays use full descriptors.
-        actual = actual if kind == "udt" or actual.startswith(kind + "<") else kind + "<" + actual + ">"
+        actual = self.references.normalized_type_descriptor(value)
         if actual != dtype:
             raise PineRuntimeError(
                 "reference binding type differs from heap object",
