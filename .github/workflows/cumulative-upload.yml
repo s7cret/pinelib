@@ -1,0 +1,23 @@
+name: Publish preserved Stage 2 cumulative commits
+'on':
+  push:
+    branches: ['ops/stage2-cumulative-upload-20260912']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore exact checked source history and publish candidate only
+        run: python .github/cumulative-transfer/publish.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cumulative-source-publication-${{ github.run_id }}
+          path: ${{ runner.temp }}/publication/
+          if-no-files-found: error
+          retention-days: 30
