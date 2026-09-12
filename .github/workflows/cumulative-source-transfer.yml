@@ -1,0 +1,23 @@
+name: Preserve exact cumulative local source
+'on':
+  push:
+    branches: ['ops/cumulative-source-transfer-20260912']
+permissions:
+  contents: write
+jobs:
+  publish-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore exact candidate, preserve history, leave RC6 untouched
+        run: python .github/stage2-transfer/restore.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cumulative-source-receipt-${{ github.run_id }}
+          path: ${{ runner.temp }}/publication/
+          if-no-files-found: warn
+          retention-days: 30
