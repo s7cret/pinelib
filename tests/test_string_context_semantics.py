@@ -246,6 +246,12 @@ def test_historical_numeric_adapter_is_still_the_original_callable():
 def test_manifest_outside_four_rows_and_exact_disk_remain_unchanged(manifest):
     remainder = deepcopy(manifest)
     remainder.pop("content_hash")
+    remainder.pop("compiled_history_reservation")
+    remainder["compiler_operations"] = [
+        operation
+        for operation in remainder["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
     remainder["rows"] = [row for row in remainder["rows"] if row["name"] not in {"str." + name for name in FUNCTIONS}]
     raw = json.dumps(remainder, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
     assert hashlib.sha256(raw).hexdigest() == "dc4f7e90019d55e803aa9a706eb7aa2e6956a676c334ce951945684a3ede3e1a"

@@ -23,6 +23,12 @@ def series_history_v1(tx: RuntimeTransaction, base: object, offset: object) -> o
     return tx.op_series_history(base, offset)
 
 
+def reserve_history_v1(
+    tx: RuntimeTransaction, series_id: str, dtype: str, history_policy: str
+) -> None:
+    tx.reserve_history_v1(series_id, dtype, history_policy)
+
+
 def na_v1(tx: RuntimeTransaction, x: object) -> bool:
     """Version-aware missing-value predicate, including flat broker values."""
     from pinelib.core.values import is_na, normalize_na

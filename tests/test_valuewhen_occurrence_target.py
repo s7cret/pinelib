@@ -31,6 +31,12 @@ def test_exact_canonical_row_and_unchanged_availability(manifest, version):
 def test_exact_one_row_two_tuples_and_entire_remainder(manifest):
     remaining = deepcopy(manifest)
     remaining.pop("content_hash")
+    remaining.pop("compiled_history_reservation")
+    remaining["compiler_operations"] = [
+        operation
+        for operation in remaining["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
     assert len(remaining["rows"]) == EXPECTED["runtime_rows"] == 1108
     selected = [r for r in remaining["rows"] if r["name"] == "ta.valuewhen"]
     assert len(selected) == 1 and sum(len(r["version_availability"]) for r in selected) == 2

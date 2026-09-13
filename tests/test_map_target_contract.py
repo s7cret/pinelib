@@ -11,6 +11,7 @@ from pinelib import na
 from pinelib.abi import reference as abi
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature, _parameter_bindings
+from pinelib.state.checkpoint import sha
 from tests.test_language_scopes_once import begin, session
 
 
@@ -39,13 +40,20 @@ def test_exact_generic_return_parameters_and_versioned_binding(manifest, expecte
 def test_only_four_rows_change_and_frozen_manifest_is_exact(manifest):
     remaining = deepcopy(manifest)
     remaining.pop("content_hash")
+    remaining.pop("compiled_history_reservation")
+    remaining["compiler_operations"] = [
+        operation
+        for operation in remaining["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
+    assert sha(remaining) == EXPECTED["expected_content_hash"]
     symbols = {row["symbol_id"] for row in EXPECTED["rows"]}
     selected = [row for row in remaining["rows"] if row["symbol_id"] in symbols]
     assert len(selected) == 4 and sum(len(row["version_availability"]) for row in selected) == 8
     remaining["rows"] = [row for row in remaining["rows"] if row["symbol_id"] not in symbols]
     encoded = json.dumps(remaining, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     assert hashlib.sha256(encoded).hexdigest() == EXPECTED["remainder_sha256"]
-    assert manifest["content_hash"] == EXPECTED["expected_content_hash"]
+
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")
 
 

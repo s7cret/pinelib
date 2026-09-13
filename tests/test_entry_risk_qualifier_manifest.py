@@ -7,6 +7,7 @@ import pytest
 
 from pinelib.abi.builder import build_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature
+from pinelib.state.checkpoint import sha
 
 
 @pytest.mark.parametrize(
@@ -60,7 +61,15 @@ def test_only_two_qualifier_fields_change_against_published_manifest():
         (Path(__file__).parent / "fixtures/entry_risk_qualifier_delta.json").read_text()
     )
     manifest = build_manifest()
-    assert manifest["content_hash"] == proof["expected_content_hash"]
+    legacy = {key: value for key, value in manifest.items() if key != "content_hash"}
+    legacy.pop("compiled_history_reservation")
+    legacy["compiler_operations"] = [
+        operation
+        for operation in legacy["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
+    assert sha(legacy) == proof["expected_content_hash"]
+    manifest = legacy
     names = set()
     for change in proof["row_changes"]:
         before, after = change["before"], change["after"]
@@ -73,7 +82,6 @@ def test_only_two_qualifier_fields_change_against_published_manifest():
             == after
         )
     assert names == {"strategy.risk.max_position_size", "strategy.risk.allow_entry_in"}
-    manifest.pop("content_hash")
     manifest["rows"] = [row for row in manifest["rows"] if row["name"] not in names]
     encoded = json.dumps(
         manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False

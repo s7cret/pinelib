@@ -61,12 +61,16 @@ class SeriesStorage(Generic[T]):
         return self.committed[index] if index >= 0 else None
 
     def commit(self) -> None:
+        if not self.initialized:
+            return
         if self.history_policy == "on_evaluation" and not self.evaluated:
             return
         self.committed.append(clone_runtime_value(self.working))  # type: ignore[arg-type]
         self.revision += 1
 
     def rollback(self) -> None:
+        if not self.initialized:
+            return
         baseline = self.committed[-1] if self.committed else None
         self.working = clone_runtime_value(baseline)  # type: ignore[assignment]
 
