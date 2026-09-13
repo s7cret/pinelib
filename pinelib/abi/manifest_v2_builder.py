@@ -104,7 +104,26 @@ _COMPILER_OPERATIONS = (
         "pure",
         "pinelib.abi.primitives.series_history_v1",
     ),
+    (
+        "state.reserve_history.v1",
+        "eager",
+        "state",
+        "pinelib.abi.primitives.reserve_history_v1",
+    ),
 )
+_COMPILER_OPERATION_CAPABILITIES = {
+    "state.reserve_history.v1": ("compiler.history_reservation.v1",),
+}
+_COMPILED_HISTORY_RESERVATION = {
+    "revision": 1,
+    "operation": "state.reserve_history.v1",
+    "capability": "compiler.history_reservation.v1",
+    "supported_pine_versions": [1, 2],
+    "scalar_types": ["bool", "color", "float", "int", "string"],
+    "history_policies": ["each_bar"],
+    "reservation": "typed-storage-without-evaluation",
+    "rollback": "transactional",
+}
 _INTERNAL_ABI_BINDINGS = {
     "registry": "RUNTIME_INPUT_REGISTRY",
     "input_id": "ADMITTED_INPUT_SPEC_ID",
@@ -571,16 +590,18 @@ def build_manifest_v2(
                     }
                 )
                 operation_index += 1
-        compiler_operations.append(
-            {
-                "name": name,
-                "evaluation": evaluation,
-                "effect": effect,
-                "abi_callable": operation_abi_callable,
-                "abi_parameters": operation_abi_parameters,
-                "parameter_bindings": operation_parameter_bindings,
-            }
-        )
+        operation = {
+            "name": name,
+            "evaluation": evaluation,
+            "effect": effect,
+            "abi_callable": operation_abi_callable,
+            "abi_parameters": operation_abi_parameters,
+            "parameter_bindings": operation_parameter_bindings,
+        }
+        operation_capabilities = _COMPILER_OPERATION_CAPABILITIES.get(name)
+        if operation_capabilities is not None:
+            operation["capabilities"] = list(operation_capabilities)
+        compiler_operations.append(operation)
     catalog_rows = tuple(catalog)
     by_symbol: dict[str, list[CatalogRow]] = {}
     for entry in catalog_rows:
@@ -845,6 +866,7 @@ def build_manifest_v2(
             "for_in": "live-array",
             "empty_tuple": "typed-elements",
         },
+        "compiled_history_reservation": _COMPILED_HISTORY_RESERVATION,
         "compiler_operations": compiler_operations,
         "rows": rows,
         "classification": counts,

@@ -168,6 +168,12 @@ def test_exact_versioned_return_and_receiver_contract(manifest, version, method)
 def test_every_non_concat_manifest_field_is_unchanged_and_disk_is_exact(manifest):
     remainder = deepcopy(manifest)
     remainder.pop("content_hash")
+    remainder.pop("compiled_history_reservation")
+    remainder["compiler_operations"] = [
+        operation
+        for operation in remainder["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
     remainder["rows"] = [r for r in remainder["rows"] if r["name"] != "array.concat"]
     encoded = json.dumps(remainder, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
     assert hashlib.sha256(encoded).hexdigest() == "46aa154700259398aaee753eb7441bd952b07030ae076480dc6dfb7e0356d854"

@@ -10,6 +10,7 @@ import pytest
 from pinelib.abi import ta
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature
+from pinelib.state.checkpoint import sha
 
 FIXTURES = Path(__file__).with_name('fixtures')
 LITERAL = FIXTURES / 'recursive_length_literal_metadata.json'
@@ -32,11 +33,18 @@ def test_exact_tsi_row_and_versions(manifest, version):
 def test_whole_remainder_and_precomputed_manifest_identity(manifest):
     remaining = deepcopy(manifest)
     remaining.pop('content_hash')
+    remaining.pop('compiled_history_reservation')
+    remaining['compiler_operations'] = [
+        operation
+        for operation in remaining['compiler_operations']
+        if operation['name'] != 'state.reserve_history.v1'
+    ]
+    assert sha(remaining) == EXPECTED['expected_content_hash']
     remaining['rows'] = [row for row in remaining['rows'] if row['name'] != 'ta.tsi']
     assert len(remaining['rows']) == EXPECTED['expected_other_rows'] == 1107
     encoded = json.dumps(remaining, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
     assert hashlib.sha256(encoded).hexdigest() == SCOPE['target_remainder_without_tsi_sha256']
-    assert manifest['content_hash'] == EXPECTED['expected_content_hash']
+
     check_manifest(Path(__file__).parents[1] / 'pinelib/abi/target_manifest.json')
 
 

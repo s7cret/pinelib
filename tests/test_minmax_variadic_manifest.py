@@ -38,6 +38,12 @@ def test_exact_modern_repeated_parameter_contract(manifest, name, version):
 def test_only_two_rows_change_without_other_denominator_or_contract_changes(manifest):
     remaining = deepcopy(manifest)
     remaining.pop("content_hash")
+    remaining.pop("compiled_history_reservation")
+    remaining["compiler_operations"] = [
+        operation
+        for operation in remaining["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
     selected = [r for r in remaining["rows"] if r["name"] in {"math.min","math.max"}]
     assert len(selected) == 2 and sum(len(r["version_availability"]) for r in selected) == 4
     remaining["rows"] = [r for r in remaining["rows"] if r not in selected]

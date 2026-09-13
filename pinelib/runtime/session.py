@@ -154,6 +154,35 @@ class RuntimeTransaction(LanguageExecutionMixin):
             storage.set(value)
         storage.evaluated = True
 
+    def reserve_history_v1(
+        self, series_id: str, dtype: str, history_policy: str
+    ) -> None:
+        """Reserve a compiler-declared scalar history identity without evaluating it."""
+        self._check()
+        if (
+            self.session.language.pine_version not in {1, 2}
+            or type(series_id) is not str
+            or not series_id
+            or type(dtype) is not str
+            or dtype not in {"bool", "color", "float", "int", "string"}
+            or type(history_policy) is not str
+            or history_policy != "each_bar"
+        ):
+            raise PineRuntimeError("unsupported history reservation")
+        if series_id not in self.session.series:
+            if len(self.session.series) >= self.session.policies.resource.max_series:
+                raise PineRuntimeError("series limit exceeded", code=PL_RESOURCE_LIMIT)
+            self.session.series[series_id] = SeriesStorage(
+                series_id, dtype, history_policy=history_policy
+            )
+            self._new_series.add(series_id)
+            return
+        storage = self.session.series[series_id]
+        if not isinstance(storage, SeriesStorage):
+            raise PineRuntimeError("series storage identity is invalid")
+        if storage.dtype != dtype or storage.history_policy != history_policy:
+            raise PineRuntimeError("series type descriptor changed for the same name")
+
     def read_series(self, name: str, offset: int = 0) -> object:
         self._check()
         try:
@@ -794,7 +823,8 @@ class RuntimeSession:
     def _begin_segments(self, frame):
         """Shared begin projection; it never executes an evaluator or callback."""
         for storage in self.series.values():
-            storage.begin()
+            if storage.initialized:
+                storage.begin()
         self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
         self.references.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
         self.visuals.begin()

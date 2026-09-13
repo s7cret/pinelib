@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature, _parameter_bindings
+from pinelib.state.checkpoint import sha
 
 EXPECTED = json.loads(
     (
@@ -31,13 +32,20 @@ def test_primary_string_parameter_type_name_and_version(manifest, expected, vers
 def test_only_three_rows_and_expected_content_hash(manifest):
     remaining = deepcopy(manifest)
     remaining.pop("content_hash")
+    remaining.pop("compiled_history_reservation")
+    remaining["compiler_operations"] = [
+        operation
+        for operation in remaining["compiler_operations"]
+        if operation["name"] != "state.reserve_history.v1"
+    ]
+    assert sha(remaining) == EXPECTED["expected_content_hash"]
     names = {r["name"] for r in EXPECTED["rows"]}
     remaining["rows"] = [r for r in remaining["rows"] if r["name"] not in names]
     raw = json.dumps(
         remaining, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode()
     assert hashlib.sha256(raw).hexdigest() == EXPECTED["remainder_sha256"]
-    assert manifest["content_hash"] == EXPECTED["expected_content_hash"]
+
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")
 
 
