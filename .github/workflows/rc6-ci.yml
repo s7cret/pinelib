@@ -1,0 +1,142 @@
+name: RC6 CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "release/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rc6-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality (Python 3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test]"
+      - name: Compile package and tools
+        run: python -m compileall -q pinelib tools
+      - name: Verify canonical ABI manifest
+        run: python -m pinelib.abi build --check
+      - name: Scan forbidden source patterns
+        run: python tools/forbidden_scan.py --root pinelib
+
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test]"
+      - name: Run complete pytest suite
+        run: python -m pytest
+
+  properties:
+    name: Request properties (Python 3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test]"
+      - name: Run deterministic request property checks
+        run: python -m tools.request_property_runner
+
+  coverage:
+    name: Coverage threshold (Python 3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test]"
+      - name: Run complete pytest suite with coverage
+        run: |
+          python -m coverage run -m pytest
+          python -m coverage report
+
+  package:
+    name: Package integrity (Python 3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test]"
+      - name: Build source and wheel distributions
+        run: python -m build --outdir dist
+      - name: Verify wheel RECORD
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected one wheel, found: {wheels}")
+          with ZipFile(wheels[0]) as archive:
+              records = [name for name in archive.namelist() if name.endswith(".dist-info/RECORD")]
+          if len(records) != 1:
+              raise SystemExit(f"expected one wheel RECORD, found: {records}")
+          print(records[0])
+          PY
+      - name: Install built wheel in a clean environment
+        run: |
+          python -m venv .ci-wheel-venv
+          .ci-wheel-venv/bin/python -m pip install dist/*.whl
+          .ci-wheel-venv/bin/python -m pip check
+          .ci-wheel-venv/bin/python -I -c "import pinelib; print(pinelib.__version__)"
