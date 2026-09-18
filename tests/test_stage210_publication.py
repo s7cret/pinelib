@@ -27,6 +27,7 @@ def test_stage210_runtime_abi_matches_publication():
 
 
 def test_stage210_unpublished_runtime_abi_change_stops_publication():
+    pytest.importorskip("pine2ast")
     from pine2ast.hardening.language_publication import (
         LanguagePublicationError,
         observe_language_publication,
