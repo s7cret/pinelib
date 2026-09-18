@@ -259,11 +259,15 @@ def test_promotion_valid_prefix_then_invalid_child_is_atomic(version):
     tx = begin(runtime, 0)
     good, bad = counter(tx, "good"), counter(tx, "bad")
     # This ordinary, unretained child is outside the new graph's policy so far.
-    array_set(tx.references, tx.get_udt_field_v1(bad, "values"), 0, "wrong")
+    values = tx.get_udt_field_v1(bad, "values")
+    # Forge an impossible child behind the public API. Stage 2.4 now rejects
+    # this corruption at array_set(), while this test intentionally exercises
+    # the later graph-promotion admission gate.
+    tx.references._objects[values.object_id].working[0] = "wrong"
     bag = array_new(tx.references, "bag", COUNTER, 1, good)
     array_push(tx.references, bag, bad)
     before = runtime.references.to_json()
-    with pytest.raises(PineRuntimeError, match="element type"):
+    with pytest.raises(PineRuntimeError, match="element type|declared type"):
         tx.references.retain_intrabar(bag)
     assert runtime.references.to_json() == before
     assert not runtime.references._nominal_intrabar_roots
@@ -277,9 +281,13 @@ def test_inserting_new_bad_child_graph_rejects_before_publication(version, porta
     tx = begin(runtime, 0)
     bag = tx.declare_reference_v1("bag", "varip", lambda: array_new(tx.references, "bag", COUNTER), DTYPE)
     bad = counter(tx, "bad")
-    array_set(tx.references, tx.get_udt_field_v1(bad, "values"), 0, "wrong")
+    values = tx.get_udt_field_v1(bad, "values")
+    # Forge an impossible child behind the public API. Stage 2.4 now rejects
+    # this corruption at array_set(), while this test intentionally exercises
+    # the later graph-promotion admission gate.
+    tx.references._objects[values.object_id].working[0] = "wrong"
     before = runtime.references.to_json()
-    with pytest.raises(PineRuntimeError, match="element type"):
+    with pytest.raises(PineRuntimeError, match="element type|declared type"):
         array_push(tx.references, bag, bad.__pinelib_portable__() if portable else bad)
     assert runtime.references.to_json() == before
     tx.abort()
@@ -369,7 +377,7 @@ def test_parent_request_restore_admits_nominal_array_and_rejects_forged_child_pa
     child.references._objects["counter-values"].working = ["forged"]
     child_saved = reseal_state(child, deepcopy(child.checkpoint().state))
     forged = checkpoint_with(parent, child_saved)
-    with pytest.raises(PineRuntimeError, match="element type"):
+    with pytest.raises(PineRuntimeError, match="element type|declared type"):
         clone.restore(forged)
     assert clone.checkpoint().to_dict() == saved
     assert Child.evaluations == evaluations and clone.requests.provider.calls == fetches

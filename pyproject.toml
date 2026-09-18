@@ -10,13 +10,6 @@ requires-python = ">=3.11"
 license = "MIT"
 dependencies = ["tzdata==2026.2"]
 
-[project.optional-dependencies]
-test = [
-    "build>=1.2,<2",
-    "coverage[toml]>=7.6,<8",
-    "pytest>=8.3,<9",
-]
-
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pinelib*"]

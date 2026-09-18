@@ -24,6 +24,16 @@ def string_v1(registry: InputRegistry, input_id: str) -> str:
     return cast(str, registry.get(input_id, "string"))
 
 
+def text_area_v1(registry: InputRegistry, input_id: str) -> str:
+    return cast(str, registry.get(input_id, "text_area"))
+
+
+def enum_v1(registry: InputRegistry, input_id: str):
+    from pinelib.reference.heap import PineEnumValue
+
+    return cast(PineEnumValue, registry.get(input_id, "enum"))
+
+
 def time_v1(registry: InputRegistry, input_id: str) -> int:
     return cast(int, registry.get(input_id, "time"))
 

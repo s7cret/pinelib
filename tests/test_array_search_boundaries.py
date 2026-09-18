@@ -106,8 +106,11 @@ def test_empty_and_unverified_descriptor_queries_keep_previous_behavior(version,
     assert search(tx, name, strings, "c") == 1
     assert search(tx, name, booleans, True) == 1
     numeric = new_array(tx, [2, 4], "numeric")
+    # Stage 2.4 closes the direct-runtime type hole: array<int> search
+    # must not silently treat bool/float queries as an absent int value.
     for query in (True, False, float("inf"), float("-inf"), float("nan")):
-        assert search(tx, name, numeric, query) == -1
+        with pytest.raises(PineRuntimeError, match="declared type"):
+            search(tx, name, numeric, query)
     tx.abort()
 
 
@@ -119,7 +122,7 @@ def test_existing_comparison_errors_are_read_only(version, name, bad):
     tx = runtime.begin(CallbackFrame("HISTORICAL_EVAL", 0))
     handle = new_array(tx, [1, 3])
     before = tx.references.to_json()
-    with pytest.raises(PineRuntimeError, match="not searchable"):
+    with pytest.raises(PineRuntimeError, match="not searchable|declared type"):
         search(tx, name, handle, bad)
     assert tx.references.to_json() == before
     tx.abort()

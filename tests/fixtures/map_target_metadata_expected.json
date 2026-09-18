@@ -4,8 +4,8 @@
   "baseline_manifest_sha256": "a2bbe511ec6c7c9b57b3ad57ec3b9afdfe8f8ceed6e466f1d705f4da97566503",
   "changed_rows": 4,
   "derivation": "Read frozen base metadata; apply only literal map.put key K/value V/return V and map.put_all from->id2 in source names/binding. No ABI builder or semantic runtime import.",
-  "expected_content_hash": "sha256:9a9e710c1b22669b9e146e07e28c1dd5d1cf5a83ef00e45ddf4b2bf9cce054fb",
-  "remainder_sha256": "7b75ac91314893eef5a1aa9ddb78d5b6f596507e04488078cd8c16412a67a502",
+  "expected_content_hash": "sha256:8093825b275027eb155b5959d1fb2cf108c5ce72cd89926d65e60af1cae8225f",
+  "remainder_sha256": "c1e946ecbe9c78c6332f2c2f061abf278d3875fd049fee9d127973caf959e12c",
   "rows": [
     {
       "abi_callable": "pinelib.abi.reference.map_put_v1",
@@ -408,5 +408,6 @@
   ],
   "schema_id": "openpine.map_target_metadata_expected.v1",
   "versioned_tuples": 8,
-  "composition_basis": "Frozen d33 plus literal reviewed string4/map4 metadata; original standalone expectations retained in source bundle3358."
+  "composition_basis": "Frozen d33 plus literal reviewed string4/map4 metadata; original standalone expectations retained in source bundle3358.",
+  "stage21_rebaseline_receipt": "pinelib/abi/stage21_manifest_delta_lock.json"
 }

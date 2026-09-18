@@ -56,6 +56,7 @@ from pinelib.reference import (
 from pinelib.runtime.session import RuntimeTransaction
 
 
+
 def array_new_v1(
     tx: RuntimeTransaction,
     object_id: str,
@@ -63,6 +64,8 @@ def array_new_v1(
     size: int = 0,
     initial: object = na,
 ) -> ReferenceHandle:
+    if tx.references.language.pine_version >= 6 and type_descriptor in {"bool", "array<bool>"} and initial is na:
+        initial = False
     return array_new(tx.references, object_id, type_descriptor, size, initial)
 
 
@@ -281,6 +284,8 @@ def matrix_new_v1(
     columns: int = 0,
     initial: object = na,
 ) -> ReferenceHandle:
+    if tx.references.language.pine_version >= 6 and type_descriptor in {"bool", "matrix<bool>"} and initial is na:
+        initial = False
     return matrix_new(tx.references, object_id, type_descriptor, rows, columns, initial)
 
 
@@ -341,3 +346,14 @@ def udt_copy_v1(
 
 def enum_value_v1(enum_id: str, member: str, ordinal: int) -> PineEnumValue:
     return enum_value(enum_id, member, ordinal)
+
+
+def array_from_v1(*values: object, tx: RuntimeTransaction,
+                  object_id: str, type_descriptor: str) -> ReferenceHandle:
+    from pinelib.reference.array import array_from
+    return array_from(tx.references, object_id, type_descriptor, values)
+
+
+def array_sum_v1(tx: RuntimeTransaction, handle: ReferenceHandle) -> object:
+    from pinelib.reference.array import array_sum
+    return array_sum(tx.references, handle)

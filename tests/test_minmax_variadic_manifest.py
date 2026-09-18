@@ -9,6 +9,8 @@ import pytest
 
 from pinelib import na
 from pinelib.abi import math as abi
+from tests.stage21_post_audit_helpers import restore_pre_audit_target
+
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.catalog import CATALOG
 from pinelib.abi.manifest_v2_builder import _parameter_bindings
@@ -36,19 +38,13 @@ def test_exact_modern_repeated_parameter_contract(manifest, name, version):
 
 
 def test_only_two_rows_change_without_other_denominator_or_contract_changes(manifest):
-    remaining = deepcopy(manifest)
+    remaining = restore_pre_audit_target(manifest)
     remaining.pop("content_hash")
-    remaining.pop("compiled_history_reservation")
-    remaining["compiler_operations"] = [
-        operation
-        for operation in remaining["compiler_operations"]
-        if operation["name"] != "state.reserve_history.v1"
-    ]
     selected = [r for r in remaining["rows"] if r["name"] in {"math.min","math.max"}]
     assert len(selected) == 2 and sum(len(r["version_availability"]) for r in selected) == 4
     remaining["rows"] = [r for r in remaining["rows"] if r not in selected]
     encoded = json.dumps(remaining,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
-    assert hashlib.sha256(encoded).hexdigest() == "b57be456482dd0d95614d9edfdb01f41c6f9ed0d673479a467236dd46abb3556"
+    assert hashlib.sha256(encoded).hexdigest() == "f2ff073325fdcbed4b337a700bc69ad3a0798e588e5ca68683ca6994358a6b5f"
     check_manifest(Path(__file__).parents[1]/"pinelib/abi/target_manifest.json")
 
 

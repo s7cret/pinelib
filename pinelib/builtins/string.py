@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import math
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pinelib.reference.registry import NominalTypeRegistry
 from decimal import ROUND_HALF_UP, Decimal
 
 from pinelib.core.values import is_na, na, require_number
@@ -122,8 +126,14 @@ def tonumber(source: str, *, ctx: RuntimeLanguageContext | None = None) -> objec
 
 
 def tostring(
-    value: object, pattern: str | None = None, *, mintick: float | None = None
+    value: object, pattern: str | None = None, *, mintick: float | None = None,
+    nominal_registry: NominalTypeRegistry | None = None
 ) -> str:
+    from pinelib.reference.heap import PineEnumValue
+    if isinstance(value, PineEnumValue) and nominal_registry is not None:
+        if pattern is not None:
+            raise PineRuntimeError("enum tostring does not accept a numeric pattern", code=PL_VALUE_TYPE)
+        return nominal_registry.enum_member(value.enum_id, value.member, value.ordinal).title
     if is_na(value):
         return "NaN"
     if type(value) is bool:

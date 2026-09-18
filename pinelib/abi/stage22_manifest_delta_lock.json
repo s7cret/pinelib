@@ -1,0 +1,392 @@
+{
+  "as_of": "2026-09-16",
+  "content_hash": "sha256:d6dd086fe8385648f6caa4f81661e0a4518e94979445a4a3b78032ca4779ecc4",
+  "official_surface": {
+    "after_content_hash": "sha256:c54d90db3c844ce631a7559cbad57a9fc79d1dc62d0b634d4c0dfa7258016399",
+    "after_count": 1108,
+    "after_top_level": {
+      "source_pack_hashes": {
+        "v1": "sha256:981a4cf3bd5878a4bfecff85ad8b78fe2184daf42591daa2e39ee6863900726a",
+        "v2": "sha256:ddf39b9f5460c0e32acc5de7b860e43e13ea79d9b4bcc3b44c90198a1e37fc05",
+        "v3": "sha256:be5670bdbe5a6a28f789c1cc287998744762cbea47f410e97a0f86fde179797a",
+        "v4": "sha256:b63a2f2d90a44d3088125095e760ee92985086528c75a9e8f8b70972d68d5be6",
+        "v5": "sha256:96cdc6c9725b770d711ad4643fea85ffc3ac7392cbca1ea497a8ad2dd230d3c7",
+        "v6": "sha256:48bbf686ac10fcd9ed344090c6787750c4e2e47df9be9814d869136836ee4bb6"
+      }
+    },
+    "before_content_hash": "sha256:e4077078d27e48b0aa78d237a687420557a41736cd3d4995fb0d846d3e564fb2",
+    "before_count": 1108,
+    "before_top_level": {
+      "source_pack_hashes": {
+        "v1": "sha256:62424dee4f9a466ff76809bb8b327a845d68af1c9ceb31b1d9db59b31f51d88b",
+        "v2": "sha256:bd618e27c2f092c7bd64ab7d457fe895e56321a0c7d06096ca35501697074dc9",
+        "v3": "sha256:d13eb433e86bb6df4b3b7eb2bea1d6c22b5acd8b718f8103713308a9bee91a60",
+        "v4": "sha256:20e3258379a78f6bb8908dbcd298bd404ff0ae0ea27a82d911f2e6cd7d84ab3e",
+        "v5": "sha256:61e47ee4cb1568d7e59085865552620b8f440fbbb59d47bbde74857b973affb2",
+        "v6": "sha256:74d223112455dd9f65ffa01ea681dd628198964d951eac3dd1faf88a9a5b5718"
+      }
+    },
+    "symbols": {
+      "bool": {
+        "after": {
+          "category": "functions",
+          "name": "bool",
+          "parameters": [
+            {
+              "name": "value",
+              "qualifier_max": "series",
+              "required": true,
+              "type": "any"
+            }
+          ],
+          "receiver_type": null,
+          "returns": "bool",
+          "supported_versions": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "symbol_id": "pine:function:bool"
+        },
+        "before": {
+          "category": "functions",
+          "name": "bool",
+          "parameters": [],
+          "receiver_type": null,
+          "returns": "bool",
+          "supported_versions": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "symbol_id": "pine:function:bool"
+        }
+      }
+    }
+  },
+  "policy": {
+    "denominator_changed": false,
+    "historical_stage21_evidence_rewritten": false,
+    "rows_added": 0,
+    "rows_removed": 0
+  },
+  "reason": "Stage 2.2 closes bool/int cast ABI and version-exact Bool/NA/history semantics without rewriting Stage 2.1 evidence.",
+  "schema_id": "pinelib.stage22_manifest_delta.v1",
+  "target_manifest": {
+    "after_content_hash": "sha256:e91b66daab987670df743a97ad6389bd280494a1afd132023dd885884c8524e3",
+    "after_count": 1108,
+    "after_top_level": {
+      "classification": {
+        "classified_official": 1108,
+        "official_total": 1108,
+        "target_delegated": 339,
+        "target_direct": 247,
+        "unknown": 0,
+        "unsupported_fail_closed": 522
+      },
+      "official_surface": {
+        "content_hash": "sha256:c54d90db3c844ce631a7559cbad57a9fc79d1dc62d0b634d4c0dfa7258016399",
+        "counts": {
+          "constants": 239,
+          "functions": 475,
+          "methods": 213,
+          "types": 20,
+          "variables": 161
+        },
+        "denominator": 1108,
+        "schema_id": "pinelib.official_pine_v6_surface.v1",
+        "source_index_content_hash": "sha256:90571b63dfbec21b1dd463f4ba9005f1de0c54dcd627000bd07ae86de8b78062",
+        "source_pack_hashes": {
+          "v1": "sha256:981a4cf3bd5878a4bfecff85ad8b78fe2184daf42591daa2e39ee6863900726a",
+          "v2": "sha256:ddf39b9f5460c0e32acc5de7b860e43e13ea79d9b4bcc3b44c90198a1e37fc05",
+          "v3": "sha256:be5670bdbe5a6a28f789c1cc287998744762cbea47f410e97a0f86fde179797a",
+          "v4": "sha256:b63a2f2d90a44d3088125095e760ee92985086528c75a9e8f8b70972d68d5be6",
+          "v5": "sha256:96cdc6c9725b770d711ad4643fea85ffc3ac7392cbca1ea497a8ad2dd230d3c7",
+          "v6": "sha256:48bbf686ac10fcd9ed344090c6787750c4e2e47df9be9814d869136836ee4bb6"
+        }
+      }
+    },
+    "before_content_hash": "sha256:162d1f54079019edbd680cb9725038c9db8617d89c29291d9a377eaf826ad95c",
+    "before_count": 1108,
+    "before_top_level": {
+      "classification": {
+        "classified_official": 1108,
+        "official_total": 1108,
+        "target_delegated": 339,
+        "target_direct": 245,
+        "unknown": 0,
+        "unsupported_fail_closed": 524
+      },
+      "official_surface": {
+        "content_hash": "sha256:e4077078d27e48b0aa78d237a687420557a41736cd3d4995fb0d846d3e564fb2",
+        "counts": {
+          "constants": 239,
+          "functions": 475,
+          "methods": 213,
+          "types": 20,
+          "variables": 161
+        },
+        "denominator": 1108,
+        "schema_id": "pinelib.official_pine_v6_surface.v1",
+        "source_index_content_hash": "sha256:90571b63dfbec21b1dd463f4ba9005f1de0c54dcd627000bd07ae86de8b78062",
+        "source_pack_hashes": {
+          "v1": "sha256:62424dee4f9a466ff76809bb8b327a845d68af1c9ceb31b1d9db59b31f51d88b",
+          "v2": "sha256:bd618e27c2f092c7bd64ab7d457fe895e56321a0c7d06096ca35501697074dc9",
+          "v3": "sha256:d13eb433e86bb6df4b3b7eb2bea1d6c22b5acd8b718f8103713308a9bee91a60",
+          "v4": "sha256:20e3258379a78f6bb8908dbcd298bd404ff0ae0ea27a82d911f2e6cd7d84ab3e",
+          "v5": "sha256:61e47ee4cb1568d7e59085865552620b8f440fbbb59d47bbde74857b973affb2",
+          "v6": "sha256:74d223112455dd9f65ffa01ea681dd628198964d951eac3dd1faf88a9a5b5718"
+        }
+      }
+    },
+    "symbols": {
+      "bool": {
+        "after": {
+          "abi_callable": "pinelib.abi.primitives.bool_v1",
+          "abi_parameters": [
+            {
+              "annotation": "RuntimeTransaction",
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "tx",
+              "position": 0
+            },
+            {
+              "annotation": "object",
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "value",
+              "position": 1
+            }
+          ],
+          "call_form": "namespace_function",
+          "capabilities": [
+            "value.bool",
+            "value.na"
+          ],
+          "category": "functions",
+          "delegation": null,
+          "diagnostic": null,
+          "disposition": "TARGET_DIRECT",
+          "dynamic_length_policy": {},
+          "evaluation_mode": "EAGER_ARGUMENTS",
+          "na_policy": {
+            "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+            "propagation": "PINE_FUNCTION_SPECIFIC"
+          },
+          "name": "bool",
+          "overload_id": "pine:function:bool#v1",
+          "parameter_bindings": [
+            {
+              "abi_parameter": "tx",
+              "binding": "INJECTED",
+              "source": "RUNTIME_TRANSACTION"
+            },
+            {
+              "abi_parameter": "value",
+              "binding": "SOURCE_PARAMETER",
+              "source": "value"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "qualifier_max": "series",
+              "required": true,
+              "type": "any"
+            }
+          ],
+          "producer_overload_ids": [
+            "pine:function:bool#canonical"
+          ],
+          "return": {
+            "identity": "VALUE",
+            "pine_type": "bool",
+            "runtime_type": "bool",
+            "tuple_arity": 0
+          },
+          "source_symbol_ids": [
+            "pine:function:bool",
+            "pine:function:bool#canonical"
+          ],
+          "state_identity_inputs": [],
+          "state_model": "PURE",
+          "symbol_id": "pine:function:bool",
+          "version_availability": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "before": {
+          "abi_callable": null,
+          "abi_parameters": [],
+          "call_form": "namespace_function",
+          "capabilities": [],
+          "category": "functions",
+          "delegation": null,
+          "diagnostic": "PL2001 bool has no admitted PineLib or delegated target",
+          "disposition": "UNSUPPORTED_FAIL_CLOSED",
+          "dynamic_length_policy": {},
+          "evaluation_mode": "EAGER_ARGUMENTS",
+          "na_policy": {
+            "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+            "propagation": "PINE_FUNCTION_SPECIFIC"
+          },
+          "name": "bool",
+          "overload_id": null,
+          "parameter_bindings": [],
+          "parameters": [],
+          "producer_overload_ids": [],
+          "return": {
+            "identity": "VALUE",
+            "pine_type": "bool",
+            "runtime_type": null,
+            "tuple_arity": 0
+          },
+          "source_symbol_ids": [
+            "pine:function:bool"
+          ],
+          "state_identity_inputs": [],
+          "state_model": "NONE",
+          "symbol_id": "pine:function:bool",
+          "version_availability": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        }
+      },
+      "int": {
+        "after": {
+          "abi_callable": "pinelib.abi.primitives.int_v1",
+          "abi_parameters": [
+            {
+              "annotation": "object",
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "value",
+              "position": 0
+            }
+          ],
+          "call_form": "namespace_function",
+          "capabilities": [
+            "value.numeric",
+            "value.na"
+          ],
+          "category": "functions",
+          "delegation": null,
+          "diagnostic": null,
+          "disposition": "TARGET_DIRECT",
+          "dynamic_length_policy": {},
+          "evaluation_mode": "EAGER_ARGUMENTS",
+          "na_policy": {
+            "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+            "propagation": "PINE_FUNCTION_SPECIFIC"
+          },
+          "name": "int",
+          "overload_id": "pine:function:int#v1",
+          "parameter_bindings": [
+            {
+              "abi_parameter": "value",
+              "binding": "SOURCE_PARAMETER",
+              "source": "value"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "qualifier_max": "series",
+              "required": true,
+              "type": "any"
+            }
+          ],
+          "producer_overload_ids": [
+            "pine:function:int#canonical"
+          ],
+          "return": {
+            "identity": "VALUE",
+            "pine_type": "int",
+            "runtime_type": "int",
+            "tuple_arity": 0
+          },
+          "source_symbol_ids": [
+            "pine:function:int",
+            "pine:function:int#canonical"
+          ],
+          "state_identity_inputs": [],
+          "state_model": "PURE",
+          "symbol_id": "pine:function:int",
+          "version_availability": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "before": {
+          "abi_callable": null,
+          "abi_parameters": [],
+          "call_form": "namespace_function",
+          "capabilities": [],
+          "category": "functions",
+          "delegation": null,
+          "diagnostic": "PL2001 int has no admitted PineLib or delegated target",
+          "disposition": "UNSUPPORTED_FAIL_CLOSED",
+          "dynamic_length_policy": {},
+          "evaluation_mode": "EAGER_ARGUMENTS",
+          "na_policy": {
+            "acceptance": "PARAMETER_SPECIFIC_RUNTIME_VALIDATION",
+            "propagation": "PINE_FUNCTION_SPECIFIC"
+          },
+          "name": "int",
+          "overload_id": null,
+          "parameter_bindings": [],
+          "parameters": [
+            {
+              "name": "value",
+              "qualifier_max": "series",
+              "required": true,
+              "type": "any"
+            }
+          ],
+          "producer_overload_ids": [],
+          "return": {
+            "identity": "VALUE",
+            "pine_type": "int",
+            "runtime_type": null,
+            "tuple_arity": 0
+          },
+          "source_symbol_ids": [
+            "pine:function:int"
+          ],
+          "state_identity_inputs": [],
+          "state_model": "NONE",
+          "symbol_id": "pine:function:int",
+          "version_availability": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        }
+      }
+    }
+  }
+}

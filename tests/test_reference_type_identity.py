@@ -95,11 +95,21 @@ def test_canonical_identity_does_not_change_legacy_search_policy(version, dtype)
     assert ref.array_binary_search_rightmost_v1(tx, handle, 3.) == -1
 
 
-@pytest.mark.parametrize('dtype,values,query', [('string', ['a', 'c'], 'b'), ('bool', [False, True], 0.5)])
-def test_non_numeric_descriptors_do_not_acquire_numeric_neighbor_fallback(dtype, values, query):
+def test_non_numeric_string_search_does_not_acquire_numeric_neighbor_fallback():
     runtime = session(6)
     tx = runtime.begin(CallbackFrame('HISTORICAL_EVAL', 0, bar_index=0))
-    handle = ref.array_new_v1(tx, 'search', dtype)
-    for item in values:
+    handle = ref.array_new_v1(tx, 'search', 'string')
+    for item in ['a', 'c']:
         ref.array_push_v1(tx, handle, item)
-    assert ref.array_binary_search_leftmost_v1(tx, handle, query) == -1
+    assert ref.array_binary_search_leftmost_v1(tx, handle, 'b') == -1
+
+
+def test_direct_runtime_rejects_wrong_typed_search_argument():
+    runtime = session(6)
+    tx = runtime.begin(CallbackFrame('HISTORICAL_EVAL', 0, bar_index=0))
+    handle = ref.array_new_v1(tx, 'search', 'bool')
+    for item in [False, True]:
+        ref.array_push_v1(tx, handle, item)
+    with pytest.raises(PineRuntimeError, match='declared type'):
+        ref.array_binary_search_leftmost_v1(tx, handle, 0.5)
+

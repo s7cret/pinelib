@@ -246,6 +246,30 @@ class RuntimeReferenceHeap:
         if not item.working_varip or (committed and not item.committed_varip):
             raise PineRuntimeError("varip slot points to nonpersistent collection", code=PL_REFERENCE_INVALID)
 
+    def validate_collection_argument(self, handle: ReferenceHandle, value: object, *, role: str = "element") -> None:
+        item = self._get(handle)
+        if item.kind not in {"array", "map", "matrix"}:
+            raise PineRuntimeError("expected collection handle", code=PL_REFERENCE_TYPE)
+        from pinelib.reference.persistence import validate_typed_collection_argument
+        validate_typed_collection_argument(item.kind, item.type_descriptor, value, heap=self, role=role)
+
+    def _validate_typed_collection_payload(self, item: _HeapObject, payload: object, *, committed: bool = False) -> None:
+        if item.kind not in {"array", "map", "matrix"}:
+            return
+        decoded = self._decode_value(payload)
+        if item.kind == "array":
+            descriptor = self._array_slice_descriptor(decoded)
+            if descriptor is not None:
+                parent, _, _ = descriptor
+                parent_item = self._get(parent)
+                normalized = (item.type_descriptor if item.type_descriptor.startswith("array<")
+                              else "array<" + item.type_descriptor + ">")
+                if self.normalized_type_descriptor(parent) != normalized:
+                    raise PineRuntimeError("array slice/backing type mismatch", code=PL_REFERENCE_TYPE)
+                return
+        from pinelib.reference.persistence import validate_typed_collection_payload
+        validate_typed_collection_payload(item.kind, item.type_descriptor, decoded, heap=self)
+
     def create(
         self,
         object_id: str,
@@ -279,6 +303,7 @@ class RuntimeReferenceHeap:
             udt_schema=clone_runtime_value(udt_schema),
         )
         if not self._loading_checkpoint:
+            self._validate_typed_collection_payload(item, payload)
             self._validate_nominal_payload(item, payload)
         self._objects[object_id] = item
         return handle
@@ -499,6 +524,7 @@ class RuntimeReferenceHeap:
             old_keys = [self._decode_value(p[0]) for p in item.working]
             if [p[0] for p in payload] != old_keys:
                 raise PineRuntimeError("map keys cannot change during direct iteration", code=PL_REFERENCE_INVALID)
+        self._validate_typed_collection_payload(item, payload)
         self._validate_nominal_payload(item, payload)
         if item.working_varip and item.kind != "udt":
             from pinelib.reference.persistence import validate_collection_payload
@@ -874,6 +900,8 @@ class RuntimeReferenceHeap:
         heap._loading_checkpoint = False
         heap._validate_closed_graph()
         for item in heap._objects.values():
+            heap._validate_typed_collection_payload(item, item.committed, committed=True)
+            heap._validate_typed_collection_payload(item, item.working)
             heap._validate_nominal_payload(item, item.committed, committed=True)
             heap._validate_nominal_payload(item, item.working)
             if item.working_varip:

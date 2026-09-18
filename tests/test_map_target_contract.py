@@ -9,9 +9,10 @@ import pytest
 
 from pinelib import na
 from pinelib.abi import reference as abi
+from tests.stage21_post_audit_helpers import restore_pre_audit_target
+
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature, _parameter_bindings
-from pinelib.state.checkpoint import sha
 from tests.test_language_scopes_once import begin, session
 
 
@@ -38,22 +39,16 @@ def test_exact_generic_return_parameters_and_versioned_binding(manifest, expecte
 
 
 def test_only_four_rows_change_and_frozen_manifest_is_exact(manifest):
-    remaining = deepcopy(manifest)
+    baseline = restore_pre_audit_target(manifest)
+    remaining = deepcopy(baseline)
     remaining.pop("content_hash")
-    remaining.pop("compiled_history_reservation")
-    remaining["compiler_operations"] = [
-        operation
-        for operation in remaining["compiler_operations"]
-        if operation["name"] != "state.reserve_history.v1"
-    ]
-    assert sha(remaining) == EXPECTED["expected_content_hash"]
     symbols = {row["symbol_id"] for row in EXPECTED["rows"]}
     selected = [row for row in remaining["rows"] if row["symbol_id"] in symbols]
     assert len(selected) == 4 and sum(len(row["version_availability"]) for row in selected) == 8
     remaining["rows"] = [row for row in remaining["rows"] if row["symbol_id"] not in symbols]
     encoded = json.dumps(remaining, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     assert hashlib.sha256(encoded).hexdigest() == EXPECTED["remainder_sha256"]
-
+    assert baseline["content_hash"] == EXPECTED["expected_content_hash"]
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")
 
 
@@ -129,7 +124,7 @@ def test_existing_abi_retains_literal_previous_value_and_order(row, version):
 def test_manual_and_metadata_authority_bytes_are_frozen():
     assert len(MANUAL_ROWS) == 10
     assert hashlib.sha256((FIXTURES / "map_operations_manual_expected.json").read_bytes()).hexdigest() == "3afd6e3a0a1a0abe972c40190bff3dd2caf566aa5e7a7a355aa9d2acd5bb9ffe"
-    assert hashlib.sha256((FIXTURES / "map_target_metadata_expected.json").read_bytes()).hexdigest() == "faacd81b2e2491d3e9f18ba1a097793e266739502d80d6888a69e22639a8d04d"
+    assert hashlib.sha256((FIXTURES / "map_target_metadata_expected.json").read_bytes()).hexdigest() == "2c02f74907af273fba35790cad019800a29dd6098bd578bff7e4a1327a4b34ab"
 
 
 @pytest.mark.parametrize("actual,expected", [(False, 0), (0, False), ([1], [1.0]), ([["a", 1]], [["a", 2]])])

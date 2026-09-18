@@ -270,10 +270,13 @@ def test_optimized_reads_preserve_negative_index_version_and_reference_alias(ver
             array_get(tx.references, a, -1)
     else:
         assert array_get(tx.references, a, -1) == 1.0
-    parent = array_new(tx.references, tx.reference_id_v1("refs"), "array<float>", 1, a)
-    assert array_get(tx.references, parent, 0) == a
-    array_set(tx.references, a, 0, 7.0)
-    assert array_get(tx.references, array_get(tx.references, parent, 0), 0) == 7.0
+    # A Pine collection cannot directly store another collection ID.  Keep the
+    # optimized-read alias regression on an admitted reference element instead.
+    label = tx.references.create(tx.reference_id_v1("label"), "visual", "label", {"text": "old"})
+    parent = array_new(tx.references, tx.reference_id_v1("refs"), "label", 1, label)
+    assert array_get(tx.references, parent, 0) == label
+    tx.references.mutate_payload(label, {"text": "new"})
+    assert tx.references.read_payload(array_get(tx.references, parent, 0))["text"] == "new"
     tx.abort()
 
 

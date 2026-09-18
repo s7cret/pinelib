@@ -27,6 +27,8 @@ class SeriesStorage(Generic[T]):
     revision: int = 0
     history_policy: str = "each_bar"
     evaluated: bool = False
+    reserved_history: int = 0
+    working_reserved_history: int = 0
 
     def __post_init__(self):
         if self.history_policy not in {"each_bar", "on_evaluation"}:
@@ -35,22 +37,30 @@ class SeriesStorage(Generic[T]):
             )
 
     def _history_identity(self) -> dict:
-        return (
-            {"history_policy": self.history_policy, "evaluated": self.evaluated}
-            if self.history_policy != "each_bar"
-            else {}
-        )
+        identity: dict[str, object] = {}
+        if self.history_policy != "each_bar":
+            identity.update({"history_policy": self.history_policy, "evaluated": self.evaluated})
+        if self.reserved_history:
+            identity["reserved_history"] = self.reserved_history
+        return identity
 
     def begin(self, value: T | None = None) -> None:
         baseline = self.committed[-1] if value is None and self.committed else value
         self.working = clone_runtime_value(baseline)  # type: ignore[assignment]
         self.initialized = True
         self.evaluated = False
+        self.working_reserved_history = self.reserved_history
 
     def set(self, value: T) -> None:
         if not self.initialized:
             raise PineRuntimeError("series not initialized")
         self.working = clone_runtime_value(value)  # type: ignore[assignment]
+
+    def reserve(self, offset: int) -> None:
+        if type(offset) is not int or offset < 0:
+            raise PineRuntimeError("invalid history reservation", code=PL_SERIES_HISTORY)
+        if offset > self.working_reserved_history:
+            self.working_reserved_history = offset
 
     def read(self, offset: int = 0) -> T | None:
         if offset < 0:
@@ -61,18 +71,16 @@ class SeriesStorage(Generic[T]):
         return self.committed[index] if index >= 0 else None
 
     def commit(self) -> None:
-        if not self.initialized:
-            return
         if self.history_policy == "on_evaluation" and not self.evaluated:
             return
         self.committed.append(clone_runtime_value(self.working))  # type: ignore[arg-type]
+        self.reserved_history = max(self.reserved_history, self.working_reserved_history)
         self.revision += 1
 
     def rollback(self) -> None:
-        if not self.initialized:
-            return
         baseline = self.committed[-1] if self.committed else None
         self.working = clone_runtime_value(baseline)  # type: ignore[assignment]
+        self.working_reserved_history = self.reserved_history
 
     @property
     def semantic_hash(self) -> str:
@@ -113,6 +121,8 @@ class SeriesStorage(Generic[T]):
         if not isinstance(data, dict) or set(data) not in (
             required,
             required | {"history_policy", "evaluated"},
+            required | {"reserved_history"},
+            required | {"history_policy", "evaluated", "reserved_history"},
         ):
             raise PineRuntimeError(
                 "series checkpoint schema mismatch", code=PL_CHECKPOINT_INVALID
@@ -126,6 +136,7 @@ class SeriesStorage(Generic[T]):
             or type(data["initialized"]) is not bool
             or type(data["revision"]) is not int
             or data["revision"] < 0
+            or ("reserved_history" in data and (type(data["reserved_history"]) is not int or data["reserved_history"] < 0))
         ):
             raise PineRuntimeError(
                 "series checkpoint types are invalid", code=PL_CHECKPOINT_INVALID
@@ -153,6 +164,8 @@ class SeriesStorage(Generic[T]):
             history_policy=data.get("history_policy", "each_bar"),
         )
         storage.evaluated = data.get("evaluated", False)
+        storage.reserved_history = data.get("reserved_history", 0)
+        storage.working_reserved_history = storage.reserved_history
         storage.committed = AppendOnlyHistory("series-history-v1", committed)
         storage.working = from_portable(data["working"])
         storage.initialized = data["initialized"]

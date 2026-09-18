@@ -90,7 +90,7 @@ def test_value_and_canonical_json_edge_matrix():
     expect_error(to_portable, {1: "x"})
     expect_error(to_portable, object())
     assert canonical_json({"β": 1, "a": 2}) == b'{"a":2,"\xce\xb2":1}'
-    assert pine_bool("x", language()) is True
+    expect_error(pine_bool, "x", language())
     assert pine_bool(False, language()) is False
     expect_error(pine_div, True, 1, language())
     expect_error(pine_div, 1, 0, language())

@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 from pinelib.runtime.session import RuntimeTransaction
+from pinelib.core.values import NZ_OMITTED
 
 
 def float_v1(x: object) -> object:
     from pinelib.core.values import pine_float
 
     return pine_float(x)
+
+
+def bool_v1(tx: RuntimeTransaction, value: object) -> object:
+    from pinelib.core.values import pine_bool_cast
+
+    tx._check()
+    return pine_bool_cast(value, tx.session.language)
+
+
+def int_v1(value: object) -> object:
+    from pinelib.core.values import pine_int
+
+    return pine_int(value)
 
 
 def operator_binary_v1(
@@ -23,21 +37,17 @@ def series_history_v1(tx: RuntimeTransaction, base: object, offset: object) -> o
     return tx.op_series_history(base, offset)
 
 
-def reserve_history_v1(
-    tx: RuntimeTransaction, series_id: str, dtype: str, history_policy: str
-) -> None:
-    tx.reserve_history_v1(series_id, dtype, history_policy)
-
-
 def na_v1(tx: RuntimeTransaction, x: object) -> bool:
     """Version-aware missing-value predicate, including flat broker values."""
-    from pinelib.core.values import is_na, normalize_na
+    from pinelib.core.values import is_na
     from pinelib.errors import PL_VALUE_TYPE, PineRuntimeError
 
     tx._check()
     if tx.session.language.pine_version >= 6 and type(x) is bool:
         raise PineRuntimeError("na does not accept bool in Pine v6", code=PL_VALUE_TYPE)
-    return is_na(normalize_na(x))
+    if x is None:
+        raise PineRuntimeError("transport null is not Pine na", code=PL_VALUE_TYPE)
+    return is_na(x)
 
 
 def once_v1(tx: RuntimeTransaction, state_id: str, condition):
@@ -73,3 +83,11 @@ def logical_lazy_v1(tx: RuntimeTransaction, operator: str, left, right):
     from pinelib.errors import PineRuntimeError
 
     raise PineRuntimeError("invalid logical operator")
+
+
+
+def nz_v1(tx: RuntimeTransaction, source: object, expression_type: str,
+          replacement: object = NZ_OMITTED) -> object:
+    from pinelib.core.values import pine_nz
+    tx._check()
+    return pine_nz(source, replacement, result_type=expression_type, ctx=tx.session.language)

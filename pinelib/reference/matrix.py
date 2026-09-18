@@ -4,6 +4,9 @@ from typing import cast
 
 from pinelib.errors import PL_REFERENCE_TYPE, PineRuntimeError
 from pinelib.reference.heap import ReferenceHandle, RuntimeReferenceHeap
+from pinelib.core.values import na
+
+_DEFAULT_INITIAL = object()
 
 
 def matrix_new(
@@ -12,12 +15,16 @@ def matrix_new(
     type_descriptor: str,
     rows: int,
     columns: int,
-    initial: object,
+    initial: object = _DEFAULT_INITIAL,
 ) -> ReferenceHandle:
     if type(rows) is not int or type(columns) is not int or rows < 0 or columns < 0:
         raise PineRuntimeError(
             "matrix dimensions must be nonnegative ints", code=PL_REFERENCE_TYPE
         )
+    if initial is _DEFAULT_INITIAL:
+        from pinelib.reference.persistence import collection_type_arguments
+        parts = collection_type_arguments("matrix", type_descriptor)
+        initial = False if (heap.language.pine_version >= 6 and parts == ("bool",)) else na
     return heap.create(
         object_id,
         "matrix",

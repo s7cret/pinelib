@@ -1,0 +1,160 @@
+{
+  "schema_id": "pinelib.stage21_manifest_delta.v1",
+  "baseline_revision": "8fa1ea99b92d6557a7104d9d2dd4a634d38a8046",
+  "baseline_target_manifest_raw_sha256": "5f5b8c42e8e77a8c17f605676b0d131184b41a4077283681d1d1647887b455e5",
+  "baseline_target_content_hash": "sha256:0c65823f2a17d86a863a16e932ff280cd0e6d6442f7a4f10ed4851b7c465ac9f",
+  "current_target_content_hash": "sha256:8093825b275027eb155b5959d1fb2cf108c5ce72cd89926d65e60af1cae8225f",
+  "target_rows": {
+    "before_count": 1108,
+    "after_count": 1108,
+    "removed": [
+      "functions|input.enum|pine:function:input.enum||namespace_function",
+      "functions|input.text_area|pine:function:input.text_area||namespace_function"
+    ],
+    "added": [
+      "functions|input.enum|pine:function:input.enum|pine:function:input.enum#v1|namespace_function",
+      "functions|input.text_area|pine:function:input.text_area|pine:function:input.text_area#v1|namespace_function"
+    ],
+    "changed": [
+      "functions|input.bool|pine:function:input.bool|pine:function:input.bool#v1|namespace_function",
+      "functions|input.color|pine:function:input.color|pine:function:input.color#v1|namespace_function",
+      "functions|input.float|pine:function:input.float|pine:function:input.float#v1|namespace_function",
+      "functions|input.int|pine:function:input.int|pine:function:input.int#v1|namespace_function",
+      "functions|input.price|pine:function:input.price|pine:function:input.price#v1|namespace_function",
+      "functions|input.session|pine:function:input.session|pine:function:input.session#v1|namespace_function",
+      "functions|input.source|pine:function:input.source|pine:function:input.source#v1|namespace_function",
+      "functions|input.string|pine:function:input.string|pine:function:input.string#v1|namespace_function",
+      "functions|input.symbol|pine:function:input.symbol|pine:function:input.symbol#v1|namespace_function",
+      "functions|input.timeframe|pine:function:input.timeframe|pine:function:input.timeframe#v1|namespace_function",
+      "functions|input.time|pine:function:input.time|pine:function:input.time#v1|namespace_function",
+      "functions|input|pine:function:input|pine:function:input#v1|namespace_function"
+    ],
+    "before_unaffected_hash": "789cc4f15074f3cf6d55e415fd9cb2a84551cb06b01ad7ea101ec1623c5a27e1",
+    "after_unaffected_hash": "789cc4f15074f3cf6d55e415fd9cb2a84551cb06b01ad7ea101ec1623c5a27e1",
+    "current_affected_hash": "792379f9f5a0d41e239b1e50475003d1ef3e01f271f61f0cced3723c71961e6e",
+    "current_all_keys_hash": "1db1ee4ee2f60b187ec6f60d8ae8eb4643450b2525297f91cb4d0484bdbc7eba"
+  },
+  "target_top_level_changed": [
+    "classification",
+    "content_hash",
+    "official_surface"
+  ],
+  "target_unrelated_row_changes": [],
+  "baseline_surface_raw_sha256": "943f40d16ae197ea86ae36f0a80439041599e8dced724d0b9769d9c6324558e5",
+  "baseline_surface_content_hash": "sha256:8a8de65aec76c62ae7faddb620698171721de26588ac6822118e93117dee857b",
+  "current_surface_content_hash": "sha256:6f7c0f7bbe75afbbb00adc7c9443b2f283fef353593a29e09c676293ad0ba576",
+  "surface_rows": {
+    "before_count": 1108,
+    "after_count": 1108,
+    "removed": [],
+    "added": [],
+    "changed": [
+      "functions|float|pine:function:float",
+      "functions|input.bool|pine:function:input.bool",
+      "functions|input.color|pine:function:input.color",
+      "functions|input.enum|pine:function:input.enum",
+      "functions|input.float|pine:function:input.float",
+      "functions|input.int|pine:function:input.int",
+      "functions|input.price|pine:function:input.price",
+      "functions|input.session|pine:function:input.session",
+      "functions|input.source|pine:function:input.source",
+      "functions|input.string|pine:function:input.string",
+      "functions|input.symbol|pine:function:input.symbol",
+      "functions|input.text_area|pine:function:input.text_area",
+      "functions|input.timeframe|pine:function:input.timeframe",
+      "functions|input.time|pine:function:input.time",
+      "functions|input|pine:function:input",
+      "functions|map.put_all|pine:function:map.put_all",
+      "functions|map.put|pine:function:map.put",
+      "functions|math.abs|pine:function:math.abs",
+      "functions|math.ceil|pine:function:math.ceil",
+      "functions|math.exp|pine:function:math.exp",
+      "functions|math.floor|pine:function:math.floor",
+      "functions|math.max|pine:function:math.max",
+      "functions|math.min|pine:function:math.min",
+      "functions|math.round|pine:function:math.round",
+      "functions|math.sqrt|pine:function:math.sqrt",
+      "functions|na|pine:function:na",
+      "functions|str.lower|pine:function:str.lower",
+      "functions|str.tonumber|pine:function:str.tonumber",
+      "functions|str.upper|pine:function:str.upper",
+      "functions|strategy.risk.allow_entry_in|pine:function:strategy.risk.allow_entry_in",
+      "functions|strategy.risk.max_position_size|pine:function:strategy.risk.max_position_size",
+      "functions|ta.macd|pine:function:ta.macd",
+      "functions|ta.rsi|pine:function:ta.rsi",
+      "functions|ta.stdev|pine:function:ta.stdev",
+      "functions|ta.tsi|pine:function:ta.tsi",
+      "functions|ta.valuewhen|pine:function:ta.valuewhen",
+      "functions|ta.variance|pine:function:ta.variance",
+      "methods|map.put_all|pine:method:map.put_all",
+      "methods|map.put|pine:method:map.put"
+    ],
+    "before_unaffected_hash": "adcae1a7fae5b3df27ada78fa0537ba7e12398fd4d1e38fb617f1cc63da271bc",
+    "after_unaffected_hash": "adcae1a7fae5b3df27ada78fa0537ba7e12398fd4d1e38fb617f1cc63da271bc",
+    "current_affected_hash": "bd2593316ee984ed8449e3c8e3ed65892d85efd1e66fba5cb9ef85e34662264c",
+    "current_all_keys_hash": "554b074f3ee6207096c147ac55465d61cb5a8e1658854f8adf4ace0ce47a56bc"
+  },
+  "surface_non_input_changed": [
+    "functions|float|pine:function:float",
+    "functions|map.put_all|pine:function:map.put_all",
+    "functions|map.put|pine:function:map.put",
+    "functions|math.abs|pine:function:math.abs",
+    "functions|math.ceil|pine:function:math.ceil",
+    "functions|math.exp|pine:function:math.exp",
+    "functions|math.floor|pine:function:math.floor",
+    "functions|math.max|pine:function:math.max",
+    "functions|math.min|pine:function:math.min",
+    "functions|math.round|pine:function:math.round",
+    "functions|math.sqrt|pine:function:math.sqrt",
+    "functions|na|pine:function:na",
+    "functions|str.lower|pine:function:str.lower",
+    "functions|str.tonumber|pine:function:str.tonumber",
+    "functions|str.upper|pine:function:str.upper",
+    "functions|strategy.risk.allow_entry_in|pine:function:strategy.risk.allow_entry_in",
+    "functions|strategy.risk.max_position_size|pine:function:strategy.risk.max_position_size",
+    "functions|ta.macd|pine:function:ta.macd",
+    "functions|ta.rsi|pine:function:ta.rsi",
+    "functions|ta.stdev|pine:function:ta.stdev",
+    "functions|ta.tsi|pine:function:ta.tsi",
+    "functions|ta.valuewhen|pine:function:ta.valuewhen",
+    "functions|ta.variance|pine:function:ta.variance",
+    "methods|map.put_all|pine:method:map.put_all",
+    "methods|map.put|pine:method:map.put"
+  ],
+  "surface_input_changed": [
+    "functions|input.bool|pine:function:input.bool",
+    "functions|input.color|pine:function:input.color",
+    "functions|input.enum|pine:function:input.enum",
+    "functions|input.float|pine:function:input.float",
+    "functions|input.int|pine:function:input.int",
+    "functions|input.price|pine:function:input.price",
+    "functions|input.session|pine:function:input.session",
+    "functions|input.source|pine:function:input.source",
+    "functions|input.string|pine:function:input.string",
+    "functions|input.symbol|pine:function:input.symbol",
+    "functions|input.text_area|pine:function:input.text_area",
+    "functions|input.timeframe|pine:function:input.timeframe",
+    "functions|input.time|pine:function:input.time",
+    "functions|input|pine:function:input"
+  ],
+  "surface_top_level_changed": [
+    "content_hash",
+    "source_pack_hashes"
+  ],
+  "classification_delta": {
+    "target_direct": [
+      243,
+      245
+    ],
+    "unsupported_fail_closed": [
+      526,
+      524
+    ]
+  },
+  "policy": {
+    "target_runtime_scope": "input_family_only",
+    "surface_scope": "input_family_plus_preexisting_catalog_projection_sync",
+    "rows_removed_from_denominator": 0,
+    "manual_numerical_expectations_changed": false
+  }
+}

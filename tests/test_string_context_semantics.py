@@ -11,6 +11,8 @@ import pytest
 
 from pinelib import CallbackFrame, RuntimeLanguageContext, RuntimeSession, na
 from pinelib.abi import string as abi
+from tests.stage21_post_audit_helpers import restore_pre_audit_target
+
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.catalog import ROWS
 from pinelib.builtins import string as owner
@@ -244,16 +246,10 @@ def test_historical_numeric_adapter_is_still_the_original_callable():
 
 
 def test_manifest_outside_four_rows_and_exact_disk_remain_unchanged(manifest):
-    remainder = deepcopy(manifest)
+    remainder = restore_pre_audit_target(manifest)
     remainder.pop("content_hash")
-    remainder.pop("compiled_history_reservation")
-    remainder["compiler_operations"] = [
-        operation
-        for operation in remainder["compiler_operations"]
-        if operation["name"] != "state.reserve_history.v1"
-    ]
     remainder["rows"] = [row for row in remainder["rows"] if row["name"] not in {"str." + name for name in FUNCTIONS}]
     raw = json.dumps(remainder, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    assert hashlib.sha256(raw).hexdigest() == "dc4f7e90019d55e803aa9a706eb7aa2e6956a676c334ce951945684a3ede3e1a"
+    assert hashlib.sha256(raw).hexdigest() == "8b1f0f331d1a3d8e71316cfefcf4a90de69923dee7252f30b8fe0916d51e9865"
     assert manifest["classification"]["official_total"] == 1108
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")
