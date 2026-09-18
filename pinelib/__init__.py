@@ -63,8 +63,10 @@ from .core import (
     is_number,
     na,
     pine_bool,
+    pine_bool_cast,
     pine_div,
     pine_div_const_int,
+    pine_int,
 )
 from .version import PACKAGE_VERSION
 
@@ -131,6 +133,8 @@ __all__ = [
     "is_number",
     "na",
     "pine_bool",
+    "pine_bool_cast",
     "pine_div",
     "pine_div_const_int",
+    "pine_int",
 ]

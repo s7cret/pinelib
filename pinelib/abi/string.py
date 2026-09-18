@@ -104,3 +104,10 @@ def format_v1(
 
 def format_time_v1(timestamp_ms: int, pattern: str, timezone_name: str) -> str:
     return _string.format_time(timestamp_ms, pattern, timezone_name)
+
+
+def tostring_v2(tx: RuntimeTransaction, value: object,
+                pattern: str | None = None, mintick: float | None = None) -> str:
+    tx._check()
+    return _string.tostring(value, pattern, mintick=mintick,
+                            nominal_registry=tx.references.nominal_registry)

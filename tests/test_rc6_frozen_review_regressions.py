@@ -160,17 +160,16 @@ def test_restore_rejects_dangling_reference_handle_graph():
     runtime_language = language("reference-graph")
     source = RuntimeSession(runtime_language)
     transaction = source.begin(CallbackFrame("HISTORICAL_EVAL", 0, bar_index=0))
-    child = arrays.array_new(
-        transaction.references,
-        "array:child",
-        "array<int>",
-        1,
-        7,
+    # Stage 2.4 correctly rejects collection IDs nested directly in another
+    # collection.  Keep this frozen dangling-graph regression on a Pine-legal
+    # reference element instead: an array<label> sharing one label ID.
+    child = transaction.references.create(
+        "visual:child", "visual", "label", {"text": "child"}
     )
     arrays.array_new(
         transaction.references,
         "array:root",
-        "array<array<int>>",
+        "array<label>",
         1,
         child,
     )
@@ -180,7 +179,7 @@ def test_restore_rejects_dangling_reference_handle_graph():
     state["references"]["objects"] = [
         row
         for row in state["references"]["objects"]
-        if row["object_id"] != "array:child"
+        if row["object_id"] != "visual:child"
     ]
     without_transcript = {
         key: value for key, value in state.items() if key != "transcript"

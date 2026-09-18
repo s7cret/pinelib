@@ -40,7 +40,11 @@ def _row(
     )
 
 
-ROWS: list[CatalogRow] = []
+ROWS: list[CatalogRow] = [
+    _row("nz", "pinelib.abi.primitives.nz_v1", versions=ALL_VERSIONS,
+         status=TargetStatus.SUPPORTED_CONTEXT, return_type="int|float|color|bool",
+         call_form="global_function", state_model="RUNTIME_CONTEXT", capabilities=("value.na",)),
+]
 
 # Pure math namespace and historical global aliases.
 _math = {
@@ -104,6 +108,15 @@ ROWS.append(
     )
 )
 
+# Versioned color values and channel extraction.
+for name in ("r", "g", "b", "t"):
+    ROWS.append(_row(f"color.{name}", f"pinelib.abi.color.{name}_v1", versions=(4, 5, 6),
+        status=TargetStatus.SUPPORTED_PURE, return_type="float", capabilities=("value.color",)))
+for name in ('aqua', 'black', 'blue', 'fuchsia', 'gray', 'green', 'lime', 'maroon', 'navy', 'olive', 'orange', 'purple', 'red', 'silver', 'teal', 'white', 'yellow'):
+    ROWS.append(_row(f"color.{name}", f"pinelib.abi.color.{name}_v1", versions=(4, 5, 6),
+        status=TargetStatus.SUPPORTED_CONTEXT, return_type="color", call_form="constant",
+        state_model="RUNTIME_CONTEXT", capabilities=("value.color",)))
+
 # Strings.
 _string = {
     "contains": "bool",
@@ -124,7 +137,7 @@ _string = {
     "format_time": "string",
 }
 for name, return_type in _string.items():
-    revision = "v2" if name in {"lower", "upper", "trim", "tonumber"} else "v1"
+    revision = "v2" if name in {"lower", "upper", "trim", "tonumber", "tostring"} else "v1"
     path = f"pinelib.abi.string.{name}_{revision}"
     state_model = "REFERENCE_HEAP" if name == "split" else "PURE"
     status = (
@@ -181,6 +194,8 @@ for name, return_type in {
     "session": "string",
     "color": "color",
     "source": "source",
+    "enum": "enum",
+    "text_area": "string",
 }.items():
     ROWS.append(
         _row(
@@ -188,6 +203,10 @@ for name, return_type in {
             (
                 "pinelib.abi.input.source_value_v1"
                 if name == "source"
+                else "pinelib.abi.input.text_area_v1"
+                if name == "text_area"
+                else "pinelib.abi.input.enum_v1"
+                if name == "enum"
                 else f"pinelib.abi.input.{name}_v1"
             ),
             versions=NAMESPACE,
@@ -429,6 +448,8 @@ for name, (return_type, tuple_arity) in _ta.items():
 
 # References.
 _array = {
+    "from": "array<T>",
+    "sum": "int|float",
     "new": "array<T>",
     "size": "int",
     "get": "T",
@@ -601,5 +622,11 @@ ROWS.append(_row("na", "pinelib.abi.primitives.na_v1", versions=ALL_VERSIONS,
 ROWS.append(_row("float", "pinelib.abi.primitives.float_v1", versions=ALL_VERSIONS,
                  status=TargetStatus.SUPPORTED_PURE, call_form="global_function",
                  return_type="float", capabilities=("value.numeric", "value.na")))
+ROWS.append(_row("bool", "pinelib.abi.primitives.bool_v1", versions=ALL_VERSIONS,
+                 status=TargetStatus.SUPPORTED_CONTEXT, call_form="global_function",
+                 return_type="bool", capabilities=("value.bool", "value.na")))
+ROWS.append(_row("int", "pinelib.abi.primitives.int_v1", versions=ALL_VERSIONS,
+                 status=TargetStatus.SUPPORTED_PURE, call_form="global_function",
+                 return_type="int", capabilities=("value.numeric", "value.na")))
 
 CATALOG: tuple[CatalogRow, ...] = tuple(ROWS)

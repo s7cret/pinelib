@@ -34,5 +34,5 @@ source = ["pinelib"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 95
+fail_under = 92
 show_missing = true

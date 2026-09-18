@@ -104,27 +104,9 @@ _COMPILER_OPERATIONS = (
         "pure",
         "pinelib.abi.primitives.series_history_v1",
     ),
-    (
-        "state.reserve_history.v1",
-        "eager",
-        "state",
-        "pinelib.abi.primitives.reserve_history_v1",
-    ),
 )
-_COMPILER_OPERATION_CAPABILITIES = {
-    "state.reserve_history.v1": ("compiler.history_reservation.v1",),
-}
-_COMPILED_HISTORY_RESERVATION = {
-    "revision": 1,
-    "operation": "state.reserve_history.v1",
-    "capability": "compiler.history_reservation.v1",
-    "supported_pine_versions": [1, 2],
-    "scalar_types": ["bool", "color", "float", "int", "string"],
-    "history_policies": ["each_bar"],
-    "reservation": "typed-storage-without-evaluation",
-    "rollback": "transactional",
-}
 _INTERNAL_ABI_BINDINGS = {
+    "expression_type": "SEMANTIC_EXPRESSION_TYPE",
     "registry": "RUNTIME_INPUT_REGISTRY",
     "input_id": "ADMITTED_INPUT_SPEC_ID",
     "tx": "RUNTIME_TRANSACTION",
@@ -149,6 +131,12 @@ _SOURCE_TO_ABI_ALIASES = {
 # Audited per-function spellings. These aliases must never become a global
 # argument-name fallback: e.g. `x` means a source in RSI, a number in exp.
 _AUDITED_ARGUMENT_ALIASES = {
+    "str.contains": {"str": "substring"},
+    "str.startswith": {"str": "prefix"},
+    "str.endswith": {"str": "suffix"},
+    "str.pos": {"str": "substring"},
+    "str.substring": {"begin_pos": "begin", "end_pos": "end"},
+    "str.tostring": {"format": "pattern"},
     "math.abs": {"number": "value"},
     "math.ceil": {"number": "value"},
     "math.floor": {"number": "value"},
@@ -176,6 +164,11 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
     qualifiers and arity-dependent returns. See docs/STAGE2_BUILTIN_BINDINGS.md.
     """
     name = official["name"]
+    if name == "input" and official["category"] == "functions":
+        return {**official, "parameters": [
+            {**p, "qualifier_max": "series"} if p["name"] == "defval" else p
+            for p in official["parameters"]
+        ]}
     if (
         name in {"strategy.risk.allow_entry_in", "strategy.risk.max_position_size"}
         and official["category"] == "functions"
@@ -253,7 +246,15 @@ def _audited_signature(official: dict[str, Any]) -> dict[str, Any]:
         parameters = [parameter("source", "float"), parameter("length", "int", qualifier="simple")]
     else:
         return official
-    returns = {"math.round": "int|float", "math.abs": "int|float", "math.ceil": "int", "math.floor": "int"}
+    returns = {
+        "math.round": "int|float",
+        "math.abs": "int|float",
+        "math.ceil": "int",
+        "math.floor": "int",
+        # Preserve the accepted target model where the series qualifier is
+        # encoded in pine_type.  Stage 2.1 must not re-type unrelated math rows.
+        "math.exp": "series<float>",
+    }
     return {**official, "parameters": parameters, "returns": returns.get(name, official["returns"])}
 
 
@@ -346,6 +347,61 @@ def _candidate_ids(official: Mapping[str, Any]) -> tuple[str, ...]:
     if name == "map.new<type,type>":
         candidates.append("pine:function:map.new")
     return tuple(dict.fromkeys(candidates))
+
+
+def _pine_return_type(official: Mapping[str, Any]) -> str:
+    """Project qualifier-aware Pine return identity without widening input rows.
+
+    The exact input-family signatures carry their qualifier independently in
+    producer_signatures.  For previously accepted non-input direct targets, a
+    series qualifier remains part of the legacy target pine_type so Stage 2.1
+    cannot silently re-type unrelated historical bindings.
+    """
+    value = str(official.get("returns") or "unknown")
+    name = str(official.get("name") or "")
+    if (
+        official.get("return_qualifier") == "series"
+        and not (name == "input" or name.startswith("input."))
+        and not value.startswith("series<")
+        and value not in {"void", "unknown"}
+    ):
+        return f"series<{value}>"
+    return value
+
+
+def _input_producer_contract(official: Mapping[str, Any]) -> tuple[list[str], dict[str, dict[str, object]]]:
+    """Return exact producer IDs/signatures only for callable input overloads.
+
+    Other builtins keep the previously accepted single target projection. Stage
+    2.1 must not widen unrelated ABI contracts while closing input signatures.
+    """
+    name = str(official.get("name"))
+    if official.get("category") != "functions" or name not in {
+        "input", "input.int", "input.float"
+    }:
+        return [], {}
+    symbol_id = str(official["symbol_id"])
+    ids = [symbol_id + "#canonical"]
+    signatures: dict[str, dict[str, object]] = {
+        ids[0]: {
+            "parameters": [dict(item) for item in official.get("parameters", [])],
+            "returns": str(official.get("returns") or "unknown"),
+            "return_qualifier": official.get("return_qualifier"),
+        }
+    }
+    for raw in official.get("overloads", []):
+        if not isinstance(raw, Mapping):
+            raise PineRuntimeError("official input overload row is malformed", code=PL_ABI_MANIFEST)
+        overload_id = raw.get("overload_id")
+        if not isinstance(overload_id, str) or not overload_id.startswith(symbol_id + "#"):
+            raise PineRuntimeError("official input overload identity is malformed", code=PL_ABI_MANIFEST)
+        ids.append(overload_id)
+        signatures[overload_id] = {
+            "parameters": [dict(item) for item in raw.get("parameters", [])],
+            "returns": str(raw.get("returns") or official.get("returns") or "unknown"),
+            "return_qualifier": raw.get("return_qualifier", official.get("return_qualifier")),
+        }
+    return list(dict.fromkeys(ids)), signatures
 
 
 def _direct_target(
@@ -508,7 +564,7 @@ def _parameter_bindings(
                     "binding": (
                         "SOURCE_VARIADIC"
                         if parameter.get("kind") == "VAR_POSITIONAL"
-                        and official["name"] in {"math.min", "math.max"}
+                        and official["name"] in {"math.min", "math.max", "array.from"}
                         and official.get("category") == "functions"
                         and source_name == "values"
                         and any(
@@ -590,18 +646,16 @@ def build_manifest_v2(
                     }
                 )
                 operation_index += 1
-        operation = {
-            "name": name,
-            "evaluation": evaluation,
-            "effect": effect,
-            "abi_callable": operation_abi_callable,
-            "abi_parameters": operation_abi_parameters,
-            "parameter_bindings": operation_parameter_bindings,
-        }
-        operation_capabilities = _COMPILER_OPERATION_CAPABILITIES.get(name)
-        if operation_capabilities is not None:
-            operation["capabilities"] = list(operation_capabilities)
-        compiler_operations.append(operation)
+        compiler_operations.append(
+            {
+                "name": name,
+                "evaluation": evaluation,
+                "effect": effect,
+                "abi_callable": operation_abi_callable,
+                "abi_parameters": operation_abi_parameters,
+                "parameter_bindings": operation_parameter_bindings,
+            }
+        )
     catalog_rows = tuple(catalog)
     by_symbol: dict[str, list[CatalogRow]] = {}
     for entry in catalog_rows:
@@ -754,7 +808,7 @@ def build_manifest_v2(
                 "abi_parameters": abi_parameters,
                 "parameter_bindings": parameter_bindings,
                 "return": {
-                    "pine_type": official_row["returns"],
+                    "pine_type": _pine_return_type(official_row),
                     "runtime_type": target.return_type if target is not None else None,
                     "tuple_arity": target.tuple_arity if target is not None else 0,
                     "identity": _return_identity(name, target),
@@ -789,6 +843,10 @@ def build_manifest_v2(
             cast(dict[str, object], rows[-1]["return"])["by_source_type"] = {"int": "int", "float": "float"}
             rows[-1]["producer_overload_ids"] = [str(official_row["symbol_id"]) + suffix
                                                 for suffix in ("#canonical", "#overload:0")]
+        input_ids, input_signatures = _input_producer_contract(official_row)
+        if input_ids:
+            rows[-1]["producer_overload_ids"] = input_ids
+            rows[-1]["producer_signatures"] = input_signatures
         if name == "ta.macd":
             rows[-1]["dynamic_length_policy"] = {
                 item: "SIMPLE_STABLE" for item in ("fastlen", "slowlen", "siglen")
@@ -866,7 +924,6 @@ def build_manifest_v2(
             "for_in": "live-array",
             "empty_tuple": "typed-elements",
         },
-        "compiled_history_reservation": _COMPILED_HISTORY_RESERVATION,
         "compiler_operations": compiler_operations,
         "rows": rows,
         "classification": counts,

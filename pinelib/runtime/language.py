@@ -46,7 +46,9 @@ class LanguageExecutionMixin:
 
     def condition_v1(self, value: object) -> bool:
         self._check()
-        if value is None or is_na(value):
+        if value is None:
+            raise PineRuntimeError("transport null is not Pine na", code=PL_VALUE_TYPE)
+        if is_na(value):
             if self.session.language.pine_version >= 6:
                 raise PineRuntimeError(
                     "bool cannot be na in Pine v6", code=PL_VALUE_TYPE

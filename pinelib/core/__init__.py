@@ -6,9 +6,11 @@ from .values import (
     normalize_na,
     pine_binary,
     pine_bool,
+    pine_bool_cast,
     pine_div,
     pine_div_const_int,
     pine_float,
+    pine_int,
     pine_unary,
 )
 
@@ -20,8 +22,10 @@ __all__ = [
     "normalize_na",
     "pine_binary",
     "pine_bool",
+    "pine_bool_cast",
     "pine_div",
     "pine_div_const_int",
     "pine_float",
+    "pine_int",
     "pine_unary",
 ]

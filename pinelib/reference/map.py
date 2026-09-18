@@ -39,6 +39,7 @@ def map_put(
 
 
 def map_get(heap: RuntimeReferenceHeap, handle: ReferenceHandle, key: object) -> object:
+    heap.validate_collection_argument(handle, key, role="key")
     for item in _entries(heap, handle):
         if item[0] == key:
             return item[1]
@@ -48,12 +49,14 @@ def map_get(heap: RuntimeReferenceHeap, handle: ReferenceHandle, key: object) ->
 def map_contains(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, key: object
 ) -> bool:
+    heap.validate_collection_argument(handle, key, role="key")
     return any(item[0] == key for item in _entries(heap, handle))
 
 
 def map_remove(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, key: object
 ) -> object:
+    heap.validate_collection_argument(handle, key, role="key")
     entries = _entries(heap, handle)
     for index, item in enumerate(entries):
         if item[0] == key:
@@ -93,5 +96,7 @@ def map_put_all(
     target: ReferenceHandle,
     source: ReferenceHandle,
 ) -> None:
+    if heap.normalized_type_descriptor(target) != heap.normalized_type_descriptor(source):
+        raise PineRuntimeError("map.put_all requires identical key/value types", code=PL_REFERENCE_TYPE)
     for key, value in _entries(heap, source):
         map_put(heap, target, key, value)

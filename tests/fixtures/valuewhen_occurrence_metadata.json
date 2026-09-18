@@ -255,7 +255,7 @@
       6
     ]
   },
-  "runtime_remainder_without_content_hash": "c23fb7fbc7530b0fffa6e02a455b57dd4c0c23c6cc4b43f6c069c4da0b053669",
+  "runtime_remainder_without_content_hash": "ddf8c586ec72f20f1c59587972291b9ae4727f4f576210a1e9efc612cf11b7ec",
   "runtime_rows": 1108,
   "changed_runtime_rows": 1,
   "changed_runtime_version_tuples": 2,
@@ -300,5 +300,6 @@
   "old_packs_semantics_preserved": true,
   "old_pack_envelope_hash_regeneration_expected": true,
   "function_completeness_claim": false,
-  "full_stage2_accepted": false
+  "full_stage2_accepted": false,
+  "stage21_rebaseline_receipt": "pinelib/abi/stage21_manifest_delta_lock.json"
 }

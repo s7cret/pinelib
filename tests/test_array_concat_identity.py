@@ -8,6 +8,8 @@ import pytest
 
 from pinelib import CallbackFrame
 from pinelib.abi import reference as ref
+from tests.stage21_post_audit_helpers import restore_pre_audit_target
+
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.errors import PineRuntimeError
 from pinelib.reference.array import array_concat
@@ -166,15 +168,9 @@ def test_exact_versioned_return_and_receiver_contract(manifest, version, method)
 
 
 def test_every_non_concat_manifest_field_is_unchanged_and_disk_is_exact(manifest):
-    remainder = deepcopy(manifest)
+    remainder = restore_pre_audit_target(manifest)
     remainder.pop("content_hash")
-    remainder.pop("compiled_history_reservation")
-    remainder["compiler_operations"] = [
-        operation
-        for operation in remainder["compiler_operations"]
-        if operation["name"] != "state.reserve_history.v1"
-    ]
     remainder["rows"] = [r for r in remainder["rows"] if r["name"] != "array.concat"]
     encoded = json.dumps(remainder, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    assert hashlib.sha256(encoded).hexdigest() == "46aa154700259398aaee753eb7441bd952b07030ae076480dc6dfb7e0356d854"
+    assert hashlib.sha256(encoded).hexdigest() == "cccaa77c3d1d91ffa605373b5109b36dcd16620a66589c5fd1fd79480ea5f23b"
     check_manifest(Path(__file__).parents[1] / "pinelib/abi/target_manifest.json")

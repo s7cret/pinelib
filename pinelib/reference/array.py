@@ -8,18 +8,24 @@ from pinelib.core.values import na
 from pinelib.errors import PL_REFERENCE_BOUNDS, PL_REFERENCE_TYPE, PineRuntimeError
 from pinelib.reference.heap import ReferenceHandle, RuntimeReferenceHeap
 
+_DEFAULT_INITIAL = object()
+
 
 def array_new(
     heap: RuntimeReferenceHeap,
     object_id: str,
     type_descriptor: str,
     size: int = 0,
-    initial: object = na,
+    initial: object = _DEFAULT_INITIAL,
 ) -> ReferenceHandle:
     if type(size) is not int or size < 0:
         raise PineRuntimeError(
             "array size must be a nonnegative int", code=PL_REFERENCE_TYPE
         )
+    if initial is _DEFAULT_INITIAL:
+        from pinelib.reference.persistence import collection_type_arguments
+        parts = collection_type_arguments("array", type_descriptor)
+        initial = False if (heap.language.pine_version >= 6 and parts == ("bool",)) else na
     return heap.create(
         object_id, "array", type_descriptor, [initial for _ in range(size)]
     )
@@ -166,6 +172,7 @@ def array_sort(
 def array_indexof(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> int:
+    heap.validate_collection_argument(handle, value)
     values = _values(heap, handle)
     try:
         return values.index(value)
@@ -176,6 +183,7 @@ def array_indexof(
 def array_lastindexof(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> int:
+    heap.validate_collection_argument(handle, value)
     values = _values(heap, handle)
     for index in range(len(values) - 1, -1, -1):
         if values[index] == value:
@@ -186,6 +194,7 @@ def array_lastindexof(
 def array_binary_search(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> int:
+    heap.validate_collection_argument(handle, value)
     values = _values(heap, handle)
     low, high = 0, len(values)
     try:
@@ -229,6 +238,7 @@ def array_last(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> object:
 def array_includes(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> bool:
+    heap.validate_collection_argument(handle, value)
     return value in _values(heap, handle)
 
 
@@ -260,6 +270,8 @@ def array_concat(
     target: ReferenceHandle,
     source: ReferenceHandle,
 ) -> ReferenceHandle:
+    if heap.normalized_type_descriptor(target) != heap.normalized_type_descriptor(source):
+        raise PineRuntimeError("array.concat requires identical element types", code=PL_REFERENCE_TYPE)
     values = _values(heap, target)
     values.extend(_values(heap, source))
     heap.mutate_payload(target, values)
@@ -279,6 +291,7 @@ def _numeric_boundary_search(
 def array_binary_search_leftmost(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> int:
+    heap.validate_collection_argument(handle, value)
     values = _values(heap, handle)
     low, high = 0, len(values)
     try:
@@ -302,6 +315,7 @@ def array_binary_search_leftmost(
 def array_binary_search_rightmost(
     heap: RuntimeReferenceHeap, handle: ReferenceHandle, value: object
 ) -> int:
+    heap.validate_collection_argument(handle, value)
     values = _values(heap, handle)
     low, high = 0, len(values)
     try:
@@ -321,3 +335,25 @@ def array_binary_search_rightmost(
     if values and _numeric_boundary_search(heap, handle, value):
         return low
     return -1
+
+
+def array_from(heap: RuntimeReferenceHeap, object_id: str, type_descriptor: str,
+               values: tuple[object, ...]) -> ReferenceHandle:
+    """Create one typed heap object; validation preserves reference identity."""
+    if not values:
+        raise PineRuntimeError("array.from requires at least one value", code=PL_REFERENCE_TYPE)
+    return heap.create(object_id, "array", type_descriptor, list(values))
+
+
+def array_sum(heap: RuntimeReferenceHeap, handle: ReferenceHandle) -> object:
+    from pinelib.core.values import is_na
+    from pinelib.reference.persistence import collection_type_arguments
+    parts = collection_type_arguments("array", heap.type_descriptor(handle))
+    if parts not in (("int",), ("float",)):
+        raise PineRuntimeError("array.sum requires array<int> or array<float>", code=PL_REFERENCE_TYPE)
+    values = [array_get(heap, handle, i) for i in range(array_size(heap, handle))]
+    defined = [v for v in values if not is_na(v)]
+    if not defined:
+        return na
+    # int arrays must not pass through binary64. Heap admission already validates types.
+    return sum(defined, 0.0 if parts == ("float",) else 0)

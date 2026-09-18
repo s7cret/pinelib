@@ -55,3 +55,50 @@ def test_direct_spec_detaches_mutable_options():
     before = inputs.identity_hash
     options.append(9)
     assert spec.options == (2, 7) and inputs.identity_hash == before
+
+
+def test_large_integer_bounds_are_checked_without_float_rounding():
+    maximum = 2**53
+    with pytest.raises(PineRuntimeError, match="above maximum"):
+        InputSpec("input:n1", "int", maximum, maximum + 1, maximum=maximum)
+
+
+def test_active_expression_is_recursively_detached_and_immutable():
+    expression = {
+        "op": "eq",
+        "left": {"op": "literal", "value": 1},
+        "right": {"op": "literal", "value": 1},
+    }
+    spec = InputSpec(
+        "input:n1", "int", 1, 1, active=True, active_expression=expression
+    )
+    before = spec.identity()
+    expression["left"]["value"] = 99
+    assert spec.identity() == before
+    with pytest.raises(TypeError):
+        spec.active_expression["left"] = {"op": "literal", "value": 2}
+    with pytest.raises(TypeError):
+        spec.active_expression["left"]["value"] = 2
+
+
+def test_active_modulo_uses_canonical_pine_remainder_semantics():
+    active = {
+        "op": "eq",
+        "left": {
+            "op": "mod",
+            "left": {"op": "literal", "value": -5},
+            "right": {"op": "literal", "value": 2},
+        },
+        "right": {"op": "literal", "value": 1},
+    }
+    inputs = InputRegistry.from_descriptors(
+        {
+            "input:n1": {
+                "input_id": "input:n1",
+                "kind": "int",
+                "default": 1,
+                "active": active,
+            }
+        }
+    )
+    assert inputs.spec("input:n1").active is True

@@ -50,23 +50,63 @@ def build_official_surface(pine2ast_package: Path) -> dict[str, Any]:
                     parameter.setdefault("type", "unknown")
                     parameter.setdefault("qualifier_max", "series")
                     parameters.append(parameter)
-            rows.append(
-                {
-                    "category": category,
-                    "name": name,
-                    # Build from the exact catalog key. Some upstream metadata fields
-                    # encode '<type>' as the literal text 'u003c...u003e'.
-                    "symbol_id": f"pine:{PREFIX[category]}:{name}",
-                    "supported_versions": [
-                        version
-                        for version, pack in packs.items()
-                        if name in pack["sections"].get(category, {})
-                    ],
-                    "parameters": parameters,
-                    "receiver_type": entry.get("receiver_type"),
-                    "returns": entry.get("returns") or entry.get("type") or "unknown",
-                }
-            )
+            row = {
+                "category": category,
+                "name": name,
+                # Build from the exact catalog key. Some upstream metadata fields
+                # encode '<type>' as the literal text 'u003c...u003e'.
+                "symbol_id": f"pine:{PREFIX[category]}:{name}",
+                "supported_versions": [
+                    version
+                    for version, pack in packs.items()
+                    if name in pack["sections"].get(category, {})
+                ],
+                "parameters": parameters,
+                "receiver_type": entry.get("receiver_type"),
+                "returns": entry.get("returns") or entry.get("type") or "unknown",
+            }
+            # Stage 2.1 extends only the input-family projection. Keeping the
+            # accepted compact shape for unrelated rows prevents a catalog-input
+            # change from silently re-baselining every runtime contract.
+            if category == "functions" and (name == "input" or name.startswith("input.")):
+                row.update(
+                    {
+                        "overloads": [
+                            {
+                                "overload_id": overload.get("overload_id"),
+                                "parameters": [
+                                    {
+                                        **dict(parameter),
+                                        "required": dict(parameter).get("required", False),
+                                        "type": dict(parameter).get("type", "unknown"),
+                                        "qualifier_max": dict(parameter).get(
+                                            "qualifier_max", "series"
+                                        ),
+                                    }
+                                    for parameter in overload.get("parameters", [])
+                                    if isinstance(parameter, dict)
+                                ],
+                                "returns": overload.get("returns")
+                                or entry.get("returns")
+                                or entry.get("type")
+                                or "unknown",
+                                "return_qualifier": overload.get("return_qualifier"),
+                            }
+                            for overload in entry.get("overloads", [])
+                            if isinstance(overload, dict)
+                        ],
+                        "return_qualifier": entry.get("return_qualifier"),
+                        "return_rule_id": entry.get("return_rule_id"),
+                        "return_qualifier_rule_id": entry.get(
+                            "return_qualifier_rule_id"
+                        ),
+                        "parameter_type_rule_id": entry.get("parameter_type_rule_id"),
+                        "input_contract_revision": entry.get(
+                            "input_contract_revision"
+                        ),
+                    }
+                )
+            rows.append(row)
     rows.sort(key=lambda row: (row["category"], row["name"]))
     counts = {
         category: sum(row["category"] == category for row in rows)

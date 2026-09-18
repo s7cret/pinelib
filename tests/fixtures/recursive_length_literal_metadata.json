@@ -1,6 +1,6 @@
 {
   "before_content_hash": "sha256:73f71769c6652b79c4fd648597e1aa1d22a031ce80bc93ec1d65290978478e2e",
-  "expected_content_hash": "sha256:9a9e710c1b22669b9e146e07e28c1dd5d1cf5a83ef00e45ddf4b2bf9cce054fb",
+  "expected_content_hash": "sha256:8093825b275027eb155b5959d1fb2cf108c5ce72cd89926d65e60af1cae8225f",
   "expected_other_rows": 1107,
   "expected_tsi_row": {
     "abi_callable": "pinelib.abi.ta.tsi_v1",
@@ -144,5 +144,6 @@
   },
   "runtime_macd_already_simple_unchanged": true,
   "schema_id": "openpine.recursive_length_literal_metadata.v1",
-  "sut_generator_executed_before_freeze": false
+  "sut_generator_executed_before_freeze": false,
+  "stage21_rebaseline_receipt": "pinelib/abi/stage21_manifest_delta_lock.json"
 }

@@ -231,7 +231,7 @@ def test_lazy_operators_do_not_evaluate_unneeded_branch(op, left):
 def test_boolean_condition_boundary_is_version_exact(version, value):
     s = session(version)
     t = begin(s, 0)
-    if version == 6 or type(value) is str:
+    if value is None or version == 6 or type(value) is str:
         with pytest.raises(PineRuntimeError):
             t.condition_v1(value)
     else:

@@ -227,6 +227,7 @@
       ]
     }
   ],
-  "remainder_sha256": "f790f1d0eec606fd205990b2e2d49218586f8f5e3aeabbcee35eb78aa93df27d",
-  "expected_content_hash": "sha256:9a9e710c1b22669b9e146e07e28c1dd5d1cf5a83ef00e45ddf4b2bf9cce054fb"
+  "remainder_sha256": "bac531e857d22081f8235cd173ec10b2ab35ceacb25991b554209fcab881c053",
+  "expected_content_hash": "sha256:8093825b275027eb155b5959d1fb2cf108c5ce72cd89926d65e60af1cae8225f",
+  "stage21_rebaseline_receipt": "pinelib/abi/stage21_manifest_delta_lock.json"
 }

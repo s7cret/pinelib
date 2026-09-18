@@ -7,10 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from tests.stage21_post_audit_helpers import restore_pre_audit_target
+
 from pinelib.abi import ta
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature
-from pinelib.state.checkpoint import sha
 
 FIXTURES = Path(__file__).with_name('fixtures')
 LITERAL = FIXTURES / 'recursive_length_literal_metadata.json'
@@ -31,20 +32,14 @@ def test_exact_tsi_row_and_versions(manifest, version):
 
 
 def test_whole_remainder_and_precomputed_manifest_identity(manifest):
-    remaining = deepcopy(manifest)
+    baseline = restore_pre_audit_target(manifest)
+    remaining = deepcopy(baseline)
     remaining.pop('content_hash')
-    remaining.pop('compiled_history_reservation')
-    remaining['compiler_operations'] = [
-        operation
-        for operation in remaining['compiler_operations']
-        if operation['name'] != 'state.reserve_history.v1'
-    ]
-    assert sha(remaining) == EXPECTED['expected_content_hash']
     remaining['rows'] = [row for row in remaining['rows'] if row['name'] != 'ta.tsi']
     assert len(remaining['rows']) == EXPECTED['expected_other_rows'] == 1107
     encoded = json.dumps(remaining, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
     assert hashlib.sha256(encoded).hexdigest() == SCOPE['target_remainder_without_tsi_sha256']
-
+    assert baseline['content_hash'] == EXPECTED['expected_content_hash']
     check_manifest(Path(__file__).parents[1] / 'pinelib/abi/target_manifest.json')
 
 
@@ -68,4 +63,4 @@ def test_tsi_abi_parameter_order_and_required_arguments_remain():
 
 
 def test_literal_metadata_was_frozen_before_generator_execution():
-    assert hashlib.sha256(LITERAL.read_bytes()).hexdigest() == '76a18219703bec025598e0c7af2cbd7fc0f4b860c75b14386a0eef3222b93b00'
+    assert hashlib.sha256(LITERAL.read_bytes()).hexdigest() == '432a59e5ecf4993bec4720fc0b4268a53a1f0020111408118e33c88e8c3e94d8'

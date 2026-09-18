@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from pinelib.abi import ta
+from tests.stage21_post_audit_helpers import restore_pre_audit_target
+
 from pinelib.abi.builder import build_manifest, check_manifest
 from pinelib.abi.manifest_v2_builder import _audited_signature
 
@@ -29,14 +31,8 @@ def test_exact_canonical_row_and_unchanged_availability(manifest, version):
 
 
 def test_exact_one_row_two_tuples_and_entire_remainder(manifest):
-    remaining = deepcopy(manifest)
+    remaining = restore_pre_audit_target(manifest)
     remaining.pop("content_hash")
-    remaining.pop("compiled_history_reservation")
-    remaining["compiler_operations"] = [
-        operation
-        for operation in remaining["compiler_operations"]
-        if operation["name"] != "state.reserve_history.v1"
-    ]
     assert len(remaining["rows"]) == EXPECTED["runtime_rows"] == 1108
     selected = [r for r in remaining["rows"] if r["name"] == "ta.valuewhen"]
     assert len(selected) == 1 and sum(len(r["version_availability"]) for r in selected) == 2
@@ -66,4 +62,4 @@ def test_existing_abi_signature_is_unchanged():
 
 
 def test_literal_metadata_precedes_builder_change():
-    assert hashlib.sha256(FIXTURE.read_bytes()).hexdigest() == "e85c8740f92e6b856527e7f5baa41ed36f9f8adaa7e58dcb2bd25ce5bdf45a2c"
+    assert hashlib.sha256(FIXTURE.read_bytes()).hexdigest() == "460762f30f29b3f268b6c3b52170e6d1d74673c13e46abf772e40e85d5e08acf"

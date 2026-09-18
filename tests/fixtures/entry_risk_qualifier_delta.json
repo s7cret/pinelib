@@ -1,8 +1,8 @@
 {
   "base": "97902943bd8f1300c3bb3e3e314465ac92fa057a",
   "base_content_hash": "sha256:3bbb194318736ff97aff6a50ef4a3c4238fda3191f3971ab2e5fe9e14e27c2f7",
-  "expected_content_hash": "sha256:9a9e710c1b22669b9e146e07e28c1dd5d1cf5a83ef00e45ddf4b2bf9cce054fb",
-  "unchanged_remainder_sha256": "9a3e37acd39c9e372dd6c81f1a6d8fc51b9b2a08935d2688dacf9a5377d3504a",
+  "expected_content_hash": "sha256:8093825b275027eb155b5959d1fb2cf108c5ce72cd89926d65e60af1cae8225f",
+  "unchanged_remainder_sha256": "02de745c2631c132e2569cbe2b8d96472c9e2c647e823c2b93d9855e8cca98e7",
   "row_changes": [
     {
       "before": {
@@ -297,5 +297,6 @@
       "after_sha256": "68cc3317a458d0d4f13193afe07f01b37a98c164c5e07cfd56609f7099e2d2fb"
     }
   ],
-  "manual_numerical_fixtures_modified": false
+  "manual_numerical_fixtures_modified": false,
+  "stage21_rebaseline_receipt": "pinelib/abi/stage21_manifest_delta_lock.json"
 }
