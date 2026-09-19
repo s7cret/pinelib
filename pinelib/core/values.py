@@ -129,14 +129,20 @@ def pine_int(value: object) -> int | _NA:
     )
 
 
+def pine_div_int_truncate(left: int, right: int) -> int:
+    if right == 0:
+        raise PineRuntimeError("division by zero", code=PL_VALUE_DIVISION)
+    quotient = abs(left) // abs(right)
+    return -quotient if (left < 0) != (right < 0) else quotient
+
+
 def pine_div_const_int(
     left: int, right: int, ctx: RuntimeLanguageContext
 ) -> int | float:
+    if ctx.pine_version <= 5:
+        return pine_div_int_truncate(left, right)
     if right == 0:
         raise PineRuntimeError("division by zero", code=PL_VALUE_DIVISION)
-    if ctx.pine_version <= 5:
-        quotient = abs(left) // abs(right)
-        return -quotient if (left < 0) != (right < 0) else quotient
     return left / right
 
 
@@ -149,7 +155,6 @@ def pine_div(left: object, right: object, ctx: RuntimeLanguageContext) -> object
     if right_number == 0:
         raise PineRuntimeError("division by zero", code=PL_VALUE_DIVISION)
     return left_number / right_number
-
 
 
 def pine_mod(left: object, right: object) -> object:
@@ -188,21 +193,33 @@ def pine_binary(
     right = normalize_na(right)
     _reject_transport_null(left, right)
     from pinelib.reference.heap import PineEnumValue
+
     if isinstance(left, PineEnumValue) or isinstance(right, PineEnumValue):
         if ctx.pine_version < 5:
             raise PineRuntimeError("enum values require Pine v5/v6", code=PL_VALUE_TYPE)
-        if (operator not in {"==", "!="}
-            or (left is not na and right is not na and (
-                not isinstance(left, PineEnumValue) or not isinstance(right, PineEnumValue)
-                or left.enum_id != right.enum_id))):
-            raise PineRuntimeError("enum operands require matching nominal types and equality operators", code=PL_VALUE_TYPE)
+        if operator not in {"==", "!="} or (
+            left is not na
+            and right is not na
+            and (
+                not isinstance(left, PineEnumValue)
+                or not isinstance(right, PineEnumValue)
+                or left.enum_id != right.enum_id
+            )
+        ):
+            raise PineRuntimeError(
+                "enum operands require matching nominal types and equality operators",
+                code=PL_VALUE_TYPE,
+            )
         if left is na or right is na:
             return na if ctx.pine_version < 6 else False
     if ctx.pine_version == 6 and operator in {"==", "!=", "<", "<=", ">", ">="}:
         if left is na or right is na:
             return False
-        if (is_number(left) and is_number(right)
-            and (type(left) is float or type(right) is float)):
+        if (
+            is_number(left)
+            and is_number(right)
+            and (type(left) is float or type(right) is float)
+        ):
             # Mixed numeric comparisons first enter the float domain. Pine v6
             # specifies nine fractional digits; its midpoint tie policy is not
             # established here. Use Python's binary-float round policy locally.
@@ -269,14 +286,24 @@ def pine_unary(operator: str, operand: object, ctx: RuntimeLanguageContext) -> o
 class _NzOmission(str, _Enum):
     OMITTED = "__pinelib_nz_omitted__"
 
+
 NZ_OMITTED = _NzOmission.OMITTED
 
-def pine_nz(source: object, replacement: object, *, result_type: str,
-            ctx: RuntimeLanguageContext) -> object:
+
+def pine_nz(
+    source: object,
+    replacement: object,
+    *,
+    result_type: str,
+    ctx: RuntimeLanguageContext,
+) -> object:
     """Typed nz: omission is distinct from explicit Pine NA and transport null."""
     allowed = {"int", "float", "color"} | ({"bool"} if ctx.pine_version <= 5 else set())
     if result_type not in allowed:
-        raise PineRuntimeError("nz requires a supported scalar overload", code=PL_VALUE_TYPE)
+        raise PineRuntimeError(
+            "nz requires a supported scalar overload", code=PL_VALUE_TYPE
+        )
+
     def check(value: object) -> None:
         if is_na(value):
             return
@@ -284,16 +311,26 @@ def pine_nz(source: object, replacement: object, *, result_type: str,
             require_number(value, name="nz argument")
             return
         valid = (
-            type(value) is int if result_type == "int" else
-            type(value) is bool if result_type == "bool" else
-            isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", value) is not None
+            type(value) is int
+            if result_type == "int"
+            else (
+                type(value) is bool
+                if result_type == "bool"
+                else isinstance(value, str)
+                and re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", value)
+                is not None
+            )
         )
         if not valid:
-            raise PineRuntimeError("nz value does not match its admitted overload", code=PL_VALUE_TYPE)
+            raise PineRuntimeError(
+                "nz value does not match its admitted overload", code=PL_VALUE_TYPE
+            )
 
     check(source)
     if replacement is NZ_OMITTED:
-        replacement = {"int": 0, "float": 0.0, "bool": False, "color": "#00000000"}[result_type]
+        replacement = {"int": 0, "float": 0.0, "bool": False, "color": "#00000000"}[
+            result_type
+        ]
     check(replacement)
     value = replacement if is_na(source) else source
     return float(value) if result_type == "float" and not is_na(value) else value
