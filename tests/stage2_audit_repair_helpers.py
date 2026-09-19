@@ -9,7 +9,32 @@ def digest(value):
     return 'sha256:' + hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
 
+def restore_history_restoration(payload):
+    """Remove only the exact restored RC6 history ABI, not builtin rows.
+
+    Endpoints pin the reviewed additive contract; resealing a mutation cannot
+    authorize it. The previous audit lock is never rewritten.
+    """
+    before = 'sha256:edd7499240e0ca738379a102569c867172c4c1ad3044916c485d70411814b685'
+    after = 'sha256:3cc0e1b96e6f2822de25e2d097d26aaf754cae246705cab9392bad705f822dfb'
+    assert digest({k: v for k, v in payload.items() if k != 'content_hash'}) == payload['content_hash']
+    assert payload['content_hash'] in {before, after}
+    restored = deepcopy(payload)
+    if payload['content_hash'] == before:
+        return restored
+    del restored['compiled_history_reservation']
+    operations = restored['compiler_operations']
+    removed = [row for row in operations if row['name'] == 'state.reserve_history.v1']
+    assert len(removed) == 1
+    restored['compiler_operations'] = [row for row in operations if row['name'] != 'state.reserve_history.v1']
+    restored['content_hash'] = before
+    assert digest({k: v for k, v in restored.items() if k != 'content_hash'}) == before
+    return restored
+
+
 def restore_audit_repair(payload, name):
+    if name == 'target_manifest.json' and 'compiled_history_reservation' in payload:
+        payload = restore_history_restoration(payload)
     lock=json.loads(files('pinelib.abi').joinpath('stage2_audit_repair_delta_lock.json').read_text())
     assert digest({k:v for k,v in lock.items() if k!='content_hash'}) == lock['content_hash']
     item=lock['artifacts'][name]
