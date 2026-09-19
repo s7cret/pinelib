@@ -29,6 +29,41 @@ def operator_binary_v1(
     return tx.op_operator_binary(operator, left, right)
 
 
+def operator_div_legacy_v1(
+    tx: RuntimeTransaction, operator: str, left: object, right: object
+) -> object:
+    return _div_opcode(tx, operator, left, right, truncate=True)
+
+
+def operator_div_fractional_v1(
+    tx: RuntimeTransaction, operator: str, left: object, right: object
+) -> object:
+    return _div_opcode(tx, operator, left, right, truncate=False)
+
+
+def _div_opcode(
+    tx: RuntimeTransaction,
+    operator: str,
+    left: object,
+    right: object,
+    *,
+    truncate: bool,
+) -> object:
+    from pinelib.core.values import na, normalize_na, pine_div, pine_div_int_truncate
+    from pinelib.errors import PineRuntimeError
+
+    tx._check()
+    if operator != "/":
+        raise PineRuntimeError("invalid division operator")
+    left = normalize_na(left)
+    right = normalize_na(right)
+    if left is na or right is na:
+        return na
+    if truncate and type(left) is int and type(right) is int:
+        return pine_div_int_truncate(left, right)
+    return pine_div(left, right, tx.session.language)
+
+
 def operator_unary_v1(tx: RuntimeTransaction, operator: str, operand: object) -> object:
     return tx.op_operator_unary(operator, operand)
 
@@ -58,6 +93,14 @@ def range_v1(tx: RuntimeTransaction, start, end, step):
     return tx.range_v1(start, end, step)
 
 
+def range_fixed_end_v1(tx: RuntimeTransaction, start, end, step):
+    return tx.range_policy_v1(start, end, step, dynamic=False)
+
+
+def range_dynamic_end_v1(tx: RuntimeTransaction, start, end, step):
+    return tx.range_policy_v1(start, end, step, dynamic=True)
+
+
 def invoke_function_v1(tx: RuntimeTransaction, callsite: str, function, arguments):
     return tx.invoke_function_v1(callsite, function, arguments)
 
@@ -85,9 +128,15 @@ def logical_lazy_v1(tx: RuntimeTransaction, operator: str, left, right):
     raise PineRuntimeError("invalid logical operator")
 
 
-
-def nz_v1(tx: RuntimeTransaction, source: object, expression_type: str,
-          replacement: object = NZ_OMITTED) -> object:
+def nz_v1(
+    tx: RuntimeTransaction,
+    source: object,
+    expression_type: str,
+    replacement: object = NZ_OMITTED,
+) -> object:
     from pinelib.core.values import pine_nz
+
     tx._check()
-    return pine_nz(source, replacement, result_type=expression_type, ctx=tx.session.language)
+    return pine_nz(
+        source, replacement, result_type=expression_type, ctx=tx.session.language
+    )
