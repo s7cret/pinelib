@@ -93,6 +93,14 @@ def range_v1(tx: RuntimeTransaction, start, end, step):
     return tx.range_v1(start, end, step)
 
 
+def range_fixed_end_v1(tx: RuntimeTransaction, start, end, step):
+    return tx.range_policy_v1(start, end, step, dynamic=False)
+
+
+def range_dynamic_end_v1(tx: RuntimeTransaction, start, end, step):
+    return tx.range_policy_v1(start, end, step, dynamic=True)
+
+
 def invoke_function_v1(tx: RuntimeTransaction, callsite: str, function, arguments):
     return tx.invoke_function_v1(callsite, function, arguments)
 
