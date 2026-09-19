@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pinelib.runtime.session import RuntimeTransaction
 from pinelib.core.values import NZ_OMITTED
+from pinelib.runtime.session import RuntimeTransaction
 
 
 def float_v1(x: object) -> object:
@@ -70,6 +70,12 @@ def operator_unary_v1(tx: RuntimeTransaction, operator: str, operand: object) ->
 
 def series_history_v1(tx: RuntimeTransaction, base: object, offset: object) -> object:
     return tx.op_series_history(base, offset)
+
+
+def reserve_history_v1(
+    tx: RuntimeTransaction, series_id: str, dtype: str, history_policy: str
+) -> None:
+    tx.reserve_history_v1(series_id, dtype, history_policy)
 
 
 def na_v1(tx: RuntimeTransaction, x: object) -> bool:
