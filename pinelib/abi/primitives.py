@@ -80,15 +80,8 @@ def reserve_history_v1(
 
 def na_v1(tx: RuntimeTransaction, x: object) -> bool:
     """Version-aware missing-value predicate, including flat broker values."""
-    from pinelib.core.values import is_na
-    from pinelib.errors import PL_VALUE_TYPE, PineRuntimeError
 
-    tx._check()
-    if tx.session.language.pine_version >= 6 and type(x) is bool:
-        raise PineRuntimeError("na does not accept bool in Pine v6", code=PL_VALUE_TYPE)
-    if x is None:
-        raise PineRuntimeError("transport null is not Pine na", code=PL_VALUE_TYPE)
-    return is_na(x)
+    return tx.na_policy_v1(x, allow_bool=tx.session.language.pine_version < 6)
 
 
 def once_v1(tx: RuntimeTransaction, state_id: str, condition):
@@ -113,25 +106,23 @@ def invoke_function_v1(tx: RuntimeTransaction, callsite: str, function, argument
 
 def logical_eager_v1(tx: RuntimeTransaction, operator: str, left, right):
     # Inputs have both been evaluated before this call, including legacy na.
-    a, b = tx.condition_v1(left), tx.condition_v1(right)
-    if operator == "and":
-        return a and b
-    if operator == "or":
-        return a or b
-    from pinelib.errors import PineRuntimeError
-
-    raise PineRuntimeError("invalid logical operator")
+    return tx.logical_eager_policy(
+        operator,
+        left,
+        right,
+        allow_na_bool=tx.session.language.pine_version < 6,
+        allow_numeric=tx.session.language.pine_version < 6,
+    )
 
 
 def logical_lazy_v1(tx: RuntimeTransaction, operator: str, left, right):
-    a = tx.condition_v1(left)
-    if operator == "and":
-        return a and tx.condition_v1(right())
-    if operator == "or":
-        return a or tx.condition_v1(right())
-    from pinelib.errors import PineRuntimeError
-
-    raise PineRuntimeError("invalid logical operator")
+    return tx.logical_lazy_policy(
+        operator,
+        left,
+        right,
+        allow_na_bool=tx.session.language.pine_version < 6,
+        allow_numeric=tx.session.language.pine_version < 6,
+    )
 
 
 def nz_v1(

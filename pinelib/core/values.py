@@ -94,12 +94,16 @@ def pine_bool(value: object, ctx: RuntimeLanguageContext) -> bool | _NA:
     )
 
 
-def pine_bool_cast(value: object, ctx: RuntimeLanguageContext) -> bool | _NA:
+def pine_bool_cast(
+    value: object, ctx: RuntimeLanguageContext, *, preserve_na: bool | None = None
+) -> bool | _NA:
     """Explicit Pine ``bool()`` cast, version-exact for bool-na semantics."""
     if value is None:
         raise PineRuntimeError("transport null is not Pine na", code=PL_VALUE_TYPE)
     if value is na:
-        return na if ctx.pine_version <= 5 else False
+        if preserve_na is None:
+            preserve_na = ctx.pine_version <= 5
+        return na if preserve_na else False
     if type(value) is bool:
         return value
     if is_number(value):
@@ -296,9 +300,12 @@ def pine_nz(
     *,
     result_type: str,
     ctx: RuntimeLanguageContext,
+    allow_bool: bool | None = None,
 ) -> object:
     """Typed nz: omission is distinct from explicit Pine NA and transport null."""
-    allowed = {"int", "float", "color"} | ({"bool"} if ctx.pine_version <= 5 else set())
+    if allow_bool is None:
+        allow_bool = ctx.pine_version <= 5
+    allowed = {"int", "float", "color"} | ({"bool"} if allow_bool else set())
     if result_type not in allowed:
         raise PineRuntimeError(
             "nz requires a supported scalar overload", code=PL_VALUE_TYPE

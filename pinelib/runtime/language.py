@@ -6,8 +6,13 @@ No separate interpreter, global mutable cache, or parallel checkpoint format.
 
 from __future__ import annotations
 
-from pinelib.core.values import is_na, na, pine_bool
-from pinelib.errors import PL_RESOURCE_LIMIT, PL_VALUE_TYPE, PineRuntimeError
+from pinelib.core.values import is_na, na
+from pinelib.errors import (
+    PL_RESOURCE_LIMIT,
+    PL_VALUE_BOOL,
+    PL_VALUE_TYPE,
+    PineRuntimeError,
+)
 from pinelib.state.checkpoint import sha
 
 
@@ -45,21 +50,99 @@ class LanguageExecutionMixin:
             self._function_path = prior
 
     def condition_v1(self, value: object) -> bool:
+        """Session-scoped condition. Same-script callers keep this path."""
+        legacy = self.session.language.pine_version < 6
+        return self.condition_policy_v1(
+            value, allow_na_bool=legacy, allow_numeric=legacy
+        )
+
+    def condition_policy_v1(
+        self, value: object, *, allow_na_bool: bool, allow_numeric: bool
+    ) -> bool:
+        """Origin-bound condition. Does not read session Pine version."""
         self._check()
         if value is None:
             raise PineRuntimeError("transport null is not Pine na", code=PL_VALUE_TYPE)
         if is_na(value):
-            if self.session.language.pine_version >= 6:
+            if not allow_na_bool:
                 raise PineRuntimeError(
                     "bool cannot be na in Pine v6", code=PL_VALUE_TYPE
                 )
             return False
-        if type(value) not in (bool, int, float):
-            raise PineRuntimeError(
-                "condition requires bool or legacy numeric value", code=PL_VALUE_TYPE
+        if type(value) is bool:
+            return value
+        if type(value) in (int, float):
+            if not allow_numeric:
+                raise PineRuntimeError(
+                    "implicit numeric-to-bool is forbidden in Pine v6",
+                    code=PL_VALUE_BOOL,
+                )
+            return value != 0
+        raise PineRuntimeError(
+            "condition requires bool or legacy numeric value", code=PL_VALUE_TYPE
+        )
+
+    def logical_eager_policy(
+        self, operator: str, left, right, *, allow_na_bool: bool, allow_numeric: bool
+    ):
+        a = self.condition_policy_v1(
+            left, allow_na_bool=allow_na_bool, allow_numeric=allow_numeric
+        )
+        b = self.condition_policy_v1(
+            right, allow_na_bool=allow_na_bool, allow_numeric=allow_numeric
+        )
+        if operator == "and":
+            return a and b
+        if operator == "or":
+            return a or b
+        raise PineRuntimeError("invalid logical operator")
+
+    def logical_lazy_policy(
+        self, operator: str, left, right, *, allow_na_bool: bool, allow_numeric: bool
+    ):
+        a = self.condition_policy_v1(
+            left, allow_na_bool=allow_na_bool, allow_numeric=allow_numeric
+        )
+        if operator == "and":
+            return a and self.condition_policy_v1(
+                right(), allow_na_bool=allow_na_bool, allow_numeric=allow_numeric
             )
-        result = pine_bool(value, self.session.language)
-        return False if result is na else result
+        if operator == "or":
+            return a or self.condition_policy_v1(
+                right(), allow_na_bool=allow_na_bool, allow_numeric=allow_numeric
+            )
+        raise PineRuntimeError("invalid logical operator")
+
+    def nz_policy_v1(
+        self,
+        source: object,
+        expression_type: str,
+        replacement: object = None,
+        *,
+        allow_bool: bool,
+    ) -> object:
+        """Origin-bound nz(). Does not consult session Pine version for bool."""
+
+        from pinelib.core.values import NZ_OMITTED, pine_nz
+
+        self._check()
+        if replacement is None:
+            replacement = NZ_OMITTED
+        return pine_nz(
+            source,
+            replacement,
+            result_type=expression_type,
+            ctx=self.session.language,
+            allow_bool=allow_bool,
+        )
+
+    def bool_policy_v1(self, value: object, *, preserve_na: bool) -> object:
+        """Origin-bound bool(). Does not consult session Pine version for na."""
+
+        from pinelib.core.values import pine_bool_cast
+
+        self._check()
+        return pine_bool_cast(value, self.session.language, preserve_na=preserve_na)
 
     def once_v1(self, state_id: str, condition) -> bool:
         self._check()
