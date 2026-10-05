@@ -787,7 +787,16 @@ class RuntimeReferenceHeap:
         for item in self._objects.values():
             for committed, payload in ((True, item.committed), (False, item.working)):
                 for handle in self._reference_handles(payload):
-                    self._get(handle)
+                    target = self._get(handle)
+                    # A real committed edge must remain closed when rollback
+                    # removes provisional allocations. New objects also carry a
+                    # constructor baseline in ``committed``; those are not yet
+                    # committed graph roots and may refer to other new objects.
+                    if committed and item.committed_exists and not target.committed_exists:
+                        raise PineRuntimeError(
+                            "committed reference points to a provisional object",
+                            code=PL_REFERENCE_INVALID,
+                        )
                 if item.kind == "array" and self._array_slice_descriptor(payload):
                     handle = ReferenceHandle(item.object_id, "array")
                     self._materialize(handle, committed=committed, active=set())
