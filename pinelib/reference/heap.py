@@ -783,6 +783,15 @@ class RuntimeReferenceHeap:
                 handles.extend(self._reference_handles(item))
         return handles
 
+    def validate_committed_storage(self, value: object) -> None:
+        """Committed series/slot roots cannot outlive their heap allocations."""
+        for handle in self._reference_handles(value):
+            if not self._get(handle).committed_exists:
+                raise PineRuntimeError(
+                    "committed storage reference points to a provisional object",
+                    code=PL_REFERENCE_INVALID,
+                )
+
     def _validate_closed_graph(self) -> None:
         for item in self._objects.values():
             for committed, payload in ((True, item.committed), (False, item.working)):
