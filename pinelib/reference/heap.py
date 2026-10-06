@@ -783,11 +783,29 @@ class RuntimeReferenceHeap:
                 handles.extend(self._reference_handles(item))
         return handles
 
+    def validate_committed_storage(self, value: object) -> None:
+        """Committed series/slot roots cannot outlive their heap allocations."""
+        for handle in self._reference_handles(value):
+            if not self._get(handle).committed_exists:
+                raise PineRuntimeError(
+                    "committed storage reference points to a provisional object",
+                    code=PL_REFERENCE_INVALID,
+                )
+
     def _validate_closed_graph(self) -> None:
         for item in self._objects.values():
             for committed, payload in ((True, item.committed), (False, item.working)):
                 for handle in self._reference_handles(payload):
-                    self._get(handle)
+                    target = self._get(handle)
+                    # A real committed edge must remain closed when rollback
+                    # removes provisional allocations. New objects also carry a
+                    # constructor baseline in ``committed``; those are not yet
+                    # committed graph roots and may refer to other new objects.
+                    if committed and item.committed_exists and not target.committed_exists:
+                        raise PineRuntimeError(
+                            "committed reference points to a provisional object",
+                            code=PL_REFERENCE_INVALID,
+                        )
                 if item.kind == "array" and self._array_slice_descriptor(payload):
                     handle = ReferenceHandle(item.object_id, "array")
                     self._materialize(handle, committed=committed, active=set())
