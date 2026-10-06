@@ -1583,6 +1583,8 @@ class RuntimeSession:
         from pinelib.reference.nominal import validate_field_type, validate_field_value
 
         for storage in new_series.values():
+            for value in storage.committed:
+                new_references.validate_committed_storage(value)
             if "udt:" in storage.dtype or "enum:" in storage.dtype:
                 validate_field_type(
                     storage.dtype, self.language.pine_version, self.nominal_registry
@@ -1596,6 +1598,8 @@ class RuntimeSession:
                     if value is not None:
                         validate_field_value(new_references, value, storage.dtype)
         for row in new_slots.to_json():
+            if row["committed_exists"]:
+                new_references.validate_committed_storage(from_portable(row["committed"]))
             new_references._decode_value(from_portable(row["working"]))
             new_references._decode_value(from_portable(row["committed"]))
             prefix = (
