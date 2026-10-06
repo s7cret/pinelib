@@ -8,7 +8,7 @@ def na_v1(tx: RuntimeTransaction) -> object:
 
 
 def open_v1(tx: RuntimeTransaction) -> object:
-    return tx.value_open
+    return tx.value_close
 
 
 def high_v1(tx: RuntimeTransaction) -> object:
