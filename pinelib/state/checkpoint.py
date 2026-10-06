@@ -32,7 +32,7 @@ def to_portable(value: object) -> object:
     """Convert supported runtime values to canonical JSON-compatible data."""
 
     if is_na(value):
-        return dict(_NA_MARKER)
+        return None
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):
