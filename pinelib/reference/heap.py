@@ -105,13 +105,15 @@ class RuntimeReferenceHeap:
     def contains(self, object_id: str) -> bool:
         return object_id in self._objects
 
-    def begin(self, *, preserve_varip: bool = False) -> None:
-        # A retained UDT keeps its identity, not all of its field mutations.
-        # Its referenced initial objects must remain addressable after rollback.
+    def begin(self, *, preserve_varip: bool = False, retained_values: tuple[object, ...] = ()) -> None:
+        # Retained roots keep allocation identity, not ordinary mutations.
+        # Constructor and working referents must remain addressable after rollback.
         retained: set[str] = set()
         if preserve_varip:
             pending = [item for item in self._objects.values() if item.working_varip
                        and (item.kind == "udt" or self._is_nominal_array(item))]
+            pending.extend(self._get(handle) for value in retained_values
+                           for handle in self._reference_handles(value))
             while pending:
                 item = pending.pop()
                 if item.object_id in retained:
@@ -143,8 +145,8 @@ class RuntimeReferenceHeap:
             item.committed_exists = True
             item.committed_varip = item.working_varip
 
-    def rollback(self, *, preserve_varip: bool = False) -> None:
-        self.begin(preserve_varip=preserve_varip)
+    def rollback(self, *, preserve_varip: bool = False, retained_values: tuple[object, ...] = ()) -> None:
+        self.begin(preserve_varip=preserve_varip, retained_values=retained_values)
 
     @staticmethod
     def _is_nominal_array(item: _HeapObject) -> bool:

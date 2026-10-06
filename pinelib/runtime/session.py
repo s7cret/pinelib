@@ -882,11 +882,15 @@ class RuntimeSession:
 
     def _begin_segments(self, frame):
         """Shared begin projection; it never executes an evaluator or callback."""
+        preserve_varip = frame.realtime or frame.defer_bar_commit
         for storage in self.series.values():
             if storage.initialized:
                 storage.begin()
-        self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.references.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
+        self.slots.begin(preserve_varip=preserve_varip)
+        self.references.begin(
+            preserve_varip=preserve_varip,
+            retained_values=self.slots.varip_values() if preserve_varip else (),
+        )
         self.visuals.begin()
         self.alerts.begin()
         self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
@@ -913,7 +917,10 @@ class RuntimeSession:
         for storage in self.series.values():
             storage.rollback()
         self.slots.rollback(preserve_varip=preserve_varip)
-        self.references.rollback(preserve_varip=preserve_varip)
+        self.references.rollback(
+            preserve_varip=preserve_varip,
+            retained_values=self.slots.varip_values() if preserve_varip else (),
+        )
         self.visuals.rollback()
         self.alerts.rollback()
         self.requests.finish(persist=False)
