@@ -968,9 +968,10 @@ class RuntimeSession:
             )
         self._validate_retained_attempt(transaction)
         frame = transaction.frame
-        if commit and (frame.defer_bar_commit or (frame.realtime and not frame.final_tick)):
+        if commit and frame.realtime and not frame.final_tick:
             # A provisional callback must also remain a strict public snapshot.
-            # Final publication commits working payloads as their new baselines.
+            # Confirmed deferred callbacks publish their ordinary working graph
+            # at BAR_COMMIT; no public checkpoint is permitted before that cut.
             try:
                 self.references._validate_closed_graph()
             except PineRuntimeError:

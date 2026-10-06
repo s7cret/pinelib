@@ -92,6 +92,37 @@ def test_finished_callback_detaches_mutable_varip_slot_alias(version, compact, f
 
 @pytest.mark.parametrize("version", [5, 6])
 @pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize("realtime", [False, True])
+def test_confirmed_deferred_ordinary_growth_slice_publishes_new_baseline(version, compact, realtime):
+    make = factory(version, compact)
+    runtime = make()
+    if realtime:
+        begin(runtime, 0, deferred=True).commit()
+        runtime.finalize_bar(0)
+    bar = int(realtime)
+    tx = begin(runtime, runtime.sequence + 1, bar=bar, realtime=realtime, deferred=True)
+    backing = array_new(tx.references, "backing", "int", 1, 7)
+    array_push(tx.references, backing, 8)
+    window = array_slice(tx.references, backing, 1, 2, "ordinary-window")
+    assert array_get(tx.references, window, 0) == 8
+    tx.commit()
+    with pytest.raises(PineRuntimeError, match="active|provisional"):
+        runtime.checkpoint()
+    runtime.finalize_bar(bar)
+    assert array_size(runtime.references, backing) == 2
+    assert array_get(runtime.references, window, 0) == 8
+    assert_ordinary_policy(runtime, backing, window)
+    restored = checkpoint_clone(runtime, make)
+    for current in (runtime, restored):
+        tx = begin(current, current.sequence + 1, bar=bar + 1, deferred=True)
+        assert array_size(tx.references, backing) == 2
+        assert array_get(tx.references, window, 0) == 8
+        tx.abort()
+        checkpoint_clone(current, make)
+
+
+@pytest.mark.parametrize("version", [5, 6])
+@pytest.mark.parametrize("compact", [False, True])
 def test_deferred_publication_detaches_callback_root_alias(version, compact):
     make = factory(version, compact)
     runtime = make()
