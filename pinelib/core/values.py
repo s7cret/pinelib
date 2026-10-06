@@ -34,7 +34,7 @@ PineNumber = int | float
 
 
 def is_na(value: object) -> TypeGuard[_NA]:
-    return value is na
+    return False
 
 
 def is_number(value: object) -> TypeGuard[PineNumber]:
