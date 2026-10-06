@@ -105,13 +105,15 @@ class RuntimeReferenceHeap:
     def contains(self, object_id: str) -> bool:
         return object_id in self._objects
 
-    def begin(self, *, preserve_varip: bool = False) -> None:
-        # A retained UDT keeps its identity, not all of its field mutations.
-        # Its referenced initial objects must remain addressable after rollback.
+    def begin(self, *, preserve_varip: bool = False, retained_values: tuple[object, ...] = ()) -> None:
+        # Retained roots keep allocation identity, not ordinary mutations.
+        # Constructor and working referents must remain addressable after rollback.
         retained: set[str] = set()
         if preserve_varip:
             pending = [item for item in self._objects.values() if item.working_varip
                        and (item.kind == "udt" or self._is_nominal_array(item))]
+            pending.extend(self._get(handle) for value in retained_values
+                           for handle in self._reference_handles(value))
             while pending:
                 item = pending.pop()
                 if item.object_id in retained:
@@ -143,8 +145,8 @@ class RuntimeReferenceHeap:
             item.committed_exists = True
             item.committed_varip = item.working_varip
 
-    def rollback(self, *, preserve_varip: bool = False) -> None:
-        self.begin(preserve_varip=preserve_varip)
+    def rollback(self, *, preserve_varip: bool = False, retained_values: tuple[object, ...] = ()) -> None:
+        self.begin(preserve_varip=preserve_varip, retained_values=retained_values)
 
     @staticmethod
     def _is_nominal_array(item: _HeapObject) -> bool:
@@ -791,6 +793,36 @@ class RuntimeReferenceHeap:
                     "committed storage reference points to a provisional object",
                     code=PL_REFERENCE_INVALID,
                 )
+
+    def validate_intrabar_storage(self, value: object) -> None:
+        """Admit retained roots only with restorable slice constructor bounds.
+
+        A new view over an ordinary backing's temporary growth cannot survive
+        rollback. Reject its binding before slot mutation, rather than promote
+        the backing or weaken public checkpoint admission. Both constructor and
+        working edges are checked, including views behind nested aliases/UDTs.
+        """
+        pending = [self._get(handle) for handle in self._reference_handles(to_portable(value))]
+        visited: set[str] = set()
+        while pending:
+            item = pending.pop()
+            if item.object_id in visited:
+                continue
+            visited.add(item.object_id)
+            for committed, payload in ((True, item.committed), (False, item.working)):
+                if item.kind == "array" and self._array_slice_descriptor(payload):
+                    self._materialize(ReferenceHandle(item.object_id, "array"),
+                                      committed=committed, active=set())
+                pending.extend(self._get(handle) for handle in self._reference_handles(payload))
+
+    def validate_working_graph(self) -> None:
+        """Validate the graph that publication would make committed."""
+        for item in self._objects.values():
+            for handle in self._reference_handles(item.working):
+                self._get(handle)
+            if item.kind == "array" and self._array_slice_descriptor(item.working):
+                self._materialize(ReferenceHandle(item.object_id, "array"),
+                                  committed=False, active=set())
 
     def _validate_closed_graph(self) -> None:
         for item in self._objects.values():

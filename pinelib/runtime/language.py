@@ -293,6 +293,7 @@ class LanguageExecutionMixin:
             if not self.session.slots.contains(key):
                 value = self._check_reference_binding(initializer(), dtype)
                 if mode == "varip" and not is_na(value):
+                    self.references.validate_intrabar_storage(value)
                     self.references.retain_intrabar(value)
                 self.set_slot(
                     key, value, owner="ast2python.reference.v1", varip=mode == "varip"
@@ -326,6 +327,7 @@ class LanguageExecutionMixin:
             self._validate_varip_binding_type(dtype)
         value = self._check_reference_binding(value, dtype)
         if mode == "varip" and not is_na(value):
+            self.references.validate_intrabar_storage(value)
             self.references.retain_intrabar(value)
         if mode != "default":
             self.set_slot(

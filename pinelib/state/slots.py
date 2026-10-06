@@ -98,6 +98,16 @@ class StateSlotRegistry:
     def rollback(self, *, preserve_varip: bool) -> None:
         self.begin(preserve_varip=preserve_varip)
 
+    def varip_values(self) -> tuple[object, ...]:
+        """Portable working roots retained through intrabar slot rollback."""
+        return tuple(to_portable(slot.working) for slot in self._slots.values() if slot.varip)
+
+    def detach_varip_values(self) -> None:
+        """Mutable callback aliases cannot change a completed callback's roots."""
+        for slot in self._slots.values():
+            if slot.varip:
+                slot.working = clone_runtime_value(slot.working)
+
     def commit(self) -> None:
         for slot in self._slots.values():
             slot.committed = clone_runtime_value(slot.working)

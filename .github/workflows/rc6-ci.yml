@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
@@ -50,6 +52,7 @@ jobs:
         run: python tools/forbidden_scan.py --root pinelib
 
   tests:
+    needs: quality
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     strategy:
@@ -59,6 +62,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -81,14 +86,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[test]"
       - name: Run complete pytest suite
-        run: python -m pytest
+        run: |
+          git rev-parse HEAD HEAD^{tree}
+          python -m pytest --collect-only -q > "$RUNNER_TEMP/pinelib-native-collection.log"
+          python -m pytest --junitxml="$RUNNER_TEMP/pinelib-native-tests.xml"
+      - name: Retain complete native test primaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pinelib-native-tests-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pinelib-native-collection.log
+            ${{ runner.temp }}/pinelib-native-tests.xml
+          if-no-files-found: error
+          retention-days: 7
 
   properties:
+    needs: tests
     name: Request properties (Python 3.13)
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
@@ -114,11 +135,14 @@ jobs:
         run: python -m tools.request_property_runner
 
   coverage:
+    needs: properties
     name: Coverage threshold (Python 3.13)
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
@@ -142,15 +166,29 @@ jobs:
           python -m pip install ".[test]"
       - name: Run complete pytest suite with coverage
         run: |
-          python -m coverage run -m pytest
+          python -m coverage run -m pytest --junitxml="$RUNNER_TEMP/pinelib-native-coverage.xml"
           python -m coverage report
+          python -m coverage json -o "$RUNNER_TEMP/pinelib-native-coverage.json"
+      - name: Retain complete coverage primaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pinelib-native-coverage-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pinelib-native-coverage.xml
+            ${{ runner.temp }}/pinelib-native-coverage.json
+          if-no-files-found: error
+          retention-days: 7
 
   package:
+    needs: coverage
     name: Package integrity (Python 3.13)
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:

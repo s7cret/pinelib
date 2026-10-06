@@ -44,12 +44,18 @@ class AbortBaseline:
         }
 
     def restore_rejected_attempt(self, runtime):
-        """Restore exact preattempt state when its witness exceeds the budget.
+        """Restore exact preattempt state when a callback attempt is rejected.
 
         Decode before updating any live owner. Keep provider/evaluator caches and
         owner identities; no callback or provider execution is involved.
         """
-        restored = runtime._decode_runtime_state(self.materialize(runtime))
+        restored = runtime._decode_runtime_state(
+            self.materialize(runtime), attempted=self.pending_bar_frame is not None)
+        # A confirmed unpublished callback can carry provisional constructors
+        # over temporary ordinary growth. Its actual working graph stays strict.
+        restored.references.validate_working_graph()
+        for value in restored.slots.varip_values():
+            restored.references.validate_intrabar_storage(value)
         runtime.series.clear()
         runtime.series.update(self.series)
         for name in ("slots", "references", "visuals", "alerts"):

@@ -558,6 +558,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
     ) -> None:
         self._check()
         self.references._decode_value(value)
+        if varip:
+            self.references.validate_intrabar_storage(value)
         slot = self.session.slots.register(state_id, owner, schema_version, varip=varip)
         slot.working = value
 
@@ -572,6 +574,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
     ) -> object:
         self._check()
         self.references._decode_value(initial)
+        if varip and not self.session.slots.contains(state_id):
+            self.references.validate_intrabar_storage(initial)
         value = self.session.slots.get_working(
             state_id,
             owner,
@@ -705,6 +709,7 @@ class RuntimeTransaction(LanguageExecutionMixin):
         # Prevent delegated preparation code from re-entering or mutating the
         # transaction while commit is being resolved.
         self.closed = True
+        self.session._validate_retained_attempt(self, commit=True)
         dispatcher = self.session.delegated_dispatcher
         try:
             if self._delegated_invocations and dispatcher is None:
@@ -870,7 +875,13 @@ class RuntimeSession:
         else:
             target = RuntimeState.HISTORICAL_CALLBACK
         self.machine.transition(target)
-        self._begin_segments(frame)
+        try:
+            self._begin_segments(frame)
+            self.references._validate_closed_graph()
+        except PineRuntimeError:
+            preattempt.restore_rejected_attempt(self)
+            self._abort_baseline = None
+            raise
         transaction = RuntimeTransaction(self, frame)
         self._active = transaction
         if values is not None:
@@ -882,11 +893,15 @@ class RuntimeSession:
 
     def _begin_segments(self, frame):
         """Shared begin projection; it never executes an evaluator or callback."""
+        preserve_varip = frame.realtime or frame.defer_bar_commit
         for storage in self.series.values():
             if storage.initialized:
                 storage.begin()
-        self.slots.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
-        self.references.begin(preserve_varip=frame.realtime or frame.defer_bar_commit)
+        self.slots.begin(preserve_varip=preserve_varip)
+        self.references.begin(
+            preserve_varip=preserve_varip,
+            retained_values=self.slots.varip_values() if preserve_varip else (),
+        )
         self.visuals.begin()
         self.alerts.begin()
         self.requests.begin(realtime=frame.realtime, sequence=frame.sequence)
@@ -913,10 +928,34 @@ class RuntimeSession:
         for storage in self.series.values():
             storage.rollback()
         self.slots.rollback(preserve_varip=preserve_varip)
-        self.references.rollback(preserve_varip=preserve_varip)
+        self.references.rollback(
+            preserve_varip=preserve_varip,
+            retained_values=self.slots.varip_values() if preserve_varip else (),
+        )
         self.visuals.rollback()
         self.alerts.rollback()
         self.requests.finish(persist=False)
+
+    def _reject_invalid_retained_attempt(self, transaction):
+        """Reject the entire attempt, preserving its previously admitted baseline."""
+        self._abort_baseline.restore_rejected_attempt(self)
+        self._abort_baseline = None
+        transaction.closed = True
+        transaction._delegated_invocations.clear()
+        transaction._delegated_outputs.clear()
+
+    def _validate_retained_attempt(self, transaction, *, commit=False):
+        # state() and set_slot() expose mutable values. UDT edges can also change
+        # after a root was admitted. Recheck the actual closure before a callback
+        # can publish retained effects or execute delegated preparation.
+        try:
+            for value in self.slots.varip_values():
+                self.references.validate_intrabar_storage(value)
+            if commit:
+                self.references.validate_working_graph()
+        except PineRuntimeError:
+            self._reject_invalid_retained_attempt(transaction)
+            raise
 
     def _finish(
         self,
@@ -929,7 +968,17 @@ class RuntimeSession:
             raise PineRuntimeError(
                 "transaction is not active", code=PL_RUNTIME_TRANSACTION_CLOSED
             )
+        self._validate_retained_attempt(transaction, commit=commit)
         frame = transaction.frame
+        if commit and frame.realtime and not frame.final_tick:
+            # A provisional callback must also remain a strict public snapshot.
+            # Confirmed deferred callbacks publish their ordinary working graph
+            # at BAR_COMMIT; no public checkpoint is permitted before that cut.
+            try:
+                self.references._validate_closed_graph()
+            except PineRuntimeError:
+                self._reject_invalid_retained_attempt(transaction)
+                raise
         delegated_outputs = tuple(transaction._delegated_outputs) if commit else ()
         transaction._delegated_outputs.clear()
         transaction._delegated_invocations.clear()
@@ -968,7 +1017,13 @@ class RuntimeSession:
                 else []
             )
             self._rollback_segments(frame, transaction._new_series)
+            try:
+                self.references._validate_closed_graph()
+            except PineRuntimeError:
+                self._reject_invalid_retained_attempt(transaction)
+                raise
             self.machine.transition(RuntimeState.ABORTED)
+        self.slots.detach_varip_values()
         self._active = None
         state_hash = (
             self.state_hash if self.commit_full_identity else self.semantic_state_hash
@@ -1119,6 +1174,7 @@ class RuntimeSession:
         )
         transaction = RuntimeTransaction(self, frame)
         transaction.closed = True
+        self._abort_baseline = AbortBaseline(self)
         self._active = transaction
         # Enter the normal transaction state before promoting the working data.
         self.machine.transition(
@@ -1412,12 +1468,15 @@ class RuntimeSession:
             self.identity_hash,
             {**record["successful_state"], "transcript": transcript.to_dict()},
         )
-        baseline._restore_checkpoint(saved_baseline.to_dict(), validate_children=False)
+        last = transcript.entries[-1] if transcript.entries else None
+        provisional = (last is not None and last["final_tick"]
+                       and last.get("control") == {"bar_commit_mode": "deferred", "boundary": "callback"})
+        baseline._restore_checkpoint(saved_baseline.to_dict(), validate_children=False,
+                                     provisional=provisional)
         established_mode = baseline._deferred_mode
         initial_mode = established_mode
         published_bar = baseline._last_published_bar
         previous = baseline
-        last = transcript.entries[-1] if transcript.entries else None
         provisional_bar = (
             last["bar_index"]
             if last is not None
@@ -1669,7 +1728,7 @@ class RuntimeSession:
             )
         return candidate
 
-    def _restore_checkpoint(self, data, *, validate_children):
+    def _restore_checkpoint(self, data, *, validate_children, provisional=False):
         if self._active is not None or self._pending_bar_frame is not None:
             raise PineRuntimeError("cannot restore an active or provisional bar")
         checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
@@ -1707,8 +1766,15 @@ class RuntimeSession:
                 key: value
                 for key, value in state.items()
                 if key not in ("transcript", "pending_abort")
-            }
+            }, attempted=provisional
         )
+        if provisional:
+            # Only the successful inner baseline of a proved deferred abort can
+            # use the existing private transient decoder. The outer checkpoint
+            # and the rollback result always use strict public admission.
+            candidate.references.validate_working_graph()
+            for value in candidate.slots.varip_values():
+                candidate.references.validate_intrabar_storage(value)
         new_sequence = candidate.sequence
         if (not new_transcript.entries and new_sequence != -1) or (
             new_transcript.entries
