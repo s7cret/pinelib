@@ -1,6 +1,6 @@
 # RC6 local reproducibility commands
 
-Run all commands from the source root with a selected Python 3.11–3.13 interpreter.
+Run all commands from the source root with an ordinary CPython 3.13 (`>=3.13,<3.14`) interpreter with the GIL enabled.
 
 ## Forbidden-source scan
 

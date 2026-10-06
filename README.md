@@ -1,5 +1,7 @@
 # PineLib 5.0.0rc6 — Stage 4 local implementation candidate
 
+The supported interpreter is ordinary CPython 3.13 (`>=3.13,<3.14`) with the GIL enabled. Free-threaded builds (`3.13t`), other Python minors, and other Python implementations are outside the supported runtime policy. This interpreter policy does not narrow functional requirements or acceptance gates.
+
 This source tree extends the Stage 3 direct runtime ABI with a canonical Request Engine. Request execution consumes immutable `openpine.marketdata.v2`-shaped snapshots through a strict provider protocol, binds every dataset to explicit semantic identity, and participates in the runtime transaction/checkpoint model.
 
 ## Implemented architecture

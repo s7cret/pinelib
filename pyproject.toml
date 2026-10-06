@@ -6,7 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "pinelib"
 version = "5.0.0rc6"
 description = "Version-exact transactional Pine runtime target"
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.14"
+classifiers = [
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
 license = "MIT"
 dependencies = ["tzdata==2026.2"]
 
