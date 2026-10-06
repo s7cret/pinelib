@@ -1,9 +1,12 @@
 """Retained graphs are admitted at callback cuts, including live Python aliases."""
 
+from copy import deepcopy
+
 import pytest
 
 from pinelib.errors import PineRuntimeError
-from pinelib.reference.array import array_get, array_new, array_push, array_size, array_slice
+from pinelib.state.checkpoint import RuntimeCheckpoint
+from pinelib.reference.array import array_get, array_new, array_pop, array_push, array_size, array_slice
 from tests.test_generic_varip_slot_reference_lifecycle import aliases, assert_ordinary_policy, checkpoint_clone
 from tests.test_varip_nominal_arrays import begin, counter, factory
 
@@ -119,6 +122,114 @@ def test_confirmed_deferred_ordinary_growth_slice_publishes_new_baseline(version
         assert array_get(tx.references, window, 0) == 8
         tx.abort()
         checkpoint_clone(current, make)
+
+
+def provisional_growth(version, compact):
+    make = factory(version, compact)
+    runtime = make()
+    tx = begin(runtime, 0, deferred=True)
+    backing = array_new(tx.references, "first-backing", "int", 1, 7)
+    array_push(tx.references, backing, 8)
+    window = array_slice(tx.references, backing, 1, 2, "first-window")
+    tx.commit()
+    return runtime, make, backing, window
+
+
+@pytest.mark.parametrize("version", [5, 6])
+@pytest.mark.parametrize("compact", [False, True])
+def test_confirmed_deferred_transient_baseline_replays_same_bar_callback_abort(version, compact):
+    runtime, make, backing, window = provisional_growth(version, compact)
+    tx = begin(runtime, runtime.sequence + 1, deferred=True)
+    assert not runtime.references.contains(window.object_id)
+    tx.abort()
+    restored = checkpoint_clone(runtime, make)
+    for current in (runtime, restored):
+        tx = begin(current, current.sequence + 1, deferred=True)
+        tx.commit()
+        current.finalize_bar(0)
+        checkpoint_clone(current, make)
+    assert runtime.checkpoint().to_dict() == restored.checkpoint().to_dict()
+
+
+@pytest.mark.parametrize("version", [5, 6])
+@pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize("corruption", ["plain_public_baseline", "inner_working_bounds"])
+def test_transient_abort_baseline_cannot_bypass_strict_public_or_working_admission(version, compact, corruption):
+    runtime, make, backing, window = provisional_growth(version, compact)
+    begin(runtime, runtime.sequence + 1, deferred=True).abort()
+    before = runtime.checkpoint().to_dict()
+    checkpoint_clone(runtime, make)
+    if corruption == "plain_public_baseline":
+        record = before["state"]["pending_abort"]
+        plain = RuntimeCheckpoint.seal(runtime.identity_hash,
+            {**record["successful_state"], "transcript": before["state"]["transcript"]})
+        target = make()
+        empty = target.checkpoint().to_dict()
+        with pytest.raises(PineRuntimeError, match="bounds"):
+            target.restore(plain.to_dict())
+        assert target.checkpoint().to_dict() == empty
+    else:
+        state = deepcopy(before["state"])
+        rows = state["pending_abort"]["successful_state"]["references"]["objects"]
+        row = next(row for row in rows if row["object_id"] == window.object_id)
+        row["working"]["$pinelib_array_slice"]["end"] = 99
+        forged = RuntimeCheckpoint.seal(runtime.identity_hash, state)
+        with pytest.raises(PineRuntimeError, match="bounds"):
+            runtime.restore(forged.to_dict())
+        assert runtime.checkpoint().to_dict() == before
+
+
+@pytest.mark.parametrize("version", [5, 6])
+@pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize("finish", ["commit", "abort"])
+def test_rejected_late_root_restores_prior_transient_confirmed_deferred_callback_atomically(version, compact, finish):
+    runtime, make, backing, window = provisional_growth(version, compact)
+    previous = runtime._state_json()
+    transcript = runtime.transcript.to_dict()
+    pending = runtime._pending_bar_frame
+    tx = begin(runtime, runtime.sequence + 1, deferred=True)
+    value = tx.state("aliases", owner="extension", schema_version="1", initial={"nested": []}, varip=True)
+    new_backing = array_new(tx.references, "late-backing", "int", 1, 7)
+    array_push(tx.references, new_backing, 8)
+    late = array_slice(tx.references, new_backing, 1, 2, "late-window")
+    value["nested"].append(late)
+    with pytest.raises(PineRuntimeError, match="bounds") as rejected:
+        getattr(tx, finish)()
+    assert rejected.value.code == "PL1611"
+    assert tx.closed and runtime._active is None
+    assert runtime._state_json() == previous
+    assert runtime.transcript.to_dict() == transcript
+    assert runtime._pending_bar_frame == pending
+    with pytest.raises(PineRuntimeError, match="active|provisional"):
+        runtime.checkpoint()
+    runtime.finalize_bar(0)
+    assert array_size(runtime.references, backing) == 2
+    assert array_get(runtime.references, window, 0) == 8
+    assert not runtime.references.contains(late.object_id)
+    checkpoint_clone(runtime, make)
+
+
+@pytest.mark.parametrize("version", [5, 6])
+@pytest.mark.parametrize("compact", [False, True])
+def test_confirmed_deferred_invalid_working_slice_rejects_before_publication(version, compact):
+    make = factory(version, compact)
+    runtime = make()
+    tx = begin(runtime, 0, deferred=True)
+    backing = array_new(tx.references, "backing", "int", 3, 7)
+    window = array_slice(tx.references, backing, 1, 3, "ordinary-window")
+    tx.commit()
+    runtime.finalize_bar(0)
+    previous = runtime.checkpoint().to_dict()
+    tx = begin(runtime, runtime.sequence + 1, bar=1, deferred=True)
+    array_pop(tx.references, backing)
+    with pytest.raises(PineRuntimeError, match="bounds"):
+        tx.commit()
+    assert tx.closed and runtime._active is None
+    assert runtime.checkpoint().to_dict() == previous
+    with pytest.raises(PineRuntimeError, match="provisional"):
+        runtime.finalize_bar(1)
+    assert array_get(runtime.references, window, 0) == 7
+    checkpoint_clone(runtime, make)
 
 
 @pytest.mark.parametrize("version", [5, 6])

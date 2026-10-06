@@ -815,6 +815,15 @@ class RuntimeReferenceHeap:
                                       committed=committed, active=set())
                 pending.extend(self._get(handle) for handle in self._reference_handles(payload))
 
+    def validate_working_graph(self) -> None:
+        """Validate the graph that publication would make committed."""
+        for item in self._objects.values():
+            for handle in self._reference_handles(item.working):
+                self._get(handle)
+            if item.kind == "array" and self._array_slice_descriptor(item.working):
+                self._materialize(ReferenceHandle(item.object_id, "array"),
+                                  committed=False, active=set())
+
     def _validate_closed_graph(self) -> None:
         for item in self._objects.values():
             for committed, payload in ((True, item.committed), (False, item.working)):

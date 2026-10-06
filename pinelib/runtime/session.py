@@ -709,7 +709,7 @@ class RuntimeTransaction(LanguageExecutionMixin):
         # Prevent delegated preparation code from re-entering or mutating the
         # transaction while commit is being resolved.
         self.closed = True
-        self.session._validate_retained_attempt(self)
+        self.session._validate_retained_attempt(self, commit=True)
         dispatcher = self.session.delegated_dispatcher
         try:
             if self._delegated_invocations and dispatcher is None:
@@ -944,13 +944,15 @@ class RuntimeSession:
         transaction._delegated_invocations.clear()
         transaction._delegated_outputs.clear()
 
-    def _validate_retained_attempt(self, transaction):
+    def _validate_retained_attempt(self, transaction, *, commit=False):
         # state() and set_slot() expose mutable values. UDT edges can also change
         # after a root was admitted. Recheck the actual closure before a callback
         # can publish retained effects or execute delegated preparation.
         try:
             for value in self.slots.varip_values():
                 self.references.validate_intrabar_storage(value)
+            if commit:
+                self.references.validate_working_graph()
         except PineRuntimeError:
             self._reject_invalid_retained_attempt(transaction)
             raise
@@ -966,7 +968,7 @@ class RuntimeSession:
             raise PineRuntimeError(
                 "transaction is not active", code=PL_RUNTIME_TRANSACTION_CLOSED
             )
-        self._validate_retained_attempt(transaction)
+        self._validate_retained_attempt(transaction, commit=commit)
         frame = transaction.frame
         if commit and frame.realtime and not frame.final_tick:
             # A provisional callback must also remain a strict public snapshot.
@@ -1466,12 +1468,15 @@ class RuntimeSession:
             self.identity_hash,
             {**record["successful_state"], "transcript": transcript.to_dict()},
         )
-        baseline._restore_checkpoint(saved_baseline.to_dict(), validate_children=False)
+        last = transcript.entries[-1] if transcript.entries else None
+        provisional = (last is not None and last["final_tick"]
+                       and last.get("control") == {"bar_commit_mode": "deferred", "boundary": "callback"})
+        baseline._restore_checkpoint(saved_baseline.to_dict(), validate_children=False,
+                                     provisional=provisional)
         established_mode = baseline._deferred_mode
         initial_mode = established_mode
         published_bar = baseline._last_published_bar
         previous = baseline
-        last = transcript.entries[-1] if transcript.entries else None
         provisional_bar = (
             last["bar_index"]
             if last is not None
@@ -1723,7 +1728,7 @@ class RuntimeSession:
             )
         return candidate
 
-    def _restore_checkpoint(self, data, *, validate_children):
+    def _restore_checkpoint(self, data, *, validate_children, provisional=False):
         if self._active is not None or self._pending_bar_frame is not None:
             raise PineRuntimeError("cannot restore an active or provisional bar")
         checkpoint = RuntimeCheckpoint.parse(data, self.identity_hash)
@@ -1761,8 +1766,15 @@ class RuntimeSession:
                 key: value
                 for key, value in state.items()
                 if key not in ("transcript", "pending_abort")
-            }
+            }, attempted=provisional
         )
+        if provisional:
+            # Only the successful inner baseline of a proved deferred abort can
+            # use the existing private transient decoder. The outer checkpoint
+            # and the rollback result always use strict public admission.
+            candidate.references.validate_working_graph()
+            for value in candidate.slots.varip_values():
+                candidate.references.validate_intrabar_storage(value)
         new_sequence = candidate.sequence
         if (not new_transcript.entries and new_sequence != -1) or (
             new_transcript.entries
