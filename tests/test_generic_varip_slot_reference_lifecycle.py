@@ -8,7 +8,7 @@ import json
 import pytest
 
 from pinelib.errors import PineRuntimeError
-from pinelib.reference.array import array_get, array_new, array_set, array_slice
+from pinelib.reference.array import array_get, array_new, array_push, array_set, array_size, array_slice
 from pinelib.state.checkpoint import to_portable
 from tests.test_varip_nominal_arrays import begin, counter, factory, increment, state
 
@@ -40,6 +40,56 @@ def assert_ordinary_policy(runtime, *handles):
     rows = {row["object_id"]: row for row in runtime.references.to_json()["objects"]}
     for handle in handles:
         assert "intrabar_persistence" not in rows[handle.object_id]
+
+
+@pytest.mark.parametrize("version", [5, 6])
+@pytest.mark.parametrize("compact", [False, True])
+@pytest.mark.parametrize("finish", ["abort", "retry_nonfinal_commit_next_begin"])
+@pytest.mark.parametrize("binding", ["set_new", "set_replace", "state_new"])
+def test_varip_slot_rejects_slice_outside_ordinary_constructor_baseline_atomically(version, compact, finish, binding):
+    make = factory(version, compact)
+    runtime = make()
+    tx = begin(runtime, 0)
+    backing = array_new(tx.references, "backing", "int", 1, 7)
+    if binding == "set_replace":
+        tx.set_slot("aliases", 7, owner="extension", varip=True)
+    tx.commit()
+    tx = begin(runtime, 1, bar=1, realtime=True, final=False)
+    array_push(tx.references, backing, 8)
+    window = array_slice(tx.references, backing, 1, 2, "window")
+    assert array_get(tx.references, window, 0) == 8
+    before = runtime.slots.to_json()
+    with pytest.raises(PineRuntimeError, match="bounds") as rejected:
+        if binding == "state_new":
+            tx.state("aliases", owner="extension", schema_version="1", initial={"nested": [window]}, varip=True)
+        else:
+            tx.set_slot("aliases", {"nested": [window]}, owner="extension", varip=True)
+    assert rejected.value.code == "PL1611"
+    assert runtime.slots.to_json() == before
+    assert_ordinary_policy(runtime, backing, window)
+    # Admission raises in the original callback before either finish path can
+    # persist the unsupported root. Abort that failed callback, then retry the
+    # nonfinal path with a view whose constructor fits the ordinary baseline.
+    tx.abort()
+    assert array_size(runtime.references, backing) == 1
+    assert array_get(runtime.references, backing, 0) == 7
+    assert not runtime.references.contains("window")
+    restored = checkpoint_clone(runtime, make)
+    assert array_get(restored.references, backing, 0) == 7
+    if finish == "retry_nonfinal_commit_next_begin":
+        for current in (runtime, restored):
+            tx = begin(current, 2, bar=1, realtime=True, final=False)
+            safe = array_slice(tx.references, backing, 0, 1, "safe-window")
+            tx.set_slot("aliases", {"nested": [safe]}, owner="extension", varip=True)
+            tx.commit()
+            checkpoint_clone(current, make)
+            tx = begin(current, 3, bar=1, realtime=True, final=False)
+            assert aliases(tx) == {"nested": [safe]}
+            assert array_get(tx.references, safe, 0) == 7
+            assert_ordinary_policy(current, backing, safe)
+            tx.abort()
+            checkpoint_clone(current, make)
+        assert restored.checkpoint().to_dict() == runtime.checkpoint().to_dict()
 
 
 @pytest.mark.parametrize("version", [5, 6])

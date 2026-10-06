@@ -558,6 +558,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
     ) -> None:
         self._check()
         self.references._decode_value(value)
+        if varip:
+            self.references.validate_intrabar_storage(value)
         slot = self.session.slots.register(state_id, owner, schema_version, varip=varip)
         slot.working = value
 
@@ -572,6 +574,8 @@ class RuntimeTransaction(LanguageExecutionMixin):
     ) -> object:
         self._check()
         self.references._decode_value(initial)
+        if varip and not self.session.slots.contains(state_id):
+            self.references.validate_intrabar_storage(initial)
         value = self.session.slots.get_working(
             state_id,
             owner,
