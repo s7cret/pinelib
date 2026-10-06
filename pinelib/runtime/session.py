@@ -709,6 +709,7 @@ class RuntimeTransaction(LanguageExecutionMixin):
         # Prevent delegated preparation code from re-entering or mutating the
         # transaction while commit is being resolved.
         self.closed = True
+        self.session._validate_retained_attempt(self)
         dispatcher = self.session.delegated_dispatcher
         try:
             if self._delegated_invocations and dispatcher is None:
@@ -874,7 +875,13 @@ class RuntimeSession:
         else:
             target = RuntimeState.HISTORICAL_CALLBACK
         self.machine.transition(target)
-        self._begin_segments(frame)
+        try:
+            self._begin_segments(frame)
+            self.references._validate_closed_graph()
+        except PineRuntimeError:
+            preattempt.restore_rejected_attempt(self)
+            self._abort_baseline = None
+            raise
         transaction = RuntimeTransaction(self, frame)
         self._active = transaction
         if values is not None:
@@ -929,6 +936,25 @@ class RuntimeSession:
         self.alerts.rollback()
         self.requests.finish(persist=False)
 
+    def _reject_invalid_retained_attempt(self, transaction):
+        """Reject the entire attempt, preserving its previously admitted baseline."""
+        self._abort_baseline.restore_rejected_attempt(self)
+        self._abort_baseline = None
+        transaction.closed = True
+        transaction._delegated_invocations.clear()
+        transaction._delegated_outputs.clear()
+
+    def _validate_retained_attempt(self, transaction):
+        # state() and set_slot() expose mutable values. UDT edges can also change
+        # after a root was admitted. Recheck the actual closure before a callback
+        # can publish retained effects or execute delegated preparation.
+        try:
+            for value in self.slots.varip_values():
+                self.references.validate_intrabar_storage(value)
+        except PineRuntimeError:
+            self._reject_invalid_retained_attempt(transaction)
+            raise
+
     def _finish(
         self,
         transaction: RuntimeTransaction,
@@ -940,7 +966,16 @@ class RuntimeSession:
             raise PineRuntimeError(
                 "transaction is not active", code=PL_RUNTIME_TRANSACTION_CLOSED
             )
+        self._validate_retained_attempt(transaction)
         frame = transaction.frame
+        if commit and (frame.defer_bar_commit or (frame.realtime and not frame.final_tick)):
+            # A provisional callback must also remain a strict public snapshot.
+            # Final publication commits working payloads as their new baselines.
+            try:
+                self.references._validate_closed_graph()
+            except PineRuntimeError:
+                self._reject_invalid_retained_attempt(transaction)
+                raise
         delegated_outputs = tuple(transaction._delegated_outputs) if commit else ()
         transaction._delegated_outputs.clear()
         transaction._delegated_invocations.clear()
@@ -979,7 +1014,13 @@ class RuntimeSession:
                 else []
             )
             self._rollback_segments(frame, transaction._new_series)
+            try:
+                self.references._validate_closed_graph()
+            except PineRuntimeError:
+                self._reject_invalid_retained_attempt(transaction)
+                raise
             self.machine.transition(RuntimeState.ABORTED)
+        self.slots.detach_varip_values()
         self._active = None
         state_hash = (
             self.state_hash if self.commit_full_identity else self.semantic_state_hash
@@ -1130,6 +1171,7 @@ class RuntimeSession:
         )
         transaction = RuntimeTransaction(self, frame)
         transaction.closed = True
+        self._abort_baseline = AbortBaseline(self)
         self._active = transaction
         # Enter the normal transaction state before promoting the working data.
         self.machine.transition(

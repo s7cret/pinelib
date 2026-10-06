@@ -44,7 +44,7 @@ class AbortBaseline:
         }
 
     def restore_rejected_attempt(self, runtime):
-        """Restore exact preattempt state when its witness exceeds the budget.
+        """Restore exact preattempt state when a callback attempt is rejected.
 
         Decode before updating any live owner. Keep provider/evaluator caches and
         owner identities; no callback or provider execution is involved.
