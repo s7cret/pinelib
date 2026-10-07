@@ -1249,6 +1249,36 @@ class RuntimeSession:
         self._preflight_checkpoint_input(data)
         self._restore_checkpoint(data, validate_children=True)
 
+    def validate_checkpoint_input(self, data: object) -> None:
+        """Apply the existing portable transport bound without decoding state.
+
+        This also bounds an enclosing owner's envelope before canonical hashing.
+        It is transport admission only; prepare_restore performs full admission.
+        """
+        self._preflight_checkpoint_input(data)
+
+    def prepare_restore(self, data: dict[str, object]) -> RuntimeSession:
+        """Fully admit a checkpoint into a detached runtime with this context.
+
+        Reuse the complete public restore decoder, including portable NA,
+        references, child requests, transcript and pending-abort proof checks.
+        Neither successful preparation nor rejection replaces live owner state.
+        The returned runtime is a local prepared owner, not another wire codec.
+        """
+        if self._active is not None or self._pending_bar_frame is not None:
+            raise PineRuntimeError("cannot prepare restore for an active or provisional bar")
+        self.validate_checkpoint_input(data)
+        candidate = RuntimeSession(
+            self.language, self.policies,
+            nominal_registry=self.nominal_registry,
+            inputs=self.inputs, instrument=self.instrument, timeframe=self.timeframe,
+            request_provider=self.requests.provider,
+            delegated_dispatcher=self.delegated_dispatcher,
+        )
+        candidate.commit_full_identity = self.commit_full_identity
+        candidate._restore_checkpoint(data, validate_children=True)
+        return candidate
+
     def _preflight_checkpoint_input(self, data):
         """Bound portable input before recursive canonical codecs inspect it."""
         limit = self.policies.resource.max_checkpoint_bytes
